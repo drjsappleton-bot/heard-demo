@@ -164,10 +164,19 @@ const EMPTY_DOC = () => ({ idx: [], pts: {} });
 function normDoc(d){ if (!d || typeof d !== "object") return null; if (!Array.isArray(d.idx)) d.idx = []; if (!d.pts || typeof d.pts !== "object") d.pts = {}; return d; }
 async function loadDoc(){
   if (bucket === "local") return normDoc(JSON.parse(localStorage.getItem(LS.localdb) || "null")) || EMPTY_DOC();
-  const r = await fetch(KV + bucket, { headers: { "Accept": "application/json" } });
+  const r = await fetch(KV + bucket + "?nocache=" + Date.now(), { cache: "no-store", headers: { "Accept": "application/json" } });
   if (r.status === 404) return null;
   if (!r.ok) throw new Error("read failed (" + r.status + ")");
   try { return normDoc(await r.json()); } catch (e) { return null; }
+}
+function mergeEntries(a, b){
+  const seen = {}, out = [];
+  for (const e of (a || []).concat(b || [])) {
+    const k = e.ts + "|" + e.text;
+    if (!seen[k]) { seen[k] = 1; out.push(e); }
+  }
+  out.sort((x, y) => x.ts - y.ts);
+  return out;
 }
 async function saveDoc(doc){
   if (bucket === "local") { localStorage.setItem(LS.localdb, JSON.stringify(doc)); return; }
@@ -323,7 +332,10 @@ async function renderPatient(){
   document.getElementById("tagline").textContent = "Patient";
   app().innerHTML = '<div class="card"><div class="empty">Loading…</div></div>';
   try { const doc = await loadDoc(); ptRec = doc ? doc.pts[route.id] : null; } catch (e) { ptRec = null; }
+  const cached = JSON.parse(localStorage.getItem("heard_cache_" + route.id) || "null");
+  if (!ptRec && cached) ptRec = cached;
   if (!ptRec) { app().innerHTML = '<div class="card"><div class="empty">Patient page not found (demo data may have expired).</div><button class="btn sub" onclick="goHome()">Home</button></div>'; return; }
+  if (cached) ptRec.entries = mergeEntries(ptRec.entries, cached.entries);
   localStorage.setItem(LS.myPatient, route.id);
   const drLink = link("/dr/" + route.id);
   const myLink = link("/p/" + route.id);
@@ -370,11 +382,16 @@ async function persistEntry(text){
   const entry = { text: text, ts: Date.now() };
   ptRec.entries.push(entry);
   renderEntries();
+  localStorage.setItem("heard_cache_" + route.id, JSON.stringify(ptRec));
   try {
     const doc = (await loadDoc()) || EMPTY_DOC();
     if (!doc.pts[route.id]) doc.pts[route.id] = ptRec;
-    else doc.pts[route.id].entries.push(entry);
+    // Always write the FULL local list merged with the server's, so a stale
+    // read can never erase earlier entries (each save is self-repairing).
+    doc.pts[route.id].entries = mergeEntries(doc.pts[route.id].entries, ptRec.entries);
     await saveDoc(doc);
+    ptRec.entries = doc.pts[route.id].entries;
+    renderEntries();
     m.textContent = "";
   }
   catch (e) { m.innerHTML = '<span class="err">Could not sync to server; kept on this device for now.</span>'; }
@@ -568,15 +585,16 @@ async function generate(){
   res.innerHTML = html;
   btn.disabled = false; btn.textContent = "Generate rounding summary";
 }
+function cleanQuote(q){ return String(q || "").replace(/^["“”'\s]+|["“”'\s]+$/g, ""); }
 function bucketHTML(title, cls, items){
   const lis = items.length
-    ? items.map(i => "<li>" + esc(i.text) + (i.quote && i.quote !== i.text ? "<q>“" + esc(i.quote) + "”</q>" : "") + "</li>").join("")
+    ? items.map(i => { const q = cleanQuote(i.quote); return "<li>" + esc(i.text) + (q && q !== i.text ? "<q>“" + esc(q) + "”</q>" : "") + "</li>"; }).join("")
     : '<li class="empty">None</li>';
   return '<div class="bucket ' + cls + '"><h3>' + title + '</h3><ul>' + lis + '</ul></div>';
 }
 function summaryMD(){
   const s = lastSummary; if (!s) return "";
-  const sec = (t, items) => "## " + t + "\n" + (items.length ? items.map(i => "- " + i.text + (i.quote && i.quote !== i.text ? "\n  - patient's words: \"" + i.quote + "\"" : "")).join("\n") : "- none") + "\n\n";
+  const sec = (t, items) => "## " + t + "\n" + (items.length ? items.map(i => { const q = cleanQuote(i.quote); return "- " + i.text + (q && q !== i.text ? "\n  - patient's words: \"" + q + "\"" : ""); }).join("\n") : "- none") + "\n\n";
   return "# Patient Concern Summary — " + drRec.last + ", " + drRec.first + " (Heard demo)\nGenerated: " + new Date().toLocaleString() + "\n\n" +
     sec("Potentially urgent (review first)", s.urgent) + sec("Physician / APP", s.md) + sec("Nursing", s.rn) + sec("Other / comfort", s.other) +
     "---\nPrototype demo. Not a medical record. Not for clinical use.\n";
