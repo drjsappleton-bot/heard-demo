@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Heard — Patient Concern Capture (Demo)</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<style>
+  :root {
+    --blue: #1f4e79; --blue-lt: #eaf1f8; --accent: #2e75b6;
+    --red: #b3261e; --red-lt: #fdecea;
+    --green: #1e7d46; --green-lt: #e8f5ee;
+    --amber: #9a6700; --amber-lt: #fff8e1;
+    --ink: #1a1d21; --mut: #5f6b76; --bg: #f4f6f8; --card: #ffffff; --line: #dde3e9;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--ink); min-height: 100vh; }
+  .wrap { max-width: 560px; margin: 0 auto; padding: 14px 14px 90px; }
+  header { text-align: center; padding: 10px 0 4px; }
+  header h1 { font-size: 22px; color: var(--blue); letter-spacing: .3px; cursor: pointer; }
+  header p { font-size: 12px; color: var(--mut); margin-top: 2px; }
+  .demo-banner { background: var(--amber-lt); color: var(--amber); border: 1px solid #e6d9a8; font-size: 11px; padding: 6px 10px; border-radius: 8px; text-align: center; margin: 10px 0; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px; margin-bottom: 12px; }
+  .hidden { display: none !important; }
+  h2.sec { font-size: 13px; text-transform: uppercase; letter-spacing: .8px; color: var(--mut); margin-bottom: 8px; }
+  .btn { display: block; width: 100%; padding: 14px; border: 0; border-radius: 12px; background: var(--blue); color: #fff; font-size: 16px; font-weight: 700; cursor: pointer; text-align: center; text-decoration: none; }
+  .btn.sub { background: var(--card); color: var(--blue); border: 1px solid var(--line); font-size: 14px; padding: 11px; font-weight: 600; }
+  .btn:disabled { opacity: .5; }
+  .btn + .btn { margin-top: 10px; }
+  input.txt { width: 100%; padding: 12px; border: 1px solid var(--line); border-radius: 10px; font-size: 15px; margin-bottom: 10px; }
+  .note { font-size: 12px; color: var(--mut); margin-top: 8px; text-align: center; }
+  .ok { color: var(--green); font-size: 12px; }
+  .err { color: var(--red); font-size: 12px; }
+
+  /* patient capture */
+  .privacy { display: flex; align-items: center; gap: 10px; justify-content: center; font-size: 13px; color: var(--mut); margin-bottom: 10px; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; background: #b7bfc7; }
+  .dot.live { background: var(--red); animation: pulse 1.2s infinite; }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .35; } }
+  .recbtn { display: block; margin: 0 auto; width: 116px; height: 116px; border-radius: 50%; border: 0; cursor: pointer;
+    background: radial-gradient(circle at 35% 30%, #3d86c8, var(--blue)); color: #fff; font-size: 14px; font-weight: 700;
+    box-shadow: 0 6px 18px rgba(31,78,121,.35); }
+  .recbtn.recording { background: radial-gradient(circle at 35% 30%, #e05a52, var(--red)); }
+  .recbtn .mic { font-size: 28px; display: block; margin-bottom: 3px; }
+  #liveText { min-height: 40px; margin-top: 12px; font-size: 15px; background: var(--blue-lt); border-radius: 10px; padding: 10px 12px; display: none; }
+  #liveText.show { display: block; }
+  .typebox { display: flex; gap: 8px; margin-top: 12px; }
+  .typebox input { flex: 1; padding: 11px 12px; border: 1px solid var(--line); border-radius: 10px; font-size: 15px; }
+  .typebox button { padding: 0 16px; border: 0; border-radius: 10px; background: var(--accent); color: #fff; font-weight: 600; cursor: pointer; }
+  .entry { border-left: 3px solid var(--accent); background: #fafcfe; padding: 9px 12px; border-radius: 0 10px 10px 0; margin-top: 8px; font-size: 14px; }
+  .entry time { display: block; font-size: 11px; color: var(--mut); margin-bottom: 2px; }
+  .qrbox { text-align: center; }
+  .qrbox .qr { display: inline-block; padding: 10px; background: #fff; border: 1px solid var(--line); border-radius: 12px; }
+  .linkline { font-size: 11px; color: var(--accent); word-break: break-all; margin-top: 8px; }
+
+  /* provider */
+  .ptrow { display: flex; justify-content: space-between; align-items: center; padding: 12px 4px; border-top: 1px solid var(--line); cursor: pointer; }
+  .ptrow:first-of-type { border-top: 0; }
+  .ptrow .nm { font-weight: 600; font-size: 15px; }
+  .ptrow .dt { font-size: 11px; color: var(--mut); }
+  .ptrow .arrow { color: var(--mut); }
+  .bucket { margin-top: 12px; }
+  .bucket h3 { font-size: 14px; padding: 8px 12px; border-radius: 10px 10px 0 0; color: #fff; }
+  .bucket ul { list-style: none; border: 1px solid var(--line); border-top: 0; border-radius: 0 0 10px 10px; }
+  .bucket li { padding: 10px 12px; font-size: 14px; border-top: 1px solid var(--line); }
+  .bucket li:first-child { border-top: 0; }
+  .bucket li q { display: block; font-size: 12px; color: var(--mut); font-style: italic; margin-top: 3px; }
+  .b-urgent h3 { background: var(--red); } .b-urgent ul { background: var(--red-lt); }
+  .b-md h3 { background: var(--blue); }
+  .b-rn h3 { background: var(--green); }
+  .b-other h3 { background: #6b7683; }
+  .empty { color: var(--mut); font-size: 13px; padding: 10px 4px; }
+  .exportrow { display: flex; gap: 8px; margin-top: 14px; }
+  .exportrow button { flex: 1; padding: 11px; border: 1px solid var(--line); background: var(--card); border-radius: 10px; font-size: 13px; font-weight: 600; color: var(--blue); cursor: pointer; }
+  .alertbar { background: var(--red); color: #fff; padding: 10px 14px; border-radius: 10px; font-size: 13px; font-weight: 600; margin-bottom: 10px; }
+  .topbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+  .topbar button, .topbar a { border: 1px solid var(--line); background: var(--card); border-radius: 8px; padding: 6px 12px; font-size: 12px; color: var(--mut); cursor: pointer; text-decoration: none; }
+  .spin { display: inline-block; width: 16px; height: 16px; border: 2px solid rgba(255,255,255,.4); border-top-color: #fff; border-radius: 50%; animation: rot .8s linear infinite; vertical-align: -3px; margin-right: 6px; }
+  @keyframes rot { to { transform: rotate(360deg); } }
+  details.settings summary { font-size: 12px; color: var(--mut); cursor: pointer; padding: 6px 2px; }
+  details.settings input { width: 100%; padding: 10px; border: 1px solid var(--line); border-radius: 8px; font-size: 13px; margin: 6px 0; }
+  details.settings .row { display: flex; gap: 8px; flex-wrap: wrap; }
+  details.settings button { padding: 8px 12px; border: 1px solid var(--line); background: var(--card); border-radius: 8px; font-size: 12px; cursor: pointer; }
+
+  /* PIN modal */
+  .pin-overlay { position: fixed; inset: 0; background: rgba(20,28,36,.6); display: flex; align-items: center; justify-content: center; z-index: 50; }
+  .pin-card { background: var(--card); border-radius: 16px; padding: 22px 24px 18px; width: 290px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,.3); }
+  .pin-card h3 { color: var(--blue); font-size: 16px; margin-bottom: 4px; }
+  .pin-card .sub { font-size: 11px; color: var(--mut); margin-bottom: 14px; }
+  .pin-dots { display: flex; justify-content: center; gap: 14px; margin-bottom: 16px; }
+  .pin-dots span { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--blue); }
+  .pin-dots span.fill { background: var(--blue); }
+  .pin-pad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .pin-pad button { padding: 14px 0; font-size: 20px; font-weight: 600; border: 1px solid var(--line); border-radius: 12px; background: #fafbfc; cursor: pointer; }
+  .pin-pad button.aux { font-size: 14px; color: var(--mut); }
+  .pin-err { color: var(--red); font-size: 12px; min-height: 16px; margin-top: 10px; }
+  .shake { animation: shake .35s; }
+  @keyframes shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-8px)} 75%{transform:translateX(8px)} }
+  footer { text-align: center; font-size: 10px; color: var(--mut); padding: 16px 10px; }
+
+  /* ===== warm landing (hero) ===== */
+  :root { --teal: #12807c; --teal-deep: #0b5f5c; --coral: #e8735a; --coral-deep: #d45f47; --cream: #fdf8f3; }
+  .hero { background: linear-gradient(150deg, var(--teal) 0%, var(--teal-deep) 78%); border-radius: 22px; padding: 34px 22px 30px; text-align: center; color: #fff; margin-bottom: 16px; box-shadow: 0 10px 26px rgba(11,95,92,.28); }
+  .hero .mark { width: 74px; height: 74px; margin: 0 auto 12px; background: rgba(255,255,255,.14); border-radius: 50%; display: flex; align-items: center; justify-content: center; }
+  .hero h1 { font-size: 34px; letter-spacing: .5px; font-weight: 800; }
+  .hero .tag { font-size: 15px; margin-top: 8px; opacity: .95; line-height: 1.45; font-weight: 500; }
+  .hero .tagsub { font-size: 12px; margin-top: 10px; opacity: .75; }
+  .choice { background: var(--cream); border: 1px solid #efe3d8; border-radius: 18px; padding: 18px; margin-bottom: 12px; }
+  .choice h2 { font-size: 17px; color: var(--teal-deep); margin-bottom: 4px; }
+  .choice p { font-size: 13px; color: var(--mut); margin-bottom: 12px; line-height: 1.4; }
+  .btn.coral { background: linear-gradient(150deg, var(--coral), var(--coral-deep)); border-radius: 14px; }
+  .btn.teal { background: linear-gradient(150deg, var(--teal), var(--teal-deep)); border-radius: 14px; }
+  .choice input.txt { border-radius: 12px; background: #fff; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header id="hdr">
+    <h1 onclick="goHome()">Heard</h1>
+    <p id="tagline">Patient-controlled concern capture &mdash; demo</p>
+  </header>
+  <div class="demo-banner">DEMO ONLY &mdash; not a medical device, no real-time alerting, not HIPAA infrastructure. Do not enter real patient information. Use your call light for urgent needs.</div>
+
+  <div id="app"></div>
+
+  <!-- PIN modal -->
+  <div id="pinOverlay" class="pin-overlay hidden">
+    <div class="pin-card" id="pinCard">
+      <h3>Provider access</h3>
+      <div class="sub">Enter your 4-digit provider PIN <span id="pinHint">(demo default: 1111)</span></div>
+      <div class="pin-dots"><span id="d0"></span><span id="d1"></span><span id="d2"></span><span id="d3"></span></div>
+      <div class="pin-pad">
+        <button onclick="pinKey('1')">1</button><button onclick="pinKey('2')">2</button><button onclick="pinKey('3')">3</button>
+        <button onclick="pinKey('4')">4</button><button onclick="pinKey('5')">5</button><button onclick="pinKey('6')">6</button>
+        <button onclick="pinKey('7')">7</button><button onclick="pinKey('8')">8</button><button onclick="pinKey('9')">9</button>
+        <button class="aux" onclick="pinCancel()">Cancel</button><button onclick="pinKey('0')">0</button><button class="aux" onclick="pinBack()">&#9003;</button>
+      </div>
+      <div class="pin-err" id="pinErr"></div>
+    </div>
+  </div>
+
+  <footer>Prototype for concept demonstration only. Demo data is stored in a shared demo database and expires automatically. Not for clinical use.</footer>
+</div>
+
+<script>
+"use strict";
+/* ================= config / storage ================= */
+const KV = "https://jsonblob.com/api/jsonBlob/";
+const LS = {
+  bucket: "heard_bucket_v2", pin: "heard_pin", key: "heard_apikey",
+  myPatient: "heard_my_patient", localdb: "heard_localdb"
+};
+let bucket = null;       // current site id ("local" = single-device mode)
+let route = {};          // parsed hash
+let pinAfter = null;     // route to go to after PIN success
+
+function baseURL(){ return location.origin === "null" ? location.href.split("#")[0] : location.origin + location.pathname; }
+function link(path){ return baseURL() + "#/b/" + bucket + path; }
+function rnd(n){ let s = ""; const c = "abcdefghjkmnpqrstuvwxyz23456789"; for (let i=0;i<n;i++) s += c[Math.floor(Math.random()*c.length)]; return s; }
+function esc(s){ return String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+
+/* ================= data layer (jsonblob.com or local) ================= */
+const EMPTY_DOC = () => ({ idx: [], pts: {} });
+function normDoc(d){ if (!d || typeof d !== "object") return null; if (!Array.isArray(d.idx)) d.idx = []; if (!d.pts || typeof d.pts !== "object") d.pts = {}; return d; }
+async function loadDoc(){
+  if (bucket === "local") return normDoc(JSON.parse(localStorage.getItem(LS.localdb) || "null")) || EMPTY_DOC();
+  const r = await fetch(KV + bucket, { headers: { "Accept": "application/json" } });
+  if (r.status === 404) return null;
+  if (!r.ok) throw new Error("read failed (" + r.status + ")");
+  try { return normDoc(await r.json()); } catch (e) { return null; }
+}
+async function saveDoc(doc){
+  if (bucket === "local") { localStorage.setItem(LS.localdb, JSON.stringify(doc)); return; }
+  const r = await fetch(KV + bucket, { method: "PUT", headers: { "Content-Type": "application/json", "Accept": "application/json" }, body: JSON.stringify(doc) });
+  if (!r.ok) throw new Error("write failed (" + r.status + ")");
+}
+async function createSite(){
+  const r = await fetch("https://jsonblob.com/api/jsonBlob", { method: "POST", headers: { "Content-Type": "application/json", "Accept": "application/json" }, body: JSON.stringify(EMPTY_DOC()) });
+  if (!r.ok) throw new Error("Could not create demo site (" + r.status + ")");
+  const loc = r.headers.get("Location") || r.headers.get("location");
+  if (!loc) throw new Error("The demo database did not return a site ID (browser blocked the Location header). Use single-device mode instead.");
+  const id = loc.split("/").pop().trim();
+  if (!id) throw new Error("Could not read new site ID.");
+  return id;
+}
+
+/* ================= routing ================= */
+function parseHash(){
+  const h = location.hash.replace(/^#\/?/, "");
+  const p = h.split("/").filter(Boolean);
+  if (p[0] === "b" && p[1]) {
+    bucket = p[1];
+    localStorage.setItem(LS.bucket, bucket);
+    if (p[2] === "p" && p[3]) return { v: "patient", id: p[3] };
+    if (p[2] === "dr" && p[3]) return { v: "drPatient", id: p[3] };
+    if (p[2] === "dr") return { v: "drHome" };
+    return { v: "landing" };
+  }
+  bucket = localStorage.getItem(LS.bucket);
+  return { v: bucket ? "landing" : "setup" };
+}
+function goHome(){ location.hash = bucket ? "#/b/" + bucket : "#/"; }
+window.addEventListener("hashchange", render);
+
+/* ================= PIN ================= */
+let pinBuf = "";
+function getPin(){ return localStorage.getItem(LS.pin) || "1111"; }
+function unlocked(){ return sessionStorage.getItem("heard_unlocked") === "1"; }
+function requirePin(nextRoute){
+  pinAfter = nextRoute; pinBuf = "";
+  renderPinDots();
+  document.getElementById("pinErr").textContent = "";
+  document.getElementById("pinHint").style.display = (getPin() === "1111") ? "inline" : "none";
+  document.getElementById("pinOverlay").classList.remove("hidden");
+}
+function renderPinDots(){ for (let i=0;i<4;i++) document.getElementById("d"+i).classList.toggle("fill", i < pinBuf.length); }
+function pinKey(k){ if (pinBuf.length >= 4) return; pinBuf += k; renderPinDots(); if (pinBuf.length === 4) setTimeout(checkPin, 120); }
+function pinBack(){ pinBuf = pinBuf.slice(0,-1); renderPinDots(); document.getElementById("pinErr").textContent = ""; }
+function pinCancel(){ document.getElementById("pinOverlay").classList.add("hidden"); goHome(); }
+function checkPin(){
+  if (pinBuf === getPin()) {
+    sessionStorage.setItem("heard_unlocked", "1");
+    document.getElementById("pinOverlay").classList.add("hidden");
+    render();
+  } else {
+    const c = document.getElementById("pinCard");
+    c.classList.remove("shake"); void c.offsetWidth; c.classList.add("shake");
+    document.getElementById("pinErr").textContent = "Incorrect PIN";
+    pinBuf = ""; renderPinDots();
+  }
+}
+function lockProvider(){ sessionStorage.removeItem("heard_unlocked"); goHome(); }
+
+/* ================= render ================= */
+const app = () => document.getElementById("app");
+async function render(){
+  stopUI(true);
+  document.getElementById("hdr").classList.remove("hidden");
+  route = parseHash();
+  if ((route.v === "drHome" || route.v === "drPatient") && !unlocked()) { app().innerHTML = '<div class="card"><div class="empty">Provider access requires PIN.</div></div>'; requirePin(route); return; }
+  if (route.v === "setup") return renderSetup();
+  if (route.v === "landing") return renderLanding();
+  if (route.v === "patient") return renderPatient();
+  if (route.v === "drHome") return renderDrHome();
+  if (route.v === "drPatient") return renderDrPatient();
+}
+
+/* ---------- setup (first run) ---------- */
+function renderSetup(){
+  document.getElementById("tagline").textContent = "Demo site setup";
+  app().innerHTML =
+    '<div class="card"><h2 class="sec">Create your demo site</h2>' +
+    '<p style="font-size:14px;margin-bottom:10px">One-time setup. This creates a free shared demo database (jsonblob.com) so patient and provider phones can talk to each other. No account needed. Links and QR codes will carry your site ID automatically.</p>' +
+    '<button class="btn" onclick="doSetup()">Create demo site</button>' +
+    '<div class="note" id="suMsg"></div></div>' +
+    '<div class="card"><h2 class="sec">Or</h2>' +
+    '<button class="btn sub" onclick="location.hash=\'#/b/local\'">Single-device mode (no internet database)</button>' +
+    '<div class="note">Patient and provider views on this one device only.</div></div>';
+}
+async function doSetup(){
+  const msg = document.getElementById("suMsg");
+  msg.textContent = "Creating…";
+  try {
+    const b = await createSite();
+    localStorage.setItem(LS.bucket, b);
+    location.hash = "#/b/" + b;
+  } catch (e) { msg.innerHTML = '<span class="err">' + esc(e.message) + ' — you can still use single-device mode below.</span>'; }
+}
+
+/* ---------- landing ---------- */
+const LOGO_SVG =
+  '<svg width="44" height="44" viewBox="0 0 44 44" xmlns="http://www.w3.org/2000/svg" fill="none">' +
+  '<rect x="4" y="16" width="4.5" height="12" rx="2.25" fill="#ffffff" opacity=".75"/>' +
+  '<rect x="12" y="10" width="4.5" height="24" rx="2.25" fill="#ffffff" opacity=".9"/>' +
+  '<rect x="20" y="4" width="4.5" height="36" rx="2.25" fill="#ffffff"/>' +
+  '<rect x="28" y="10" width="4.5" height="24" rx="2.25" fill="#ffffff" opacity=".9"/>' +
+  '<rect x="36" y="16" width="4.5" height="12" rx="2.25" fill="#ffffff" opacity=".75"/>' +
+  '</svg>';
+function renderLanding(){
+  document.getElementById("hdr").classList.add("hidden");
+  const mine = localStorage.getItem(LS.myPatient);
+  app().innerHTML =
+    '<div class="hero">' +
+    '<div class="mark">' + LOGO_SVG + '</div>' +
+    '<h1>Heard</h1>' +
+    '<div class="tag">Your care team is listening, even between visits.</div>' +
+    '<div class="tagsub">Speak your questions and concerns any time. Your care team sees them at their next visit.</div>' +
+    '</div>' +
+    '<div class="choice"><h2>I\'m a patient</h2>' +
+    '<p>Sign in once to get your personal page. Everything you capture is under your control.</p>' +
+    '<input class="txt" id="npFirst" placeholder="First name">' +
+    '<input class="txt" id="npLast" placeholder="Last name">' +
+    '<button class="btn coral" onclick="newPatient()">Sign in &amp; get my link</button>' +
+    '<div class="note" id="npMsg"></div>' +
+    (mine ? '<button class="btn sub" style="margin-top:10px" onclick="location.hash=\'#/b/\'+bucket+\'/p/\'+localStorage.getItem(LS.myPatient)">Return to my patient page</button>' : "") +
+    '</div>' +
+    '<div class="choice"><h2>I\'m a provider</h2>' +
+    '<p>See every patient\'s questions and concerns, sorted by role, ready for rounds.</p>' +
+    '<button class="btn teal" onclick="location.hash=\'#/b/\'+bucket+\'/dr\'">Provider sign in</button>' +
+    '<div class="note">Requires your provider PIN.</div></div>' +
+    (bucket === "local" ? '<div class="note">Single-device mode: everything stays on this phone.</div>' : '<div class="note">Demo site ID: ' + esc(bucket) + '</div>');
+}
+async function newPatient(){
+  const f = document.getElementById("npFirst").value.trim();
+  const l = document.getElementById("npLast").value.trim();
+  const msg = document.getElementById("npMsg");
+  if (!f || !l) { msg.innerHTML = '<span class="err">First and last name required.</span>'; return; }
+  msg.textContent = "Creating your page…";
+  const id = rnd(6);
+  try {
+    const doc = (await loadDoc()) || EMPTY_DOC();
+    doc.pts[id] = { first: f, last: l, created: Date.now(), entries: [] };
+    doc.idx.push({ id: id, first: f, last: l, created: Date.now() });
+    await saveDoc(doc);
+    localStorage.setItem(LS.myPatient, id);
+    location.hash = "#/b/" + bucket + "/p/" + id;
+  } catch (e) { msg.innerHTML = '<span class="err">' + esc(e.message) + '</span>'; }
+}
+
+/* ---------- patient page ---------- */
+let ptRec = null;
+async function renderPatient(){
+  document.getElementById("tagline").textContent = "Patient";
+  app().innerHTML = '<div class="card"><div class="empty">Loading…</div></div>';
+  try { const doc = await loadDoc(); ptRec = doc ? doc.pts[route.id] : null; } catch (e) { ptRec = null; }
+  if (!ptRec) { app().innerHTML = '<div class="card"><div class="empty">Patient page not found (demo data may have expired).</div><button class="btn sub" onclick="goHome()">Home</button></div>'; return; }
+  localStorage.setItem(LS.myPatient, route.id);
+  const drLink = link("/dr/" + route.id);
+  const myLink = link("/p/" + route.id);
+  app().innerHTML =
+    '<div class="card"><h2 class="sec">Hello, ' + esc(ptRec.first) + '</h2>' +
+    '<div class="privacy"><span id="privDot" class="dot"></span><span id="privLabel">Microphone off &mdash; nothing is being recorded</span></div>' +
+    '<button id="recBtn" class="recbtn" onclick="toggleRec()"><span class="mic">&#127908;</span><span id="recLabel">Tap to speak</span></button>' +
+    '<div class="note">Tap, say your question or concern, tap again to stop. Your care team will see it at their next visit.</div>' +
+    '<div id="liveText"></div>' +
+    '<div class="typebox"><input id="typeInput" type="text" placeholder="Or type a question / concern&hellip;" onkeydown="if(event.key===\'Enter\')addTyped()"><button onclick="addTyped()">Add</button></div>' +
+    '<div id="capMsg" class="note"></div></div>' +
+    '<div class="card"><h2 class="sec">Captured so far (<span id="count">' + ptRec.entries.length + '</span>)</h2><div id="entries"></div></div>' +
+    '<div class="card qrbox"><h2 class="sec">For your care team</h2><div class="qr" id="qrDr"></div>' +
+    '<div class="note">A provider entering the room can scan this to open your provider view (their PIN required).</div></div>' +
+    '<div class="card"><h2 class="sec">Demo links (clickable)</h2>' +
+    '<a class="btn sub" href="' + esc(myLink) + '">&#128100; My patient page &mdash; bookmark this</a>' +
+    '<a class="btn sub" style="margin-top:10px" href="' + esc(drLink) + '" target="_blank" rel="noopener">&#129658; Provider view for this patient &mdash; opens new tab, PIN required</a>' +
+    '<button class="btn sub" style="margin-top:10px" onclick="copyText(' + JSON.stringify(JSON.stringify(myLink)) + ')">Copy patient link</button>' +
+    '<button class="btn sub" style="margin-top:10px" onclick="copyText(' + JSON.stringify(JSON.stringify(drLink)) + ')">Copy provider link</button>' +
+    '<div class="linkline">' + esc(myLink) + '</div></div>';
+  renderEntries();
+  makeQR("qrDr", drLink);
+}
+function makeQR(elId, text){
+  const el = document.getElementById(elId);
+  if (typeof QRCode !== "undefined") new QRCode(el, { text: text, width: 150, height: 150, correctLevel: QRCode.CorrectLevel.M });
+  else el.innerHTML = '<div class="linkline">' + esc(text) + '</div>';
+}
+function copyText(jsonStr){
+  const t = JSON.parse(jsonStr);
+  if (navigator.clipboard) navigator.clipboard.writeText(t).then(() => alert("Link copied."));
+  else prompt("Copy this link:", t);
+}
+function renderEntries(){
+  const box = document.getElementById("entries"); if (!box) return;
+  const a = ptRec.entries;
+  document.getElementById("count").textContent = a.length;
+  box.innerHTML = a.length
+    ? a.map(e => '<div class="entry"><time>' + new Date(e.ts).toLocaleString() + '</time>' + esc(e.text) + '</div>').join("")
+    : '<div class="empty">Nothing captured yet.</div>';
+}
+async function persistEntry(text){
+  const m = document.getElementById("capMsg");
+  const entry = { text: text, ts: Date.now() };
+  ptRec.entries.push(entry);
+  renderEntries();
+  try {
+    const doc = (await loadDoc()) || EMPTY_DOC();
+    if (!doc.pts[route.id]) doc.pts[route.id] = ptRec;
+    else doc.pts[route.id].entries.push(entry);
+    await saveDoc(doc);
+    m.textContent = "";
+  }
+  catch (e) { m.innerHTML = '<span class="err">Could not sync to server; kept on this device for now.</span>'; }
+}
+function addTyped(){
+  const inp = document.getElementById("typeInput");
+  const t = inp.value.trim(); if (!t) return;
+  inp.value = ""; persistEntry(t);
+}
+
+/* speech */
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+let rec = null, recording = false, finalBuf = "", lastSaved = "";
+function toggleRec(){
+  if (!SR) { alert("Live speech-to-text isn't supported in this browser; please type instead."); return; }
+  recording ? stopRec() : startRec();
+}
+function startRec(){
+  finalBuf = "";
+  rec = new SR();
+  rec.continuous = true; rec.interimResults = true; rec.lang = "en-US";
+  rec.onresult = (e) => {
+    let interim = "";
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      if (e.results[i].isFinal) finalBuf += e.results[i][0].transcript + " ";
+      else interim += e.results[i][0].transcript;
+    }
+    const lt = document.getElementById("liveText");
+    if (lt) { lt.classList.add("show"); lt.textContent = (finalBuf + interim).trim() || "Listening…"; }
+  };
+  rec.onerror = (e) => { stopUI(); if (e.error === "not-allowed") alert("Microphone permission denied. Allow mic access or type instead."); };
+  rec.onend = () => { if (recording) { saveCapture(); stopUI(); } };
+  try { rec.start(); } catch (e) { alert("Could not start microphone: " + e.message); return; }
+  recording = true;
+  const b = document.getElementById("recBtn");
+  if (b) { b.classList.add("recording"); document.getElementById("recLabel").textContent = "Tap to stop";
+    document.getElementById("privDot").classList.add("live");
+    document.getElementById("privLabel").textContent = "Recording — you are in control";
+    const lt = document.getElementById("liveText"); lt.classList.add("show"); lt.textContent = "Listening…"; }
+}
+function stopRec(){ recording = false; try { rec.stop(); } catch(e){} saveCapture(); stopUI(); }
+function stopUI(silent){
+  recording = false;
+  if (rec) { try { rec.stop(); } catch(e){} }
+  const b = document.getElementById("recBtn");
+  if (b && !silent) {
+    b.classList.remove("recording");
+    document.getElementById("recLabel").textContent = "Tap to speak";
+    document.getElementById("privDot").classList.remove("live");
+    document.getElementById("privLabel").textContent = "Microphone off — nothing is being recorded";
+    setTimeout(() => { const lt = document.getElementById("liveText"); if (lt) { lt.classList.remove("show"); lt.textContent = ""; } }, 1200);
+  }
+}
+function saveCapture(){
+  const t = finalBuf.trim(); finalBuf = "";
+  if (!t || t === lastSaved) return;
+  lastSaved = t; persistEntry(t);
+}
+
+/* ---------- provider home ---------- */
+async function renderDrHome(){
+  document.getElementById("tagline").textContent = "Provider";
+  app().innerHTML =
+    '<div class="topbar"><span style="font-size:13px;font-weight:600;color:var(--blue)">Patient list</span><button onclick="lockProvider()">&#128274; Lock</button></div>' +
+    '<div class="card" id="ptList"><div class="empty">Loading…</div></div>' +
+    '<div class="card"><h2 class="sec">Open by patient code</h2>' +
+    '<div class="typebox"><input id="ptCode" placeholder="6-character code (e.g. from QR link)"><button onclick="openByCode()">Open</button></div></div>' +
+    settingsHTML();
+  wireSettings();
+  let idx = [];
+  try { const doc = await loadDoc(); idx = doc ? doc.idx : []; } catch (e) { document.getElementById("ptList").innerHTML = '<div class="empty err">Could not load patient list: ' + esc(e.message) + '</div>'; return; }
+  const box = document.getElementById("ptList");
+  box.innerHTML = idx.length
+    ? idx.slice().reverse().map(p =>
+        '<div class="ptrow" onclick="location.hash=\'#/b/\'+bucket+\'/dr/' + p.id + '\'">' +
+        '<div><div class="nm">' + esc(p.last) + ', ' + esc(p.first) + '</div><div class="dt">Signed in ' + new Date(p.created).toLocaleString() + ' &middot; code ' + p.id + '</div></div>' +
+        '<span class="arrow">&#8250;</span></div>').join("")
+    : '<div class="empty">No patients have signed in yet. New patients sign in from the landing page.</div>';
+}
+function openByCode(){
+  const c = document.getElementById("ptCode").value.trim().toLowerCase();
+  if (c) location.hash = "#/b/" + bucket + "/dr/" + c;
+}
+
+/* ---------- provider: single patient ---------- */
+let drRec = null, lastSummary = null;
+async function renderDrPatient(){
+  document.getElementById("tagline").textContent = "Provider";
+  app().innerHTML = '<div class="card"><div class="empty">Loading…</div></div>';
+  try { const doc = await loadDoc(); drRec = doc ? doc.pts[route.id] : null; } catch (e) { drRec = null; }
+  if (!drRec) { app().innerHTML = '<div class="card"><div class="empty">Patient not found (demo data may have expired).</div><button class="btn sub" onclick="location.hash=\'#/b/\'+bucket+\'/dr\'">Back to list</button></div>'; return; }
+  app().innerHTML =
+    '<div class="topbar"><a href="#/b/' + bucket + '/dr">&#8249; All patients</a><button onclick="lockProvider()">&#128274; Lock</button></div>' +
+    '<div class="card"><h2 class="sec">Patient</h2><div class="nm" style="font-size:17px;font-weight:700">' + esc(drRec.last) + ', ' + esc(drRec.first) + '</div>' +
+    '<div class="dt" style="font-size:12px;color:var(--mut)">' + drRec.entries.length + ' captured item(s) &middot; signed in ' + new Date(drRec.created).toLocaleString() + '</div>' +
+    '<button id="genBtn" class="btn" style="margin-top:12px" onclick="generate()">Generate rounding summary</button>' +
+    '<div class="note" id="modeNote"></div></div>' +
+    '<div id="results"></div>' + settingsHTML();
+  wireSettings();
+  updateModeNote();
+}
+function settingsHTML(){
+  return '<div class="card"><details class="settings"><summary>Settings &mdash; AI mode, PIN</summary>' +
+    '<input id="apiKey" type="password" placeholder="Anthropic API key (sk-ant-...) — blank = offline keyword mode">' +
+    '<div class="row"><button onclick="saveKey()">Save key</button><button onclick="clearKey()">Remove key</button></div><div id="keyStatus"></div>' +
+    '<input id="newPin" type="tel" inputmode="numeric" maxlength="4" placeholder="New 4-digit provider PIN (this device)">' +
+    '<div class="row"><button onclick="changePin()">Change PIN</button></div><div id="pinStatus"></div>' +
+    '</details></div>';
+}
+function wireSettings(){
+  const k = localStorage.getItem(LS.key);
+  if (k && document.getElementById("apiKey")) document.getElementById("apiKey").value = k;
+}
+function saveKey(){
+  const k = document.getElementById("apiKey").value.trim();
+  if (!k) { document.getElementById("keyStatus").innerHTML = '<span class="err">No key entered.</span>'; return; }
+  localStorage.setItem(LS.key, k);
+  document.getElementById("keyStatus").innerHTML = '<span class="ok">Key saved on this device. AI mode active.</span>';
+  updateModeNote();
+}
+function clearKey(){
+  localStorage.removeItem(LS.key);
+  if (document.getElementById("apiKey")) document.getElementById("apiKey").value = "";
+  document.getElementById("keyStatus").innerHTML = '<span class="ok">Key removed. Offline keyword mode.</span>';
+  updateModeNote();
+}
+function changePin(){
+  const np = document.getElementById("newPin").value.trim();
+  if (!/^\d{4}$/.test(np)) { document.getElementById("pinStatus").innerHTML = '<span class="err">PIN must be exactly 4 digits.</span>'; return; }
+  localStorage.setItem(LS.pin, np);
+  document.getElementById("newPin").value = "";
+  document.getElementById("pinStatus").innerHTML = '<span class="ok">PIN updated for this device.</span>';
+}
+function updateModeNote(){
+  const n = document.getElementById("modeNote"); if (!n) return;
+  n.textContent = localStorage.getItem(LS.key)
+    ? "AI mode: summaries generated by Claude via your API key."
+    : "Offline keyword mode (no AI). Add an API key in Settings for real AI summaries.";
+}
+
+/* ---------- summarization ---------- */
+const URGENT_RX = /(chest (pain|pressure|heav|tight)|can'?t breathe|trouble breathing|short(ness)? of breath|bleeding|passed out|faint|numb|slurred|worst headache|suicid|crushing)/i;
+const MD_RX = /(diagnos|prognos|surgery|operation|procedure|results?|scan|mri|ct\b|x-?ray|biopsy|discharge|go home|going home|treatment|plan|specialist|medication change|new medication|why am i)/i;
+const RN_RX = /(pain|medic|pill|dose|iv\b|bathroom|toilet|nausea|vomit|sleep|itch|dizz|water|food|eat|blanket|cold|hot|wound|dressing|bandage|shower|walk)/i;
+function mockSummarize(entries){
+  const out = { urgent: [], md: [], rn: [], other: [] };
+  for (const e of entries) {
+    const item = { text: e.text, quote: e.text };
+    if (URGENT_RX.test(e.text)) out.urgent.push(item);
+    else if (MD_RX.test(e.text)) out.md.push(item);
+    else if (RN_RX.test(e.text)) out.rn.push(item);
+    else out.other.push(item);
+  }
+  return out;
+}
+async function aiSummarize(entries, key){
+  const transcript = entries.map(e => "[" + new Date(e.ts).toLocaleTimeString() + "] " + e.text).join("\n");
+  const prompt = "You are a clinical triage assistant inside a hospital patient-experience app. A hospitalized patient recorded the following questions and concerns between staff visits. Rewrite each distinct question/concern concisely and sort into JSON with keys: urgent (anything suggesting a potentially dangerous symptom, e.g. chest pressure, breathing trouble, new neuro symptoms, bleeding), md (questions for the physician/APP: diagnosis, results, treatment plan, discharge), rn (nursing needs: pain, meds timing, comfort, bathroom, wound care), other (anything else). Each item: {\"text\": concise restatement, \"quote\": the patient's original words}. Return ONLY valid JSON, no markdown fences.\n\nPatient recordings:\n" + transcript;
+  const resp = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: { "content-type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" },
+    body: JSON.stringify({ model: "claude-haiku-4-5", max_tokens: 1500, messages: [{ role: "user", content: prompt }] })
+  });
+  if (!resp.ok) { const t = await resp.text(); throw new Error("API error " + resp.status + ": " + t.slice(0, 200)); }
+  const data = await resp.json();
+  let txt = (data.content && data.content[0] && data.content[0].text || "").trim();
+  txt = txt.replace(/^```(json)?/i, "").replace(/```$/, "").trim();
+  const j = JSON.parse(txt);
+  return { urgent: j.urgent || [], md: j.md || [], rn: j.rn || [], other: j.other || [] };
+}
+async function generate(){
+  const res = document.getElementById("results");
+  if (!drRec.entries.length) { res.innerHTML = '<div class="card"><div class="empty">This patient has not captured any items yet.</div></div>'; return; }
+  const btn = document.getElementById("genBtn");
+  btn.disabled = true; btn.innerHTML = '<span class="spin"></span>Summarizing…';
+  const key = localStorage.getItem(LS.key);
+  let s, usedAI = false, failNote = "";
+  try {
+    if (key) { s = await aiSummarize(drRec.entries, key); usedAI = true; }
+    else s = mockSummarize(drRec.entries);
+  } catch (err) { s = mockSummarize(drRec.entries); failNote = '<div class="err" style="margin-bottom:8px">AI call failed (' + esc(err.message) + '); fell back to keyword mode.</div>'; }
+  lastSummary = s;
+  let html = '<div class="card">' + failNote;
+  if (s.urgent.length) html += '<div class="alertbar">&#9888; ' + s.urgent.length + ' potentially urgent item(s) — in the full system this would notify the RN in real time.</div>';
+  html += bucketHTML("&#9888; Flagged as potentially urgent", "b-urgent", s.urgent);
+  html += bucketHTML("Physician / APP list", "b-md", s.md);
+  html += bucketHTML("Nursing list", "b-rn", s.rn);
+  html += bucketHTML("Other / comfort", "b-other", s.other);
+  html += '<div class="exportrow"><button onclick="exportMD(false)">Download .md</button><button onclick="exportMD(true)">Share summary</button></div>';
+  html += '<div class="note">' + (usedAI ? "Generated by Claude (AI mode)." : "Keyword demo mode — not AI.") + '</div></div>';
+  res.innerHTML = html;
+  btn.disabled = false; btn.textContent = "Generate rounding summary";
+}
+function bucketHTML(title, cls, items){
+  const lis = items.length
+    ? items.map(i => "<li>" + esc(i.text) + (i.quote && i.quote !== i.text ? "<q>“" + esc(i.quote) + "”</q>" : "") + "</li>").join("")
+    : '<li class="empty">None</li>';
+  return '<div class="bucket ' + cls + '"><h3>' + title + '</h3><ul>' + lis + '</ul></div>';
+}
+function summaryMD(){
+  const s = lastSummary; if (!s) return "";
+  const sec = (t, items) => "## " + t + "\n" + (items.length ? items.map(i => "- " + i.text + (i.quote && i.quote !== i.text ? "\n  - patient's words: \"" + i.quote + "\"" : "")).join("\n") : "- none") + "\n\n";
+  return "# Patient Concern Summary — " + drRec.last + ", " + drRec.first + " (Heard demo)\nGenerated: " + new Date().toLocaleString() + "\n\n" +
+    sec("Potentially urgent (review first)", s.urgent) + sec("Physician / APP", s.md) + sec("Nursing", s.rn) + sec("Other / comfort", s.other) +
+    "---\nPrototype demo. Not a medical record. Not for clinical use.\n";
+}
+async function exportMD(share){
+  const md = summaryMD(); if (!md) return;
+  if (share && navigator.share) { try { await navigator.share({ title: "Patient Concern Summary", text: md }); } catch(e){} return; }
+  const blob = new Blob([md], { type: "text/markdown" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob); a.download = "patient_concern_summary.md"; a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+/* ================= init ================= */
+render();
+</script>
+</body>
+</html>
