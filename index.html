@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Heard — Patient Concern Capture (Demo)</title>
+<link rel="icon" href="https://figurelabs-images-us-east-1.s3.us-east-1.amazonaws.com/com/bioford/plot/img/43270c16-c582-4a48-b7fc-a05e65b7b44e.png">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <style>
   :root {
@@ -102,6 +103,7 @@
   :root { --teal: #12807c; --teal-deep: #0b5f5c; --coral: #e8735a; --coral-deep: #d45f47; --cream: #fdf8f3; }
   .hero { background: linear-gradient(150deg, var(--teal) 0%, var(--teal-deep) 78%); border-radius: 22px; padding: 34px 22px 30px; text-align: center; color: #fff; margin-bottom: 16px; box-shadow: 0 10px 26px rgba(11,95,92,.28); }
   .hero .mark { width: 74px; height: 74px; margin: 0 auto 12px; background: rgba(255,255,255,.14); border-radius: 50%; display: flex; align-items: center; justify-content: center; }
+  .hero .markimg { width: 78px; height: 78px; display: block; margin: 0 auto 12px; border-radius: 20px; box-shadow: 0 4px 12px rgba(0,0,0,.22); }
   .hero h1 { font-size: 34px; letter-spacing: .5px; font-weight: 800; }
   .hero .tag { font-size: 15px; margin-top: 8px; opacity: .95; line-height: 1.45; font-weight: 500; }
   .hero .tagsub { font-size: 12px; margin-top: 10px; opacity: .75; }
@@ -333,7 +335,8 @@ const HERO_ART =
   '<path d="M232 78 q10 -6 18 2" stroke="#12807c" stroke-width="2.5" fill="none" stroke-linecap="round" opacity=".55"/>' +
   '<path d="M228 66 q16 -10 30 3" stroke="#12807c" stroke-width="2.5" fill="none" stroke-linecap="round" opacity=".35"/>' +
   '</svg>';
-const HERO_IMG_URL = "https://figurelabs-images-us-east-1.s3.us-east-1.amazonaws.com/com/bioford/plot/img/72e62074-6743-43ed-b8e7-c77a73a873f5";
+const HERO_IMG_URL = "https://figurelabs-images-us-east-1.s3.us-east-1.amazonaws.com/com/bioford/plot/img/316fc370-2fdc-43e7-a4bb-615033c76efb.png";
+const ICON_URL = "https://figurelabs-images-us-east-1.s3.us-east-1.amazonaws.com/com/bioford/plot/img/43270c16-c582-4a48-b7fc-a05e65b7b44e.png";
 function npDocChange(sel){
   document.getElementById("npDocOther").style.display = sel.value === "__other" ? "block" : "none";
 }
@@ -350,7 +353,7 @@ async function renderLanding(){
     '<input class="txt" id="npDocOther" style="display:none" placeholder="Type your doctor\'s name">';
   app().innerHTML =
     '<div class="hero">' +
-    '<div class="mark">' + LOGO_SVG + '</div>' +
+    '<img class="markimg" src="' + ICON_URL + '" alt="Heard icon" onerror="this.outerHTML = \'<div class=&quot;mark&quot;>\' + LOGO_SVG + \'</div>\'">' +
     '<h1>Heard</h1>' +
     '<div class="tag">Your care team is listening, even between visits.</div>' +
     '<div class="tagsub">Speak your questions and concerns any time. Your care team sees them at their next visit.</div>' +
