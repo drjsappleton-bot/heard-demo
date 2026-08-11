@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Heard — Patient Concern Capture (Demo)</title>
-<link rel="icon" href="https://figurelabs-images-us-east-1.s3.us-east-1.amazonaws.com/com/bioford/plot/img/43270c16-c582-4a48-b7fc-a05e65b7b44e.png">
+<link rel="icon" href="heard-icon.png">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <style>
   :root {
@@ -335,8 +335,12 @@ const HERO_ART =
   '<path d="M232 78 q10 -6 18 2" stroke="#12807c" stroke-width="2.5" fill="none" stroke-linecap="round" opacity=".55"/>' +
   '<path d="M228 66 q16 -10 30 3" stroke="#12807c" stroke-width="2.5" fill="none" stroke-linecap="round" opacity=".35"/>' +
   '</svg>';
-const HERO_IMG_URL = "https://figurelabs-images-us-east-1.s3.us-east-1.amazonaws.com/com/bioford/plot/img/316fc370-2fdc-43e7-a4bb-615033c76efb.png";
-const ICON_URL = "https://figurelabs-images-us-east-1.s3.us-east-1.amazonaws.com/com/bioford/plot/img/43270c16-c582-4a48-b7fc-a05e65b7b44e.png";
+// Images are served from the site's own repo (upload heard-hero.png and
+// heard-icon.png next to index.html). Fallback: inline SVG art.
+const HERO_IMG_URL = "heard-hero.png";
+const ICON_URL = "heard-icon.png";
+function heroFallback(im){ im.parentNode.innerHTML = HERO_ART; }
+function iconFallback(im){ im.outerHTML = '<div class="mark">' + LOGO_SVG + '</div>'; }
 function npDocChange(sel){
   document.getElementById("npDocOther").style.display = sel.value === "__other" ? "block" : "none";
 }
@@ -353,12 +357,12 @@ async function renderLanding(){
     '<input class="txt" id="npDocOther" style="display:none" placeholder="Type your doctor\'s name">';
   app().innerHTML =
     '<div class="hero">' +
-    '<img class="markimg" src="' + ICON_URL + '" alt="Heard icon" onerror="this.outerHTML = \'<div class=&quot;mark&quot;>\' + LOGO_SVG + \'</div>\'">' +
+    '<img class="markimg" src="' + ICON_URL + '" alt="Heard icon" onerror="iconFallback(this)">' +
     '<h1>Heard</h1>' +
     '<div class="tag">Your care team is listening, even between visits.</div>' +
     '<div class="tagsub">Speak your questions and concerns any time. Your care team sees them at their next visit.</div>' +
     '</div>' +
-    '<div class="heroimg"><img src="' + HERO_IMG_URL + '" alt="A patient speaking and a caring provider listening" onerror="this.parentNode.innerHTML = HERO_ART"></div>' +
+    '<div class="heroimg"><img src="' + HERO_IMG_URL + '" alt="A patient speaking, and walking out of the hospital satisfied" onerror="heroFallback(this)"></div>' +
     '<div class="choice"><h2>I\'m a patient</h2>' +
     '<p>Sign in once to get your personal page. Everything you capture is under your control.</p>' +
     '<input class="txt" id="npFirst" placeholder="First name">' +
