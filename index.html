@@ -111,6 +111,15 @@
   .btn.coral { background: linear-gradient(150deg, var(--coral), var(--coral-deep)); border-radius: 14px; }
   .btn.teal { background: linear-gradient(150deg, var(--teal), var(--teal-deep)); border-radius: 14px; }
   .choice input.txt { border-radius: 12px; background: #fff; }
+  .choice select.txt { border-radius: 12px; background: #fff; appearance: auto; }
+  .heroimg { text-align: center; margin: -4px 0 14px; }
+  .heroimg svg, .heroimg img { width: 100%; max-width: 430px; height: auto; display: block; margin: 0 auto; border-radius: 18px; box-shadow: 0 4px 14px rgba(11,95,92,.12); }
+  .entry.heard { border-left-color: var(--green); background: var(--green-lt); }
+  .heardchk { display: block; margin-top: 6px; font-size: 12px; color: var(--green); cursor: pointer; font-weight: 600; }
+  .heardchk input { vertical-align: -2px; margin-right: 4px; }
+  .itemchk { float: right; margin-left: 10px; font-size: 11px; color: var(--mut); cursor: pointer; white-space: nowrap; }
+  .itemchk input { vertical-align: -2px; margin-right: 3px; }
+  .provtag { display: inline-block; background: var(--blue-lt); color: var(--blue); border-radius: 8px; padding: 4px 10px; font-size: 13px; font-weight: 600; margin: 2px 4px 2px 0; }
 </style>
 </head>
 <body>
@@ -160,8 +169,10 @@ function rnd(n){ let s = ""; const c = "abcdefghjkmnpqrstuvwxyz23456789"; for (l
 function esc(s){ return String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
 
 /* ================= data layer (jsonblob.com or local) ================= */
-const EMPTY_DOC = () => ({ idx: [], pts: {} });
-function normDoc(d){ if (!d || typeof d !== "object") return null; if (!Array.isArray(d.idx)) d.idx = []; if (!d.pts || typeof d.pts !== "object") d.pts = {}; return d; }
+const EMPTY_DOC = () => ({ idx: [], pts: {}, providers: [] });
+function normDoc(d){ if (!d || typeof d !== "object") return null; if (!Array.isArray(d.idx)) d.idx = []; if (!d.pts || typeof d.pts !== "object") d.pts = {}; if (!Array.isArray(d.providers)) d.providers = []; return d; }
+function normRec(r){ if (r) { if (!Array.isArray(r.entries)) r.entries = []; if (!Array.isArray(r.deleted)) r.deleted = []; } return r; }
+function entryKey(e){ return e.ts + "|" + e.text; }
 async function loadDoc(){
   if (bucket === "local") return normDoc(JSON.parse(localStorage.getItem(LS.localdb) || "null")) || EMPTY_DOC();
   const r = await fetch(KV + bucket + "?nocache=" + Date.now(), { cache: "no-store", headers: { "Accept": "application/json" } });
@@ -169,11 +180,14 @@ async function loadDoc(){
   if (!r.ok) throw new Error("read failed (" + r.status + ")");
   try { return normDoc(await r.json()); } catch (e) { return null; }
 }
-function mergeEntries(a, b){
+function mergeEntries(a, b, deleted){
+  const del = deleted instanceof Set ? deleted : new Set(deleted || []);
   const seen = {}, out = [];
   for (const e of (a || []).concat(b || [])) {
-    const k = e.ts + "|" + e.text;
-    if (!seen[k]) { seen[k] = 1; out.push(e); }
+    const k = entryKey(e);
+    if (del.has(k)) continue;
+    if (!seen[k]) { seen[k] = e; out.push(e); }
+    else if (e.heard) seen[k].heard = true;
   }
   out.sort((x, y) => x.ts - y.ts);
   return out;
@@ -285,9 +299,55 @@ const LOGO_SVG =
   '<rect x="28" y="10" width="4.5" height="24" rx="2.25" fill="#ffffff" opacity=".9"/>' +
   '<rect x="36" y="16" width="4.5" height="12" rx="2.25" fill="#ffffff" opacity=".75"/>' +
   '</svg>';
-function renderLanding(){
+const HERO_ART =
+  '<svg viewBox="0 0 420 190" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="A patient speaking and a caring provider listening">' +
+  '<rect x="0" y="0" width="420" height="190" rx="18" fill="#fdf8f3"/>' +
+  '<rect x="24" y="118" width="180" height="40" rx="10" fill="#ffffff" stroke="#e5d9cc"/>' +
+  '<rect x="24" y="112" width="180" height="18" rx="9" fill="#12807c" opacity=".85"/>' +
+  '<rect x="30" y="96" width="44" height="22" rx="8" fill="#ffffff" stroke="#e5d9cc"/>' +
+  '<circle cx="66" cy="84" r="17" fill="#f2c9a8"/>' +
+  '<path d="M49 84 a17 17 0 0 1 34 0 z" fill="#6b4f3a"/>' +
+  '<circle cx="61" cy="86" r="1.8" fill="#3a2d22"/>' +
+  '<circle cx="71" cy="86" r="1.8" fill="#3a2d22"/>' +
+  '<path d="M62 93 q4 3 8 0" stroke="#3a2d22" stroke-width="1.6" fill="none" stroke-linecap="round"/>' +
+  '<g>' +
+  '<path d="M96 52 h84 a12 12 0 0 1 12 12 v18 a12 12 0 0 1 -12 12 h-64 l-14 14 v-14 h-6 a12 12 0 0 1 -12 -12 v-18 a12 12 0 0 1 12 -12 z" fill="#ffffff" stroke="#e8735a" stroke-width="2"/>' +
+  '<rect x="112" y="64" width="5" height="16" rx="2.5" fill="#e8735a" opacity=".7"/>' +
+  '<rect x="124" y="58" width="5" height="28" rx="2.5" fill="#e8735a"/>' +
+  '<rect x="136" y="62" width="5" height="20" rx="2.5" fill="#e8735a" opacity=".85"/>' +
+  '<rect x="148" y="66" width="5" height="12" rx="2.5" fill="#e8735a" opacity=".6"/>' +
+  '<rect x="160" y="61" width="5" height="22" rx="2.5" fill="#e8735a" opacity=".8"/>' +
+  '</g>' +
+  '<g>' +
+  '<circle cx="330" cy="74" r="19" fill="#f2c9a8"/>' +
+  '<path d="M311 70 a19 19 0 0 1 38 2 l-6 -3 -26 -2 z" fill="#4a4a4a"/>' +
+  '<circle cx="324" cy="77" r="1.8" fill="#3a2d22"/>' +
+  '<circle cx="335" cy="77" r="1.8" fill="#3a2d22"/>' +
+  '<path d="M325 85 q4 3 9 0" stroke="#3a2d22" stroke-width="1.6" fill="none" stroke-linecap="round"/>' +
+  '<path d="M296 158 q4 -50 34 -50 q30 0 34 50 z" fill="#12807c"/>' +
+  '<path d="M316 112 q-8 18 0 30" stroke="#fdf8f3" stroke-width="3" fill="none" stroke-linecap="round"/>' +
+  '<path d="M344 112 q8 18 0 30" stroke="#fdf8f3" stroke-width="3" fill="none" stroke-linecap="round"/>' +
+  '<circle cx="330" cy="140" r="6" fill="#fdf8f3" stroke="#0b5f5c" stroke-width="2"/>' +
+  '</g>' +
+  '<path d="M247 96 c-6 -8 -18 -2 -12 8 c4 6 12 10 12 10 c0 0 8 -4 12 -10 c6 -10 -6 -16 -12 -8 z" fill="#e8735a"/>' +
+  '<path d="M232 78 q10 -6 18 2" stroke="#12807c" stroke-width="2.5" fill="none" stroke-linecap="round" opacity=".55"/>' +
+  '<path d="M228 66 q16 -10 30 3" stroke="#12807c" stroke-width="2.5" fill="none" stroke-linecap="round" opacity=".35"/>' +
+  '</svg>';
+const HERO_IMG_URL = "https://figurelabs-images-us-east-1.s3.us-east-1.amazonaws.com/com/bioford/plot/img/72e62074-6743-43ed-b8e7-c77a73a873f5";
+function npDocChange(sel){
+  document.getElementById("npDocOther").style.display = sel.value === "__other" ? "block" : "none";
+}
+async function renderLanding(){
   document.getElementById("hdr").classList.add("hidden");
   const mine = localStorage.getItem(LS.myPatient);
+  let provs = [];
+  try { const doc = await loadDoc(); provs = doc && doc.providers ? doc.providers : []; } catch (e) {}
+  const docOptions =
+    '<select class="txt" id="npDoc" onchange="npDocChange(this)">' +
+    '<option value="">Who is your doctor? (choose if listed)</option>' +
+    provs.map(p => '<option>' + esc(p.name) + '</option>').join("") +
+    '<option value="__other">My doctor isn\'t listed</option></select>' +
+    '<input class="txt" id="npDocOther" style="display:none" placeholder="Type your doctor\'s name">';
   app().innerHTML =
     '<div class="hero">' +
     '<div class="mark">' + LOGO_SVG + '</div>' +
@@ -295,10 +355,12 @@ function renderLanding(){
     '<div class="tag">Your care team is listening, even between visits.</div>' +
     '<div class="tagsub">Speak your questions and concerns any time. Your care team sees them at their next visit.</div>' +
     '</div>' +
+    '<div class="heroimg"><img src="' + HERO_IMG_URL + '" alt="A patient speaking and a caring provider listening" onerror="this.parentNode.innerHTML = HERO_ART"></div>' +
     '<div class="choice"><h2>I\'m a patient</h2>' +
     '<p>Sign in once to get your personal page. Everything you capture is under your control.</p>' +
     '<input class="txt" id="npFirst" placeholder="First name">' +
     '<input class="txt" id="npLast" placeholder="Last name">' +
+    docOptions +
     '<button class="btn coral" onclick="newPatient()">Sign in &amp; get my link</button>' +
     '<div class="note" id="npMsg"></div>' +
     (mine ? '<button class="btn sub" style="margin-top:10px" onclick="location.hash=\'#/b/\'+bucket+\'/p/\'+localStorage.getItem(LS.myPatient)">Return to my patient page</button>' : "") +
@@ -315,11 +377,14 @@ async function newPatient(){
   const msg = document.getElementById("npMsg");
   if (!f || !l) { msg.innerHTML = '<span class="err">First and last name required.</span>'; return; }
   msg.textContent = "Creating your page…";
+  const sel = document.getElementById("npDoc");
+  let doctor = sel ? sel.value : "";
+  if (doctor === "__other") doctor = document.getElementById("npDocOther").value.trim();
   const id = rnd(6);
   try {
     const doc = (await loadDoc()) || EMPTY_DOC();
-    doc.pts[id] = { first: f, last: l, created: Date.now(), entries: [] };
-    doc.idx.push({ id: id, first: f, last: l, created: Date.now() });
+    doc.pts[id] = { first: f, last: l, doctor: doctor, created: Date.now(), entries: [], deleted: [] };
+    doc.idx.push({ id: id, first: f, last: l, doctor: doctor, created: Date.now() });
     await saveDoc(doc);
     localStorage.setItem(LS.myPatient, id);
     location.hash = "#/b/" + bucket + "/p/" + id;
@@ -332,10 +397,14 @@ async function renderPatient(){
   document.getElementById("tagline").textContent = "Patient";
   app().innerHTML = '<div class="card"><div class="empty">Loading…</div></div>';
   try { const doc = await loadDoc(); ptRec = doc ? doc.pts[route.id] : null; } catch (e) { ptRec = null; }
-  const cached = JSON.parse(localStorage.getItem("heard_cache_" + route.id) || "null");
+  const cached = normRec(JSON.parse(localStorage.getItem("heard_cache_" + route.id) || "null"));
   if (!ptRec && cached) ptRec = cached;
   if (!ptRec) { app().innerHTML = '<div class="card"><div class="empty">Patient page not found (demo data may have expired).</div><button class="btn sub" onclick="goHome()">Home</button></div>'; return; }
-  if (cached) ptRec.entries = mergeEntries(ptRec.entries, cached.entries);
+  normRec(ptRec);
+  if (cached) {
+    ptRec.deleted = [...new Set(ptRec.deleted.concat(cached.deleted))];
+    ptRec.entries = mergeEntries(ptRec.entries, cached.entries, ptRec.deleted);
+  }
   localStorage.setItem(LS.myPatient, route.id);
   const drLink = link("/dr/" + route.id);
   const myLink = link("/p/" + route.id);
@@ -374,27 +443,38 @@ function renderEntries(){
   const a = ptRec.entries;
   document.getElementById("count").textContent = a.length;
   box.innerHTML = a.length
-    ? a.map(e => '<div class="entry"><time>' + new Date(e.ts).toLocaleString() + '</time>' + esc(e.text) + '</div>').join("")
+    ? a.map((e, i) =>
+        '<div class="entry' + (e.heard ? ' heard' : '') + '"><time>' + new Date(e.ts).toLocaleString() + '</time>' + esc(e.text) +
+        '<label class="heardchk" title="Check this when you feel this concern was heard and addressed">' +
+        '<input type="checkbox" ' + (e.heard ? 'checked' : '') + ' onchange="markHeard(' + i + ', this.checked)"> I was heard</label></div>'
+      ).join("")
     : '<div class="empty">Nothing captured yet.</div>';
 }
-async function persistEntry(text){
+function markHeard(i, v){
+  if (ptRec.entries[i]) { ptRec.entries[i].heard = !!v; renderEntries(); saveRecord(); }
+}
+async function saveRecord(){
+  // Always write the FULL local list merged with the server's (minus tombstoned
+  // deletions), so a stale read can never erase earlier entries.
   const m = document.getElementById("capMsg");
-  const entry = { text: text, ts: Date.now() };
-  ptRec.entries.push(entry);
-  renderEntries();
   localStorage.setItem("heard_cache_" + route.id, JSON.stringify(ptRec));
   try {
     const doc = (await loadDoc()) || EMPTY_DOC();
-    if (!doc.pts[route.id]) doc.pts[route.id] = ptRec;
-    // Always write the FULL local list merged with the server's, so a stale
-    // read can never erase earlier entries (each save is self-repairing).
-    doc.pts[route.id].entries = mergeEntries(doc.pts[route.id].entries, ptRec.entries);
+    const srv = normRec(doc.pts[route.id]) || ptRec;
+    ptRec.deleted = [...new Set((srv.deleted || []).concat(ptRec.deleted || []))];
+    ptRec.entries = mergeEntries(srv.entries, ptRec.entries, ptRec.deleted);
+    doc.pts[route.id] = ptRec;
     await saveDoc(doc);
-    ptRec.entries = doc.pts[route.id].entries;
+    localStorage.setItem("heard_cache_" + route.id, JSON.stringify(ptRec));
     renderEntries();
-    m.textContent = "";
+    if (m) m.textContent = "";
   }
-  catch (e) { m.innerHTML = '<span class="err">Could not sync to server; kept on this device for now.</span>'; }
+  catch (e) { if (m) m.innerHTML = '<span class="err">Could not sync to server; kept on this device for now.</span>'; }
+}
+function persistEntry(text){
+  ptRec.entries.push({ text: text, ts: Date.now() });
+  renderEntries();
+  saveRecord();
 }
 function addTyped(){
   const inp = document.getElementById("typeInput");
@@ -459,17 +539,35 @@ async function renderDrHome(){
     '<div class="card" id="ptList"><div class="empty">Loading…</div></div>' +
     '<div class="card"><h2 class="sec">Open by patient code</h2>' +
     '<div class="typebox"><input id="ptCode" placeholder="6-character code (e.g. from QR link)"><button onclick="openByCode()">Open</button></div></div>' +
+    '<div class="card"><h2 class="sec">Provider directory</h2>' +
+    '<div id="provList" class="empty">Loading…</div>' +
+    '<div class="typebox"><input id="provName" placeholder="Your name (e.g. Dr. Appleton)"><button onclick="addProvider()">Add me</button></div>' +
+    '<div class="note">Names added here appear in the patient sign-in dropdown.</div></div>' +
     settingsHTML();
   wireSettings();
-  let idx = [];
-  try { const doc = await loadDoc(); idx = doc ? doc.idx : []; } catch (e) { document.getElementById("ptList").innerHTML = '<div class="empty err">Could not load patient list: ' + esc(e.message) + '</div>'; return; }
+  let idx = [], provs = [];
+  try { const doc = await loadDoc(); idx = doc ? doc.idx : []; provs = doc && doc.providers ? doc.providers : []; } catch (e) { document.getElementById("ptList").innerHTML = '<div class="empty err">Could not load patient list: ' + esc(e.message) + '</div>'; return; }
   const box = document.getElementById("ptList");
   box.innerHTML = idx.length
     ? idx.slice().reverse().map(p =>
         '<div class="ptrow" onclick="location.hash=\'#/b/\'+bucket+\'/dr/' + p.id + '\'">' +
-        '<div><div class="nm">' + esc(p.last) + ', ' + esc(p.first) + '</div><div class="dt">Signed in ' + new Date(p.created).toLocaleString() + ' &middot; code ' + p.id + '</div></div>' +
+        '<div><div class="nm">' + esc(p.last) + ', ' + esc(p.first) + '</div><div class="dt">Signed in ' + new Date(p.created).toLocaleString() + ' &middot; code ' + p.id + (p.doctor ? ' &middot; ' + esc(p.doctor) : '') + '</div></div>' +
         '<span class="arrow">&#8250;</span></div>').join("")
     : '<div class="empty">No patients have signed in yet. New patients sign in from the landing page.</div>';
+  document.getElementById("provList").innerHTML = provs.length
+    ? provs.map(p => '<span class="provtag">' + esc(p.name) + '</span>').join(" ")
+    : 'No providers registered yet. Add your name below.';
+  document.getElementById("provList").className = provs.length ? "" : "empty";
+}
+async function addProvider(){
+  const inp = document.getElementById("provName");
+  const n = inp.value.trim(); if (!n) return;
+  try {
+    const doc = (await loadDoc()) || EMPTY_DOC();
+    if (!doc.providers.some(p => p.name.toLowerCase() === n.toLowerCase())) doc.providers.push({ name: n, created: Date.now() });
+    await saveDoc(doc);
+    renderDrHome();
+  } catch (e) { alert("Could not save provider name: " + e.message); }
 }
 function openByCode(){
   const c = document.getElementById("ptCode").value.trim().toLowerCase();
@@ -483,11 +581,13 @@ async function renderDrPatient(){
   app().innerHTML = '<div class="card"><div class="empty">Loading…</div></div>';
   try { const doc = await loadDoc(); drRec = doc ? doc.pts[route.id] : null; } catch (e) { drRec = null; }
   if (!drRec) { app().innerHTML = '<div class="card"><div class="empty">Patient not found (demo data may have expired).</div><button class="btn sub" onclick="location.hash=\'#/b/\'+bucket+\'/dr\'">Back to list</button></div>'; return; }
+  normRec(drRec);
   app().innerHTML =
     '<div class="topbar"><a href="#/b/' + bucket + '/dr">&#8249; All patients</a><button onclick="lockProvider()">&#128274; Lock</button></div>' +
     '<div class="card"><h2 class="sec">Patient</h2><div class="nm" style="font-size:17px;font-weight:700">' + esc(drRec.last) + ', ' + esc(drRec.first) + '</div>' +
-    '<div class="dt" style="font-size:12px;color:var(--mut)">' + drRec.entries.length + ' captured item(s) &middot; signed in ' + new Date(drRec.created).toLocaleString() + '</div>' +
+    '<div class="dt" style="font-size:12px;color:var(--mut)">' + drRec.entries.length + ' captured item(s) &middot; signed in ' + new Date(drRec.created).toLocaleString() + (drRec.doctor ? ' &middot; Doctor: ' + esc(drRec.doctor) : '') + '</div>' +
     '<button id="genBtn" class="btn" style="margin-top:12px" onclick="generate()">Generate rounding summary</button>' +
+    '<button class="btn sub" style="margin-top:10px;color:var(--red)" onclick="clearPatientItems()">Clear ALL items for this patient</button>' +
     '<div class="note" id="modeNote"></div></div>' +
     '<div id="results"></div>' + settingsHTML();
   wireSettings();
@@ -574,21 +674,72 @@ async function generate(){
     else s = mockSummarize(drRec.entries);
   } catch (err) { s = mockSummarize(drRec.entries); failNote = '<div class="err" style="margin-bottom:8px">AI call failed (' + esc(err.message) + '); fell back to keyword mode.</div>'; }
   lastSummary = s;
-  let html = '<div class="card">' + failNote;
-  if (s.urgent.length) html += '<div class="alertbar">&#9888; ' + s.urgent.length + ' potentially urgent item(s) — in the full system this would notify the RN in real time.</div>';
-  html += bucketHTML("&#9888; Flagged as potentially urgent", "b-urgent", s.urgent);
-  html += bucketHTML("Physician / APP list", "b-md", s.md);
-  html += bucketHTML("Nursing list", "b-rn", s.rn);
-  html += bucketHTML("Other / comfort", "b-other", s.other);
-  html += '<div class="exportrow"><button onclick="exportMD(false)">Download .md</button><button onclick="exportMD(true)">Share summary</button></div>';
-  html += '<div class="note">' + (usedAI ? "Generated by Claude (AI mode)." : "Keyword demo mode — not AI.") + '</div></div>';
-  res.innerHTML = html;
+  lastUsedAI = usedAI;
+  renderSummaryHTML(failNote);
   btn.disabled = false; btn.textContent = "Generate rounding summary";
 }
+let lastUsedAI = false;
+function renderSummaryHTML(failNote){
+  const res = document.getElementById("results"); if (!res) return;
+  const s = lastSummary; if (!s) { res.innerHTML = ""; return; }
+  let html = '<div class="card">' + (failNote || "");
+  if (s.urgent.length) html += '<div class="alertbar">&#9888; ' + s.urgent.length + ' potentially urgent item(s) — in the full system this would notify the RN in real time.</div>';
+  html += bucketHTML("&#9888; Flagged as potentially urgent", "b-urgent", "urgent", s.urgent);
+  html += bucketHTML("Physician / APP list", "b-md", "md", s.md);
+  html += bucketHTML("Nursing list", "b-rn", "rn", s.rn);
+  html += bucketHTML("Other / comfort", "b-other", "other", s.other);
+  html += '<div class="exportrow"><button onclick="exportMD(false)">Download .md</button><button onclick="exportMD(true)">Share summary</button></div>';
+  html += '<div class="note">' + (lastUsedAI ? "Generated by Claude (AI mode)." : "Keyword demo mode — not AI.") + ' Checking a box marks the item addressed and removes it.</div></div>';
+  res.innerHTML = html;
+}
+async function completeItem(bucket, idx){
+  const item = lastSummary && lastSummary[bucket] && lastSummary[bucket][idx];
+  if (!item) return;
+  const q = cleanQuote(item.quote) || item.text;
+  const ql = q.toLowerCase();
+  const matches = drRec.entries.filter(e => {
+    const t = e.text.toLowerCase();
+    return t === ql || t.includes(ql) || ql.includes(t);
+  });
+  lastSummary[bucket].splice(idx, 1);
+  renderSummaryHTML();
+  if (matches.length) {
+    drRec.deleted = [...new Set((drRec.deleted || []).concat(matches.map(entryKey)))];
+    const del = new Set(drRec.deleted);
+    drRec.entries = drRec.entries.filter(e => !del.has(entryKey(e)));
+    try {
+      const doc = (await loadDoc()) || EMPTY_DOC();
+      const rec = normRec(doc.pts[route.id]);
+      if (rec) {
+        rec.deleted = [...new Set(rec.deleted.concat(drRec.deleted))];
+        rec.entries = mergeEntries(rec.entries, [], rec.deleted);
+        await saveDoc(doc);
+      }
+    } catch (e) { alert("Removed from view, but could not sync the removal: " + e.message); }
+  }
+}
+async function clearPatientItems(){
+  if (!confirm("Remove ALL captured items for this patient? This cannot be undone.")) return;
+  try {
+    const doc = (await loadDoc()) || EMPTY_DOC();
+    const rec = normRec(doc.pts[route.id]);
+    if (rec) {
+      rec.deleted = [...new Set(rec.deleted.concat(rec.entries.map(entryKey)))];
+      rec.entries = [];
+      await saveDoc(doc);
+      drRec = rec; lastSummary = null;
+    }
+    renderDrPatient();
+  } catch (e) { alert("Could not clear items: " + e.message); }
+}
 function cleanQuote(q){ return String(q || "").replace(/^["“”'\s]+|["“”'\s]+$/g, ""); }
-function bucketHTML(title, cls, items){
+function bucketHTML(title, cls, key, items){
   const lis = items.length
-    ? items.map(i => { const q = cleanQuote(i.quote); return "<li>" + esc(i.text) + (q && q !== i.text ? "<q>“" + esc(q) + "”</q>" : "") + "</li>"; }).join("")
+    ? items.map((i, idx) => {
+        const q = cleanQuote(i.quote);
+        return "<li><label class=\"itemchk\" title=\"Mark addressed and remove\"><input type=\"checkbox\" onchange=\"completeItem('" + key + "'," + idx + ")\"> done</label>" +
+          esc(i.text) + (q && q !== i.text ? "<q>“" + esc(q) + "”</q>" : "") + "</li>";
+      }).join("")
     : '<li class="empty">None</li>';
   return '<div class="bucket ' + cls + '"><h3>' + title + '</h3><ul>' + lis + '</ul></div>';
 }
