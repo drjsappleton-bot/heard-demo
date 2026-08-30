@@ -523,52 +523,132 @@ function addTyped(){
 }
 
 /* speech */
+/* Rewritten 2026-08-29. The previous version lost roughly half of what was said:
+   - saveCapture() only ever saved finalBuf, so a phrase still marked interim when
+     the patient tapped stop was displayed and then thrown away
+   - stopRec() called rec.stop() and then saved synchronously, but stop() is async:
+     the trailing final result arrives afterwards, into a buffer that was just cleared
+   - onend only saved when `recording` was still true, so a manual stop never saved from there
+   - Chrome ends a session by itself after a few seconds of silence even with
+     continuous = true. Nothing reopened it, so the mic looked live and was not */
 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-let rec = null, recording = false, finalBuf = "", lastSaved = "";
+let rec = null, recording = false, wantRec = false;
+let finalBuf = "", interimBuf = "", lastSaved = "", restarts = 0;
+let endTimer = null, hideTimer = null, lastHeardAt = 0;
+const MAX_RESTARTS = 60;          // roughly five minutes of silence
+const SILENCE_LIMIT_MS = 90000;   // stop on our own after this much true silence
+
 function toggleRec(){
-  if (!SR) { alert("Live speech-to-text isn't supported in this browser; please type instead."); return; }
-  recording ? stopRec() : startRec();
+  if (!SR) { alert("Live speech-to-text is not supported in this browser; please type instead."); return; }
+  wantRec ? stopRec() : startRec();
 }
+
+function showLive(txt, sticky){
+  clearTimeout(hideTimer);
+  const lt = document.getElementById("liveText");
+  if (!lt) return;
+  lt.classList.add("show");
+  lt.textContent = txt;
+  if (!sticky) hideTimer = setTimeout(() => { lt.classList.remove("show"); lt.textContent = ""; }, 1800);
+}
+
 function startRec(){
-  finalBuf = "";
+  finalBuf = ""; interimBuf = ""; lastSaved = ""; restarts = 0;
+  wantRec = true; lastHeardAt = Date.now();
+  recUI(true);
+  openRec();
+}
+
+/* Opens a session, and is called again from onend when silence closed one
+   while the patient still has the button open. */
+function openRec(){
   rec = new SR();
-  rec.continuous = true; rec.interimResults = true; rec.lang = "en-US";
+  rec.continuous = true;
+  rec.interimResults = true;
+  rec.lang = "en-US";
+
   rec.onresult = (e) => {
     let interim = "";
     for (let i = e.resultIndex; i < e.results.length; i++) {
       if (e.results[i].isFinal) finalBuf += e.results[i][0].transcript + " ";
       else interim += e.results[i][0].transcript;
     }
-    const lt = document.getElementById("liveText");
-    if (lt) { lt.classList.add("show"); lt.textContent = (finalBuf + interim).trim() || "Listening…"; }
+    interimBuf = interim;
+    lastHeardAt = Date.now();
+    showLive((finalBuf + " " + interim).replace(/\s+/g, " ").trim() || "Listening…", true);
   };
-  rec.onerror = (e) => { stopUI(); if (e.error === "not-allowed") alert("Microphone permission denied. Allow mic access or type instead."); };
-  rec.onend = () => { if (recording) { saveCapture(); stopUI(); } };
-  try { rec.start(); } catch (e) { alert("Could not start microphone: " + e.message); return; }
-  recording = true;
-  const b = document.getElementById("recBtn");
-  if (b) { b.classList.add("recording"); document.getElementById("recLabel").textContent = "Tap to stop";
-    document.getElementById("privDot").classList.add("live");
-    document.getElementById("privLabel").textContent = "Recording — you are in control";
-    const lt = document.getElementById("liveText"); lt.classList.add("show"); lt.textContent = "Listening…"; }
-}
-function stopRec(){ recording = false; try { rec.stop(); } catch(e){} saveCapture(); stopUI(); }
-function stopUI(silent){
-  recording = false;
-  if (rec) { try { rec.stop(); } catch(e){} }
-  const b = document.getElementById("recBtn");
-  if (b && !silent) {
-    b.classList.remove("recording");
-    document.getElementById("recLabel").textContent = "Tap to speak";
-    document.getElementById("privDot").classList.remove("live");
-    document.getElementById("privLabel").textContent = "Microphone off — nothing is being recorded";
-    setTimeout(() => { const lt = document.getElementById("liveText"); if (lt) { lt.classList.remove("show"); lt.textContent = ""; } }, 1200);
+
+  rec.onerror = (e) => {
+    const fatal = { "not-allowed": "Microphone blocked. Allow mic access in the browser, or type it instead.",
+                    "service-not-allowed": "Speech service unavailable in this browser. Type it instead.",
+                    "audio-capture": "No microphone found. Type it instead." };
+    if (fatal[e.error]) { wantRec = false; recording = false; recUI(false); showLive(fatal[e.error], true); return; }
+    /* no-speech, network, aborted: leave it to onend, which reopens or finishes */
+  };
+
+  rec.onend = () => {
+    recording = false;
+    const silent = Date.now() - lastHeardAt > SILENCE_LIMIT_MS;
+    if (wantRec && !silent && restarts < MAX_RESTARTS) {
+      restarts++;
+      setTimeout(() => { if (wantRec) openRec(); }, 150);
+      return;
+    }
+    if (wantRec && silent) wantRec = false;   /* we closed it, not the patient */
+    finishCapture();
+  };
+
+  try { rec.start(); recording = true; }
+  catch (e) {
+    /* start() throws if a session is already live; that is harmless */
+    if (!recording && !restarts) { wantRec = false; recUI(false); showLive("Could not start the microphone: " + e.message, true); }
   }
 }
-function saveCapture(){
-  const t = finalBuf.trim(); finalBuf = "";
-  if (!t || t === lastSaved) return;
-  lastSaved = t; persistEntry(t);
+
+function stopRec(){
+  wantRec = false;
+  clearTimeout(endTimer);
+  recUI(false);
+  try { if (rec) rec.stop(); } catch (e) {}
+  /* stop() is asynchronous. Trailing final results and onend land after it,
+     so the save happens in onend. This is only the backstop if onend never fires. */
+  endTimer = setTimeout(finishCapture, 1500);
+}
+
+function finishCapture(){
+  clearTimeout(endTimer);
+  if (wantRec) return;
+  recording = false;
+  recUI(false);
+  /* Interim text counts. Tapping stop mid-phrase used to discard it. */
+  const t = (finalBuf + " " + interimBuf).replace(/\s+/g, " ").trim();
+  finalBuf = ""; interimBuf = "";
+  if (!t) { showLive("Nothing was heard. Tap again, or type it below.", true); return; }
+  if (t === lastSaved) return;
+  lastSaved = t;
+  showLive("Captured: " + t);
+  persistEntry(t);
+}
+
+function recUI(on){
+  const b = document.getElementById("recBtn");
+  const lbl = document.getElementById("recLabel");
+  const dot = document.getElementById("privDot");
+  const pl = document.getElementById("privLabel");
+  if (b) b.classList.toggle("recording", !!on);
+  if (lbl) lbl.textContent = on ? "Tap to stop" : "Tap to speak";
+  if (dot) dot.classList.toggle("live", !!on);
+  if (pl) pl.textContent = on ? "Recording — you are in control" : "Microphone off — nothing is being recorded";
+  if (on) showLive("Listening…", true);
+}
+
+/* Silent teardown used by the router on every navigation. Never saves. */
+function stopUI(silent){
+  wantRec = false; recording = false;
+  clearTimeout(endTimer); clearTimeout(hideTimer);
+  finalBuf = ""; interimBuf = "";
+  try { if (rec) rec.stop(); } catch (e) {}
+  if (!silent) recUI(false);
 }
 
 /* ---------- provider home ---------- */
