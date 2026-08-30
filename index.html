@@ -346,19 +346,29 @@ const ICON_URL = "heard-icon.png";
 function heroFallback(im){ im.parentNode.innerHTML = HERO_ART; }
 function iconFallback(im){ im.outerHTML = '<div class="mark">' + LOGO_SVG + '</div>'; }
 function npDocChange(sel){
-  document.getElementById("npDocOther").style.display = sel.value === "__other" ? "block" : "none";
+  const other = sel.value === "__other";
+  ["npDocOther", "npTeam", "npDocNote"].forEach(function(id){
+    const el = document.getElementById(id);
+    if (el) el.style.display = other ? "block" : "none";
+  });
 }
 async function renderLanding(){
   document.getElementById("hdr").classList.add("hidden");
   const mine = localStorage.getItem(LS.myPatient);
   let provs = [];
   try { const doc = await loadDoc(); provs = doc && doc.providers ? doc.providers : []; } catch (e) {}
+  const known = provs.slice().sort((a, b) => String(a.name).localeCompare(String(b.name)));
+  const hideFree = known.length ? ' style="display:none"' : '';
   const docOptions =
-    '<select class="txt" id="npDoc" onchange="npDocChange(this)">' +
-    '<option value="">Who is your doctor? (choose if listed)</option>' +
-    provs.map(p => '<option>' + esc(p.name) + '</option>').join("") +
-    '<option value="__other">My doctor isn\'t listed</option></select>' +
-    '<input class="txt" id="npDocOther" style="display:none" placeholder="Type your doctor\'s name">';
+    (known.length
+      ? '<select class="txt" id="npDoc" onchange="npDocChange(this)">' +
+        '<option value="">Who is your doctor? (choose if listed)</option>' +
+        known.map(p => '<option>' + esc(p.name) + '</option>').join("") +
+        '<option value="__other">My doctor is not listed</option></select>'
+      : '') +
+    '<input class="txt" id="npDocOther"' + hideFree + ' placeholder="Your doctor\'s name">' +
+    '<input class="txt" id="npTeam"' + hideFree + ' placeholder="Practice or care team (optional)">' +
+    '<div class="note" id="npDocNote"' + hideFree + '>A name typed here joins this demo\'s list, so the next patient can pick it. It does not notify anyone.</div>';
   app().innerHTML =
     '<div class="hero">' +
     '<img class="markimg" src="' + ICON_URL + '" alt="Heard icon" onerror="iconFallback(this)">' +
@@ -390,14 +400,27 @@ async function newPatient(){
   msg.textContent = "Creating your page…";
   const sel = document.getElementById("npDoc");
   let doctor = sel ? sel.value : "";
-  if (doctor === "__other") doctor = document.getElementById("npDocOther").value.trim();
+  let typedDoctor = false;
+  if (!sel || doctor === "__other") {
+    const o = document.getElementById("npDocOther");
+    doctor = o ? o.value.trim() : "";
+    typedDoctor = !!doctor;
+  }
+  const teamEl = document.getElementById("npTeam");
+  const team = (teamEl && teamEl.style.display !== "none") ? teamEl.value.trim() : "";
   const id = rnd(6);
   try {
     const doc = (await loadDoc()) || EMPTY_DOC();
-    doc.pts[id] = { first: f, last: l, doctor: doctor, created: Date.now(), entries: [], deleted: [] };
-    doc.idx.push({ id: id, first: f, last: l, doctor: doctor, created: Date.now() });
+    doc.pts[id] = { first: f, last: l, doctor: doctor, team: team, created: Date.now(), entries: [], deleted: [] };
+    doc.idx.push({ id: id, first: f, last: l, doctor: doctor, team: team, created: Date.now() });
+    // A doctor the patient typed joins the directory, so the dropdown fills as the demo is used.
+    if (typedDoctor && !doc.providers.some(p => String(p.name).toLowerCase() === doctor.toLowerCase())) {
+      doc.providers.push({ name: doctor, team: team, created: Date.now(), addedBy: "patient", linked: false });
+    }
     await saveDoc(doc);
     localStorage.setItem(LS.myPatient, id);
+    // Render from this copy if the very first read has not caught up yet.
+    try { localStorage.setItem("heard_cache_" + id, JSON.stringify(doc.pts[id])); } catch (e) {}
     location.hash = "#/b/" + bucket + "/p/" + id;
   } catch (e) { msg.innerHTML = '<span class="err">' + esc(e.message) + '</span>'; }
 }
@@ -410,7 +433,13 @@ async function renderPatient(){
   try { const doc = await loadDoc(); ptRec = doc ? doc.pts[route.id] : null; } catch (e) { ptRec = null; }
   const cached = normRec(JSON.parse(localStorage.getItem("heard_cache_" + route.id) || "null"));
   if (!ptRec && cached) ptRec = cached;
-  if (!ptRec) { app().innerHTML = '<div class="card"><div class="empty">Patient page not found (demo data may have expired).</div><button class="btn sub" onclick="goHome()">Home</button></div>'; return; }
+  if (!ptRec) {
+    const mine = localStorage.getItem(LS.myPatient);
+    app().innerHTML = '<div class="card"><div class="empty">No patient page with code <b>' + esc(route.id || "") + '</b> on this demo site.</div>' +
+      (mine && mine !== route.id ? '<button class="btn coral" onclick="location.hash=\'#/b/\'+bucket+\'/p/\'+localStorage.getItem(LS.myPatient)">Open my patient page</button>' : '') +
+      '<button class="btn sub" onclick="goHome()">Home</button></div>';
+    return;
+  }
   normRec(ptRec);
   if (cached) {
     ptRec.deleted = [...new Set(ptRec.deleted.concat(cached.deleted))];
@@ -562,11 +591,11 @@ async function renderDrHome(){
   box.innerHTML = idx.length
     ? idx.slice().reverse().map(p =>
         '<div class="ptrow" onclick="location.hash=\'#/b/\'+bucket+\'/dr/' + p.id + '\'">' +
-        '<div><div class="nm">' + esc(p.last) + ', ' + esc(p.first) + '</div><div class="dt">Signed in ' + new Date(p.created).toLocaleString() + ' &middot; code ' + p.id + (p.doctor ? ' &middot; ' + esc(p.doctor) : '') + '</div></div>' +
+        '<div><div class="nm">' + esc(p.last) + ', ' + esc(p.first) + '</div><div class="dt">Signed in ' + new Date(p.created).toLocaleString() + ' &middot; code ' + p.id + (p.doctor ? ' &middot; ' + esc(p.doctor) : '') + (p.team ? ' &middot; ' + esc(p.team) : '') + '</div></div>' +
         '<span class="arrow">&#8250;</span></div>').join("")
     : '<div class="empty">No patients have signed in yet. New patients sign in from the landing page.</div>';
   document.getElementById("provList").innerHTML = provs.length
-    ? provs.map(p => '<span class="provtag">' + esc(p.name) + '</span>').join(" ")
+    ? provs.map(p => '<span class="provtag">' + esc(p.name) + (p.addedBy === "patient" ? ' <em>&middot; added by a patient, not linked</em>' : '') + '</span>').join(" ")
     : 'No providers registered yet. Add your name below.';
   document.getElementById("provList").className = provs.length ? "" : "empty";
 }
