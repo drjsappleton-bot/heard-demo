@@ -121,6 +121,19 @@
   .heardchk input { vertical-align: -2px; margin-right: 4px; }
   .itemchk { float: right; margin-left: 10px; font-size: 11px; color: var(--mut); cursor: pointer; white-space: nowrap; }
   .itemchk input { vertical-align: -2px; margin-right: 3px; }
+  /* loop states: open -> addressed by the care team -> closed once the patient confirms */
+  .entryfoot { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 6px; }
+  .entryfoot .heardchk { margin-top: 0; }
+  .ctbadge { font-size: 11px; font-weight: 600; white-space: nowrap; color: var(--amber); }
+  .entry.closed .ctbadge { color: var(--green); }
+  .entry.addressed { border-left-color: var(--amber); background: var(--amber-lt); }
+  .entry.closed { border-left-color: var(--green); background: var(--green-lt); }
+  .addrlist { list-style: none; }
+  .addrlist li { padding: 10px 12px; font-size: 14px; border: 1px solid var(--line); border-radius: 10px; margin-top: 8px; background: var(--green-lt); }
+  .addrlist li q { display: block; font-size: 12px; color: var(--mut); font-style: italic; margin-top: 3px; }
+  .addrstat { float: right; margin-left: 10px; font-size: 11px; white-space: nowrap; }
+  .addrstat.done { color: var(--green); font-weight: 600; }
+  .addrstat.wait { color: var(--mut); }
   .provtag { display: inline-block; background: var(--blue-lt); color: var(--blue); border-radius: 8px; padding: 4px 10px; font-size: 13px; font-weight: 600; margin: 2px 4px 2px 0; }
 </style>
 </head>
@@ -189,7 +202,7 @@ function mergeEntries(a, b, deleted){
     const k = entryKey(e);
     if (del.has(k)) continue;
     if (!seen[k]) { seen[k] = e; out.push(e); }
-    else if (e.heard) seen[k].heard = true;
+    else { if (e.heard) seen[k].heard = true; if (e.addressed) seen[k].addressed = true; }
   }
   out.sort((x, y) => x.ts - y.ts);
   return out;
@@ -457,6 +470,9 @@ async function renderPatient(){
     '<div class="typebox"><input id="typeInput" type="text" placeholder="Or type a question / concern&hellip;" onkeydown="if(event.key===\'Enter\')addTyped()"><button onclick="addTyped()">Add</button></div>' +
     '<div id="capMsg" class="note"></div></div>' +
     '<div class="card"><h2 class="sec">Captured so far (<span id="count">' + ptRec.entries.length + '</span>)</h2><div id="entries"></div></div>' +
+    '<div class="card" id="closedCard" style="display:none"><h2 class="sec">Answered and closed (<span id="closedCount">0</span>)</h2>' +
+    '<div class="note" style="margin-bottom:6px">Your care team answered these, and you confirmed you were heard.</div>' +
+    '<div id="closedEntries"></div></div>' +
     '<div class="card qrbox"><h2 class="sec">For your care team</h2><div class="qr" id="qrDr"></div>' +
     '<div class="note">A provider entering the room can scan this to open your provider view (their PIN required).</div></div>' +
     '<div class="card"><h2 class="sec">Demo links (clickable)</h2>' +
@@ -478,17 +494,37 @@ function copyText(jsonStr){
   if (navigator.clipboard) navigator.clipboard.writeText(t).then(() => alert("Link copied."));
   else prompt("Copy this link:", t);
 }
+function entryHTML(e, i, closed){
+  const badge = e.addressed
+    ? '<span class="ctbadge">&#10003; Heard by care team</span>'
+    : '<span class="ctbadge" style="color:var(--mut);font-weight:400">Waiting for your care team</span>';
+  return '<div class="entry' + (closed ? ' closed' : (e.addressed ? ' addressed' : '')) + '">' +
+    '<time>' + new Date(e.ts).toLocaleString() + '</time>' + esc(e.text) +
+    '<div class="entryfoot">' +
+      '<label class="heardchk" title="Check this when you feel this concern was heard and addressed">' +
+      '<input type="checkbox" ' + (e.heard ? 'checked' : '') + ' onchange="markHeard(' + i + ', this.checked)"> I was heard</label>' +
+      badge +
+    '</div></div>';
+}
 function renderEntries(){
   const box = document.getElementById("entries"); if (!box) return;
   const a = ptRec.entries;
-  document.getElementById("count").textContent = a.length;
-  box.innerHTML = a.length
-    ? a.map((e, i) =>
-        '<div class="entry' + (e.heard ? ' heard' : '') + '"><time>' + new Date(e.ts).toLocaleString() + '</time>' + esc(e.text) +
-        '<label class="heardchk" title="Check this when you feel this concern was heard and addressed">' +
-        '<input type="checkbox" ' + (e.heard ? 'checked' : '') + ' onchange="markHeard(' + i + ', this.checked)"> I was heard</label></div>'
-      ).join("")
-    : '<div class="empty">Nothing captured yet.</div>';
+  // An item closes only when the care team addressed it AND the patient confirmed.
+  const open = [], closed = [];
+  a.forEach((e, i) => ((e.addressed && e.heard) ? closed : open).push([e, i]));
+  const cnt = document.getElementById("count");
+  if (cnt) cnt.textContent = open.length;
+  box.innerHTML = open.length
+    ? open.map(([e, i]) => entryHTML(e, i, false)).join("")
+    : (a.length ? '<div class="empty">Everything so far has been answered and closed.</div>' : '<div class="empty">Nothing captured yet.</div>');
+  const card = document.getElementById("closedCard");
+  const cbox = document.getElementById("closedEntries");
+  const ccnt = document.getElementById("closedCount");
+  if (card && cbox) {
+    card.style.display = closed.length ? "" : "none";
+    if (ccnt) ccnt.textContent = closed.length;
+    cbox.innerHTML = closed.map(([e, i]) => entryHTML(e, i, true)).join("");
+  }
 }
 function markHeard(i, v){
   if (ptRec.entries[i]) { ptRec.entries[i].heard = !!v; renderEntries(); saveRecord(); }
@@ -799,6 +835,25 @@ async function generate(){
   btn.disabled = false; btn.textContent = "Generate rounding summary";
 }
 let lastUsedAI = false;
+/* Ties a summary line back to the captured entries it came from, so the
+   provider view can show whether the patient has since confirmed. */
+function entriesForItem(item){
+  const q = cleanQuote(item.quote) || item.text;
+  const ql = String(q).toLowerCase();
+  const list = (drRec && drRec.entries) ? drRec.entries : [];
+  return list.filter(e => {
+    const t = String(e.text).toLowerCase();
+    return t === ql || t.includes(ql) || ql.includes(t);
+  });
+}
+function itemState(item){
+  const m = entriesForItem(item);
+  return {
+    matched: m.length,
+    addressed: m.length ? m.some(e => e.addressed) : !!item.addressed,
+    heard: m.length ? m.every(e => e.heard) : false
+  };
+}
 function renderSummaryHTML(failNote){
   const res = document.getElementById("results"); if (!res) return;
   const s = lastSummary; if (!s) { res.innerHTML = ""; return; }
@@ -808,35 +863,31 @@ function renderSummaryHTML(failNote){
   html += bucketHTML("Physician / APP list", "b-md", "md", s.md);
   html += bucketHTML("Nursing list", "b-rn", "rn", s.rn);
   html += bucketHTML("Other / comfort", "b-other", "other", s.other);
+  html += addressedHTML();
   html += '<div class="exportrow"><button onclick="exportMD(false)">Download .md</button><button onclick="exportMD(true)">Share summary</button></div>';
-  html += '<div class="note">' + (lastUsedAI ? "Generated by Claude (AI mode)." : "Keyword demo mode — not AI.") + ' Checking a box marks the item addressed and removes it.</div></div>';
+  html += '<div class="note">' + (lastUsedAI ? "Generated by Claude (AI mode)." : "Keyword demo mode — not AI.") + ' Marking an item addressed moves it to the Addressed list below. Nothing is deleted.</div></div>';
   res.innerHTML = html;
 }
+/* Marks an item addressed. It is NOT deleted: it moves to the Addressed list
+   here, and stays on the patient's page badged "Heard by care team". */
 async function completeItem(bucket, idx){
   const item = lastSummary && lastSummary[bucket] && lastSummary[bucket][idx];
   if (!item) return;
-  const q = cleanQuote(item.quote) || item.text;
-  const ql = q.toLowerCase();
-  const matches = drRec.entries.filter(e => {
-    const t = e.text.toLowerCase();
-    return t === ql || t.includes(ql) || ql.includes(t);
-  });
-  lastSummary[bucket].splice(idx, 1);
+  item.addressed = true;
+  const matches = entriesForItem(item);
+  matches.forEach(e => { e.addressed = true; if (!e.addressedAt) e.addressedAt = Date.now(); });
   renderSummaryHTML();
-  if (matches.length) {
-    drRec.deleted = [...new Set((drRec.deleted || []).concat(matches.map(entryKey)))];
-    const del = new Set(drRec.deleted);
-    drRec.entries = drRec.entries.filter(e => !del.has(entryKey(e)));
-    try {
-      const doc = (await loadDoc()) || EMPTY_DOC();
-      const rec = normRec(doc.pts[route.id]);
-      if (rec) {
-        rec.deleted = [...new Set(rec.deleted.concat(drRec.deleted))];
-        rec.entries = mergeEntries(rec.entries, [], rec.deleted);
-        await saveDoc(doc);
-      }
-    } catch (e) { alert("Removed from view, but could not sync the removal: " + e.message); }
-  }
+  if (!matches.length) return;
+  try {
+    const doc = (await loadDoc()) || EMPTY_DOC();
+    const rec = normRec(doc.pts[route.id]);
+    if (rec) {
+      rec.entries = mergeEntries(rec.entries, drRec.entries, rec.deleted);
+      doc.pts[route.id] = rec;
+      drRec.entries = rec.entries;
+      await saveDoc(doc);
+    }
+  } catch (e) { alert("Marked addressed here, but could not sync it: " + e.message); }
 }
 async function clearPatientItems(){
   if (!confirm("Remove ALL captured items for this patient? This cannot be undone.")) return;
@@ -853,14 +904,34 @@ async function clearPatientItems(){
   } catch (e) { alert("Could not clear items: " + e.message); }
 }
 function cleanQuote(q){ return String(q || "").replace(/^["“”'\s]+|["“”'\s]+$/g, ""); }
+function addressedHTML(){
+  const s = lastSummary; if (!s) return "";
+  const rows = [];
+  ["urgent", "md", "rn", "other"].forEach(k => (s[k] || []).forEach((i, idx) => {
+    const st = itemState(i);
+    if (st.addressed) rows.push([i, st]);
+  }));
+  if (!rows.length) return '';
+  const lis = rows.map(([i, st]) => {
+    const q = cleanQuote(i.quote);
+    const stat = st.matched
+      ? (st.heard ? '<span class="addrstat done">&#9745; Patient confirmed heard</span>'
+                  : '<span class="addrstat wait">&#9744; Awaiting patient</span>')
+      : '<span class="addrstat wait">&#9744; Not linked to a captured item</span>';
+    return '<li>' + stat + '&#10003; ' + esc(i.text) + (q && q !== i.text ? '<q>“' + esc(q) + '”</q>' : '') + '</li>';
+  }).join("");
+  return '<div class="bucket"><h3 style="background:var(--green)">Addressed (' + rows.length + ')</h3>' +
+    '<ul class="addrlist">' + lis + '</ul></div>';
+}
 function bucketHTML(title, cls, key, items){
-  const lis = items.length
-    ? items.map((i, idx) => {
+  const openItems = items.map((i, idx) => [i, idx]).filter(([i]) => !itemState(i).addressed);
+  const lis = openItems.length
+    ? openItems.map(([i, idx]) => {
         const q = cleanQuote(i.quote);
-        return "<li><label class=\"itemchk\" title=\"Mark addressed and remove\"><input type=\"checkbox\" onchange=\"completeItem('" + key + "'," + idx + ")\"> done</label>" +
+        return "<li><label class=\"itemchk\" title=\"Mark addressed. The item stays, and moves to the Addressed list below\"><input type=\"checkbox\" onchange=\"completeItem('" + key + "'," + idx + ")\"> Addressed</label>" +
           esc(i.text) + (q && q !== i.text ? "<q>“" + esc(q) + "”</q>" : "") + "</li>";
       }).join("")
-    : '<li class="empty">None</li>';
+    : '<li class="empty">' + (items.length ? "All addressed" : "None") + '</li>';
   return '<div class="bucket ' + cls + '"><h3>' + title + '</h3><ul>' + lis + '</ul></div>';
 }
 function summaryMD(){
