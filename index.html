@@ -28,7 +28,11 @@
   .btn.sub { background: var(--card); color: var(--blue); border: 1px solid var(--line); font-size: 14px; padding: 11px; font-weight: 600; }
   .btn:disabled { opacity: .5; }
   .btn + .btn { margin-top: 10px; }
-  input.txt { width: 100%; padding: 12px; border: 1px solid var(--line); border-radius: 10px; font-size: 15px; margin-bottom: 10px; }
+  input.txt, select.txt { width: 100%; height: 52px; padding: 0 14px; border: 1px solid var(--line); border-radius: 10px;
+    font-size: 16px; font-family: inherit; color: var(--ink); background: #fff; margin-bottom: 10px; box-sizing: border-box; }
+  select.txt { appearance: none; -webkit-appearance: none; padding-right: 40px;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'><path fill='%235f6b76' d='M5.5 7.5 10 12l4.5-4.5z'/></svg>");
+    background-repeat: no-repeat; background-position: right 12px center; background-size: 18px; }
   .note { font-size: 12px; color: var(--mut); margin-top: 8px; text-align: center; }
   .ok { color: var(--green); font-size: 12px; }
   .err { color: var(--red); font-size: 12px; }
@@ -114,8 +118,7 @@
   .choice p { font-size: 13px; color: var(--mut); margin-bottom: 12px; line-height: 1.4; }
   .btn.coral { background: linear-gradient(150deg, var(--coral), var(--coral-deep)); border-radius: 14px; }
   .btn.teal { background: linear-gradient(150deg, var(--teal), var(--teal-deep)); border-radius: 14px; }
-  .choice input.txt { border-radius: 12px; background: #fff; }
-  .choice select.txt { border-radius: 12px; background: #fff; appearance: auto; }
+  .choice input.txt, .choice select.txt { border-radius: 12px; }
   .heroimg { text-align: center; margin: -4px 0 14px; }
   .heroimg svg, .heroimg img { width: 100%; max-width: 430px; height: auto; display: block; margin: 0 auto; border-radius: 18px; box-shadow: 0 4px 14px rgba(11,95,92,.12); }
   .entry.heard { border-left-color: var(--green); background: var(--green-lt); }
@@ -414,15 +417,30 @@ async function renderLanding(){
     '<input class="txt" id="npFirst" placeholder="First name">' +
     '<input class="txt" id="npLast" placeholder="Last name">' +
     docOptions +
-    '<button class="btn coral" onclick="newPatient()">Sign in &amp; get my link</button>' +
+    '<button class="btn coral" style="margin-top:16px" onclick="newPatient()">Sign in &amp; get my link</button>' +
     '<div class="note" id="npMsg"></div>' +
-    (mine ? '<button class="btn sub" style="margin-top:10px" onclick="location.hash=\'#/b/\'+bucket+\'/p/\'+localStorage.getItem(LS.myPatient)">Return to my patient page</button>' : "") +
     '</div>' +
+    '<div class="choice"><h2>Already have a page?</h2>' +
+    '<p>Come back to it from any phone or computer.</p>' +
+    (mine ? '<button class="btn" onclick="location.hash=\'#/b/\'+bucket+\'/p/\'+localStorage.getItem(LS.myPatient)">Return to my patient page</button><div style="height:14px"></div>' : '') +
+    '<input class="txt" id="reCode" maxlength="6" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="' + (mine ? 'Or open a different code' : 'Enter your 6-character page code') + '">' +
+    '<button class="btn' + (mine ? ' sub' : '') + '" onclick="openMyPage()">Open my page</button>' +
+    '<div class="note" id="reMsg">Your code is the last part of your saved link, after /p/. A caregiver invite code works here too.</div></div>' +
     '<div class="choice"><h2>I\'m a provider</h2>' +
     '<p>See every patient\'s questions and concerns, sorted by role, ready for rounds.</p>' +
     '<button class="btn teal" onclick="location.hash=\'#/b/\'+bucket+\'/dr\'">Provider sign in</button>' +
     '<div class="note">Requires your provider PIN.</div></div>' +
     (bucket === "local" ? '<div class="note">Single-device mode: everything stays on this phone.</div>' : '<div class="note">Demo site ID: ' + esc(bucket) + '</div>');
+}
+function openMyPage(){
+  const el = document.getElementById("reCode");
+  const m = document.getElementById("reMsg");
+  const c = (el.value || "").trim();
+  if (!c) { m.innerHTML = '<span class="err">Enter the code from your link.</span>'; return; }
+  /* Patient page codes are six lower-case characters. Caregiver invite codes are
+     upper case with digits. Send each to the route that understands it. */
+  if (c === c.toUpperCase() && /^[A-Z2-9]{6}$/.test(c)) { location.hash = "#/b/" + bucket + "/c/" + c; return; }
+  location.hash = "#/b/" + bucket + "/p/" + c.toLowerCase();
 }
 async function newPatient(){
   const f = document.getElementById("npFirst").value.trim();
