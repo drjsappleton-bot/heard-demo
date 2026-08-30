@@ -136,6 +136,12 @@
   .addrstat { float: right; margin-left: 10px; font-size: 11px; white-space: nowrap; }
   .addrstat.done { color: var(--green); font-weight: 600; }
   .addrstat.wait { color: var(--mut); }
+  .authhdr { font-size: 12px; text-transform: uppercase; letter-spacing: .6px; color: var(--mut); margin: 14px 0 2px; }
+  .authhdr:first-child { margin-top: 2px; }
+  .authhdr.cg { color: var(--accent); }
+  .cgtag { display: inline-block; margin-left: 8px; font-size: 11px; font-weight: 600; color: var(--accent); background: var(--blue-lt); border-radius: 6px; padding: 1px 6px; vertical-align: 1px; }
+  .sharecode { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 28px; letter-spacing: 4px; font-weight: 700; color: var(--blue); text-align: center; background: var(--blue-lt); border-radius: 10px; padding: 12px; margin: 8px 0; }
+  .warnbox { background: var(--amber-lt); border: 1px solid #e6d9a8; color: var(--amber); border-radius: 10px; padding: 10px 12px; font-size: 12px; margin-top: 8px; }
   .provtag { display: inline-block; background: var(--blue-lt); color: var(--blue); border-radius: 8px; padding: 4px 10px; font-size: 13px; font-weight: 600; margin: 2px 4px 2px 0; }
 </style>
 </head>
@@ -174,7 +180,7 @@
 const KV = "/api/store/";
 const LS = {
   bucket: "heard_bucket_v2", pin: "heard_pin", key: "heard_apikey",
-  myPatient: "heard_my_patient", localdb: "heard_localdb"
+  myPatient: "heard_my_patient", localdb: "heard_localdb", cgPrefix: "heard_cg_"
 };
 let bucket = null;       // current site id ("local" = single-device mode)
 let route = {};          // parsed hash
@@ -188,7 +194,16 @@ function esc(s){ return String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt
 /* ================= data layer (Netlify Blobs via /api/store, or local) ================= */
 const EMPTY_DOC = () => ({ idx: [], pts: {}, providers: [] });
 function normDoc(d){ if (!d || typeof d !== "object") return null; if (!Array.isArray(d.idx)) d.idx = []; if (!d.pts || typeof d.pts !== "object") d.pts = {}; if (!Array.isArray(d.providers)) d.providers = []; return d; }
-function normRec(r){ if (r) { if (!Array.isArray(r.entries)) r.entries = []; if (!Array.isArray(r.deleted)) r.deleted = []; } return r; }
+function normRec(r){ if (r) { if (!Array.isArray(r.entries)) r.entries = []; if (!Array.isArray(r.deleted)) r.deleted = []; if (!Array.isArray(r.caregivers)) r.caregivers = []; } return r; }
+/* Invite codes are read aloud and typed by hand, so the alphabet drops
+   characters that get confused: O/0, I/1/L, and lower case entirely. */
+function rndCode(n){ let s = ""; const c = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"; for (let i=0;i<n;i++) s += c[Math.floor(Math.random()*c.length)]; return s; }
+/* Who is writing right now. Set by the view before anything is captured. */
+let AUTHOR = { by: "patient", name: "" };
+function authorLabel(e){
+  if (!e || e.by !== "caregiver") return "";
+  return "Caregiver" + (e.byName ? " \u2014 " + e.byName : "");
+}
 function entryKey(e){ return e.ts + "|" + e.text; }
 async function loadDoc(){
   if (bucket === "local") return normDoc(JSON.parse(localStorage.getItem(LS.localdb) || "null")) || EMPTY_DOC();
@@ -238,6 +253,7 @@ function parseHash(){
     if (p[2] === "p" && p[3]) return { v: "patient", id: p[3] };
     if (p[2] === "dr" && p[3]) return { v: "drPatient", id: p[3] };
     if (p[2] === "dr") return { v: "drHome" };
+    if (p[2] === "c" && p[3]) return { v: "care", code: String(p[3]).toUpperCase() };
     return { v: "landing" };
   }
   bucket = localStorage.getItem(LS.bucket);
@@ -286,6 +302,7 @@ async function render(){
   if (route.v === "landing") return renderLanding();
   if (route.v === "patient") return renderPatient();
   if (route.v === "drHome") return renderDrHome();
+  if (route.v === "care") return renderCaregiver();
   if (route.v === "drPatient") return renderDrPatient();
 }
 
@@ -461,6 +478,8 @@ async function renderPatient(){
     ptRec.entries = mergeEntries(ptRec.entries, cached.entries, ptRec.deleted);
   }
   localStorage.setItem(LS.myPatient, route.id);
+  AUTHOR = { by: "patient", name: "" };
+  RENDER_READONLY = false;
   const drLink = link("/dr/" + route.id);
   const myLink = link("/p/" + route.id);
   app().innerHTML =
@@ -478,6 +497,7 @@ async function renderPatient(){
     '<div class="card" id="closedCard" style="display:none"><h2 class="sec">Heard by your care team (<span id="closedCount">0</span>)</h2>' +
     '<div class="note" style="margin-bottom:6px">Your care team answered these, and you confirmed you were heard.</div>' +
     '<div id="closedEntries"></div></div>' +
+    '<div class="card"><h2 class="sec">Share with a caregiver</h2><div id="shareBox"></div></div>' +
     '<div class="card qrbox"><h2 class="sec">For your care team</h2><div class="qr" id="qrDr"></div>' +
     '<div class="note">A provider entering the room can scan this to open your provider view (their PIN required).</div></div>' +
     '<div class="card"><h2 class="sec">Demo links (clickable)</h2>' +
@@ -487,7 +507,109 @@ async function renderPatient(){
     '<button class="btn sub" style="margin-top:10px" onclick="copyText(' + JSON.stringify(JSON.stringify(drLink)) + ')">Copy provider link</button>' +
     '<div class="linkline">' + esc(myLink) + '</div></div>';
   renderEntries();
+  renderShare();
   makeQR("qrDr", drLink);
+}
+function careLink(code){ return link("/c/" + code); }
+function renderShare(){
+  const box = document.getElementById("shareBox"); if (!box) return;
+  const sh = ptRec.share;
+  if (!sh || !sh.code) {
+    box.innerHTML = '<div class="note">A family member or friend can add questions to this same list, from their own phone.</div>' +
+      '<button class="btn coral" style="margin-top:10px" onclick="makeShareCode()">Create an invite code</button>';
+    return;
+  }
+  const url = careLink(sh.code);
+  const msg = "I am using Heard to keep track of questions for my care team. Join with code " + sh.code + " or open " + url;
+  const joined = (ptRec.caregivers || []).map(c => esc(c.name)).join(", ");
+  box.innerHTML =
+    '<div class="note">Give this code to the person helping you. They enter it on their own phone, put in their name, and can then add questions to this list.</div>' +
+    '<div class="sharecode">' + esc(sh.code) + '</div>' +
+    '<a class="btn coral" href="sms:?&body=' + encodeURIComponent(msg) + '">&#128241; Text this to a caregiver</a>' +
+    (navigator.share ? '<button class="btn sub" style="margin-top:10px" onclick="shareInvite()">Share another way</button>' : '') +
+    '<button class="btn sub" style="margin-top:10px" onclick="copyText(' + JSON.stringify(JSON.stringify(url)) + ')">Copy caregiver link</button>' +
+    '<div class="linkline">' + esc(url) + '</div>' +
+    (joined ? '<div class="note" style="margin-top:8px">Joined so far: <b>' + joined + '</b></div>' : '') +
+    '<div class="warnbox">Anyone who uses this code can see everything on this page, now and later. Replace the code to stop new people joining.</div>' +
+    '<button class="btn sub" style="margin-top:8px" onclick="makeShareCode(true)">Replace the code</button>';
+}
+async function makeShareCode(replace){
+  if (replace && !confirm("Replace the code? The old one stops working. Caregivers who already joined stay joined.")) return;
+  ptRec.share = { code: rndCode(6), created: Date.now() };
+  renderShare();
+  await saveRecord();
+}
+async function shareInvite(){
+  const sh = ptRec.share; if (!sh) return;
+  const url = careLink(sh.code);
+  try { await navigator.share({ title: "Heard", text: "Join my Heard list with code " + sh.code, url: url }); } catch (e) {}
+}
+
+/* ---------- caregiver ---------- */
+async function renderCaregiver(){
+  document.getElementById("tagline").textContent = "Caregiver";
+  app().innerHTML = '<div class="card"><div class="empty">Loading&hellip;</div></div>';
+  let doc = null;
+  try { doc = await loadDoc(); } catch (e) {}
+  let pid = null;
+  if (doc && doc.pts) {
+    for (const k in doc.pts) {
+      const r = doc.pts[k];
+      if (r && r.share && String(r.share.code).toUpperCase() === route.code) { pid = k; break; }
+    }
+  }
+  if (!pid) {
+    app().innerHTML = '<div class="card"><div class="empty">That invite code is not recognised on this demo site. It may have been replaced. Ask for a new one.</div>' +
+      '<button class="btn sub" onclick="goHome()">Home</button></div>';
+    return;
+  }
+  route.id = pid;
+  ptRec = normRec(doc.pts[pid]);
+  RENDER_READONLY = true;
+  const stored = localStorage.getItem(LS.cgPrefix + pid);
+  if (!stored) {
+    app().innerHTML = '<div class="card"><h2 class="sec">You have been invited to help ' + esc(ptRec.first) + '</h2>' +
+      '<p style="font-size:14px;margin-bottom:10px">Add your name so the care team knows who asked. Your questions appear on the same list, under your name.</p>' +
+      '<input class="txt" id="cgName" placeholder="Your name">' +
+      '<button class="btn coral" onclick="joinAsCaregiver()">Join</button>' +
+      '<div class="note" id="cgMsg"></div>' +
+      '<div class="warnbox">You will be able to see everything ' + esc(ptRec.first) + ' has recorded.</div></div>';
+    return;
+  }
+  AUTHOR = { by: "caregiver", name: stored };
+  drawCaregiver(stored);
+}
+async function joinAsCaregiver(){
+  const n = (document.getElementById("cgName").value || "").trim();
+  const m = document.getElementById("cgMsg");
+  if (!n) { m.innerHTML = '<span class="err">Please enter your name.</span>'; return; }
+  localStorage.setItem(LS.cgPrefix + route.id, n);
+  AUTHOR = { by: "caregiver", name: n };
+  if (!ptRec.caregivers.some(c => String(c.name).toLowerCase() === n.toLowerCase())) {
+    ptRec.caregivers.push({ name: n, joined: Date.now() });
+    try { await saveRecord(); } catch (e) {}
+  }
+  drawCaregiver(n);
+}
+function drawCaregiver(name){
+  app().innerHTML =
+    '<div class="card"><h2 class="sec">Helping ' + esc(ptRec.first) + '</h2>' +
+    '<div class="note">You are signed in as <b>' + esc(name) + '</b>. Anything you add is labelled with your name so the care team knows who asked.</div>' +
+    '<div class="privacy"><span id="privDot" class="dot"></span><span id="privLabel">Microphone off &mdash; nothing is being recorded</span></div>' +
+    '<button id="recBtn" class="recbtn" onclick="toggleRec()"><span class="mic">&#127908;</span><span id="recLabel">Tap to speak</span></button>' +
+    '<div class="note">' + (SPEECH_LIKELY
+      ? 'Tap, say the question, tap again to stop.'
+      : 'On this browser, tap the box below and use the microphone key on your keyboard to speak.'
+      ) + (IS_IOS_NON_SAFARI ? ' Opening this page in Safari lets you speak with one tap instead.' : '') + '</div>' +
+    '<div id="liveText"></div>' +
+    '<div class="typebox"><input id="typeInput" type="text" placeholder="Or type a question / concern&hellip;" onkeydown="if(event.key===\'Enter\')addTyped()"><button onclick="addTyped()">Add</button></div>' +
+    '<div id="capMsg" class="note"></div></div>' +
+    '<div class="card"><h2 class="sec">Captured so far (<span id="count">0</span>)</h2><div id="entries"></div></div>' +
+    '<div class="card" id="closedCard" style="display:none"><h2 class="sec">Heard by your care team (<span id="closedCount">0</span>)</h2>' +
+    '<div class="note" style="margin-bottom:6px">The care team answered these, and ' + esc(ptRec.first) + ' confirmed.</div>' +
+    '<div id="closedEntries"></div></div>' +
+    '<div class="card"><div class="warnbox">Only ' + esc(ptRec.first) + ' can tick "I was heard". You can see it, and you cannot set it.</div></div>';
+  renderEntries();
 }
 function makeQR(elId, text){
   const el = document.getElementById(elId);
@@ -499,18 +621,46 @@ function copyText(jsonStr){
   if (navigator.clipboard) navigator.clipboard.writeText(t).then(() => alert("Link copied."));
   else prompt("Copy this link:", t);
 }
-function entryHTML(e, i, closed){
+function entryHTML(e, i, closed, readOnly){
   const badge = e.addressed
     ? '<span class="ctbadge">&#10003; Heard by your care team</span>'
     : '<span class="ctbadge" style="color:var(--mut);font-weight:400">Waiting for your care team</span>';
+  const who = authorLabel(e);
+  /* "I was heard" belongs to the patient. A caregiver sees its state, and cannot set it. */
+  const control = readOnly
+    ? '<span class="heardchk" style="font-weight:400;color:var(--mut)">' + (e.heard ? '&#9745; Patient marked heard' : '&#9744; Patient has not marked this yet') + '</span>'
+    : '<label class="heardchk" title="Check this when you feel this concern was heard and addressed">' +
+      '<input type="checkbox" ' + (e.heard ? 'checked' : '') + ' onchange="markHeard(' + i + ', this.checked)"> I was heard</label>';
   return '<div class="entry' + (closed ? ' closed' : (e.addressed ? ' addressed' : '')) + '">' +
-    '<time>' + new Date(e.ts).toLocaleString() + '</time>' + esc(e.text) +
-    '<div class="entryfoot">' +
-      '<label class="heardchk" title="Check this when you feel this concern was heard and addressed">' +
-      '<input type="checkbox" ' + (e.heard ? 'checked' : '') + ' onchange="markHeard(' + i + ', this.checked)"> I was heard</label>' +
-      badge +
-    '</div></div>';
+    '<time>' + new Date(e.ts).toLocaleString() + (who ? ' &middot; <b>' + esc(who) + '</b>' : '') + '</time>' + esc(e.text) +
+    '<div class="entryfoot">' + control + badge + '</div></div>';
 }
+/* Groups a list into the patient's own items, then one group per caregiver. */
+function groupByAuthor(pairs){
+  const mine = [], byCg = {};
+  pairs.forEach(pr => {
+    const e = pr[0];
+    if (e.by === "caregiver") { const k = e.byName || "Caregiver"; (byCg[k] = byCg[k] || []).push(pr); }
+    else mine.push(pr);
+  });
+  return { mine, byCg };
+}
+function groupedHTML(pairs, closed, readOnly){
+  const g = groupByAuthor(pairs);
+  const names = Object.keys(g.byCg).sort();
+  if (!names.length) return pairs.map(pr => entryHTML(pr[0], pr[1], closed, readOnly)).join("");
+  let html = "";
+  if (g.mine.length) {
+    html += '<h3 class="authhdr">From ' + esc(ptRec.first) + '</h3>' +
+            g.mine.map(pr => entryHTML(pr[0], pr[1], closed, readOnly)).join("");
+  }
+  names.forEach(n => {
+    html += '<h3 class="authhdr cg">Caregiver &mdash; ' + esc(n) + '</h3>' +
+            g.byCg[n].map(pr => entryHTML(pr[0], pr[1], closed, readOnly)).join("");
+  });
+  return html;
+}
+let RENDER_READONLY = false;
 function renderEntries(){
   const box = document.getElementById("entries"); if (!box) return;
   const a = ptRec.entries;
@@ -520,7 +670,7 @@ function renderEntries(){
   const cnt = document.getElementById("count");
   if (cnt) cnt.textContent = open.length;
   box.innerHTML = open.length
-    ? open.map(([e, i]) => entryHTML(e, i, false)).join("")
+    ? groupedHTML(open, false, RENDER_READONLY)
     : (a.length ? '<div class="empty">Everything so far has been answered and closed.</div>' : '<div class="empty">Nothing captured yet.</div>');
   const card = document.getElementById("closedCard");
   const cbox = document.getElementById("closedEntries");
@@ -528,7 +678,7 @@ function renderEntries(){
   if (card && cbox) {
     card.style.display = closed.length ? "" : "none";
     if (ccnt) ccnt.textContent = closed.length;
-    cbox.innerHTML = closed.map(([e, i]) => entryHTML(e, i, true)).join("");
+    cbox.innerHTML = groupedHTML(closed, true, RENDER_READONLY);
   }
 }
 function markHeard(i, v){
@@ -553,7 +703,9 @@ async function saveRecord(){
   catch (e) { if (m) m.innerHTML = '<span class="err">Could not sync to server; kept on this device for now.</span>'; }
 }
 function persistEntry(text){
-  ptRec.entries.push({ text: text, ts: Date.now() });
+  const e = { text: text, ts: Date.now(), by: AUTHOR.by };
+  if (AUTHOR.by === "caregiver" && AUTHOR.name) e.byName = AUTHOR.name;
+  ptRec.entries.push(e);
   renderEntries();
   saveRecord();
 }
@@ -896,6 +1048,14 @@ function entriesForItem(item){
     return t === ql || t.includes(ql) || ql.includes(t);
   });
 }
+/* The rounding list should say who asked, since a caregiver's question and the
+   patient's own are answered differently. */
+function itemAuthorTag(item){
+  const m = entriesForItem(item);
+  const cg = m.find(e => e.by === "caregiver");
+  if (!cg) return "";
+  return '<span class="cgtag">Caregiver' + (cg.byName ? " &mdash; " + esc(cg.byName) : "") + '</span>';
+}
 function itemState(item){
   const m = entriesForItem(item);
   return {
@@ -968,7 +1128,7 @@ function addressedHTML(){
       ? (st.heard ? '<span class="addrstat done">&#9745; Patient confirmed heard</span>'
                   : '<span class="addrstat wait">&#9744; Awaiting patient</span>')
       : '<span class="addrstat wait">&#9744; Not linked to a captured item</span>';
-    return '<li>' + stat + '&#10003; ' + esc(i.text) + (q && q !== i.text ? '<q>“' + esc(q) + '”</q>' : '') + '</li>';
+    return '<li>' + stat + '&#10003; ' + esc(i.text) + itemAuthorTag(i) + (q && q !== i.text ? '<q>“' + esc(q) + '”</q>' : '') + '</li>';
   }).join("");
   return '<div class="bucket"><h3 style="background:var(--green)">Addressed (' + rows.length + ')</h3>' +
     '<ul class="addrlist">' + lis + '</ul></div>';
@@ -979,7 +1139,7 @@ function bucketHTML(title, cls, key, items){
     ? openItems.map(([i, idx]) => {
         const q = cleanQuote(i.quote);
         return "<li><label class=\"itemchk\" title=\"Mark addressed. The item stays, and moves to the Addressed list below\"><input type=\"checkbox\" onchange=\"completeItem('" + key + "'," + idx + ")\"> Addressed</label>" +
-          esc(i.text) + (q && q !== i.text ? "<q>“" + esc(q) + "”</q>" : "") + "</li>";
+          esc(i.text) + itemAuthorTag(i) + (q && q !== i.text ? "<q>“" + esc(q) + "”</q>" : "") + "</li>";
       }).join("")
     : '<li class="empty">' + (items.length ? "All addressed" : "None") + '</li>';
   return '<div class="bucket ' + cls + '"><h3>' + title + '</h3><ul>' + lis + '</ul></div>';
