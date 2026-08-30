@@ -467,7 +467,10 @@ async function renderPatient(){
     '<div class="card"><h2 class="sec">Hello, ' + esc(ptRec.first) + '</h2>' +
     '<div class="privacy"><span id="privDot" class="dot"></span><span id="privLabel">Microphone off &mdash; nothing is being recorded</span></div>' +
     '<button id="recBtn" class="recbtn" onclick="toggleRec()"><span class="mic">&#127908;</span><span id="recLabel">Tap to speak</span></button>' +
-    '<div class="note">Tap, say your question or concern, tap again to stop. Your care team will see it at their next visit.</div>' +
+    '<div class="note">' + (SPEECH_LIKELY
+      ? 'Tap, say your question or concern, tap again to stop. Your care team will see it at their next visit.'
+      : 'On this browser, tap the box below and use the microphone key on your keyboard to speak. Your care team will see it at their next visit.'
+      ) + (IS_IOS_NON_SAFARI ? ' Opening this page in Safari lets you speak with one tap instead.' : '') + '</div>' +
     '<div id="liveText"></div>' +
     '<div class="typebox"><input id="typeInput" type="text" placeholder="Or type a question / concern&hellip;" onkeydown="if(event.key===\'Enter\')addTyped()"><button onclick="addTyped()">Add</button></div>' +
     '<div id="capMsg" class="note"></div></div>' +
@@ -570,6 +573,18 @@ function addTyped(){
    - Chrome ends a session by itself after a few seconds of silence even with
      continuous = true. Nothing reopened it, so the mic looked live and was not */
 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+/* Every browser on iOS is WebKit, but only Safari is entitled to reach Apple's
+   speech service. Chrome, Edge, Firefox and the rest expose
+   webkitSpeechRecognition on iOS and then fail with "service-not-allowed".
+   Firefox on Android does not implement SpeechRecognition at all.
+   In every one of those cases the phone keyboard's own microphone key still
+   dictates into a text field, so that is the fallback rather than "type it". */
+const UA = navigator.userAgent || "";
+const IS_IOS = /iP(hone|od|ad)/.test(UA) || (/Macintosh/.test(UA) && navigator.maxTouchPoints > 1);
+const IS_IOS_NON_SAFARI = IS_IOS && /CriOS|FxiOS|EdgiOS|OPiOS|GSA|DuckDuckGo|Brave|YaBrowser|Coast|Mercury/i.test(UA);
+const SPEECH_LIKELY = !!SR && !IS_IOS_NON_SAFARI;
+let speechBlocked = false;
 let rec = null, recording = false, wantRec = false;
 let finalBuf = "", interimBuf = "", lastSaved = "", restarts = 0;
 let endTimer = null, hideTimer = null, lastHeardAt = 0;
@@ -577,7 +592,13 @@ const MAX_RESTARTS = 60;          // roughly five minutes of silence
 const SILENCE_LIMIT_MS = 90000;   // stop on our own after this much true silence
 
 function toggleRec(){
-  if (!SR) { alert("Live speech-to-text is not supported in this browser; please type instead."); return; }
+  if (!SR) { useKeyboardDictation("This browser cannot listen directly."); return; }
+  if (speechBlocked || IS_IOS_NON_SAFARI) {
+    useKeyboardDictation(IS_IOS_NON_SAFARI
+      ? "On iPhone, only Safari can let a web page listen."
+      : "This browser will not let a web page listen.");
+    return;
+  }
   wantRec ? stopRec() : startRec();
 }
 
@@ -590,6 +611,20 @@ function showLive(txt, sticky){
   if (!sticky) hideTimer = setTimeout(() => { lt.classList.remove("show"); lt.textContent = ""; }, 1800);
 }
 
+function keyboardHint(){
+  return IS_IOS
+    ? "Tap the box below, then tap the microphone key on your keyboard and speak."
+    : "Tap the box below, then tap the microphone key on your keyboard and speak.";
+}
+/* Not a dead end: the keyboard microphone dictates in every mobile browser. */
+function useKeyboardDictation(reason){
+  speechBlocked = true;
+  wantRec = false; recording = false;
+  recUI(false);
+  showLive(reason + " " + keyboardHint(), true);
+  const inp = document.getElementById("typeInput");
+  if (inp) { try { inp.focus(); } catch (e) {} }
+}
 function startRec(){
   finalBuf = ""; interimBuf = ""; lastSaved = ""; restarts = 0;
   wantRec = true; lastHeardAt = Date.now();
@@ -617,10 +652,23 @@ function openRec(){
   };
 
   rec.onerror = (e) => {
-    const fatal = { "not-allowed": "Microphone blocked. Allow mic access in the browser, or type it instead.",
-                    "service-not-allowed": "Speech service unavailable in this browser. Type it instead.",
-                    "audio-capture": "No microphone found. Type it instead." };
-    if (fatal[e.error]) { wantRec = false; recording = false; recUI(false); showLive(fatal[e.error], true); return; }
+    if (e.error === "service-not-allowed") {
+      useKeyboardDictation(IS_IOS
+        ? "On iPhone, only Safari can let a web page listen."
+        : "This browser will not let a web page listen.");
+      return;
+    }
+    if (e.error === "not-allowed") {
+      wantRec = false; recording = false; recUI(false);
+      showLive("Microphone permission was denied. Allow it in your browser settings, or " + keyboardHint().charAt(0).toLowerCase() + keyboardHint().slice(1), true);
+      const inp = document.getElementById("typeInput"); if (inp) { try { inp.focus(); } catch (x) {} }
+      return;
+    }
+    if (e.error === "audio-capture") {
+      wantRec = false; recording = false; recUI(false);
+      showLive("No microphone found. " + keyboardHint(), true);
+      return;
+    }
     /* no-speech, network, aborted: leave it to onend, which reopens or finishes */
   };
 
