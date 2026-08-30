@@ -122,7 +122,7 @@
   .itemchk { float: right; margin-left: 10px; font-size: 11px; color: var(--mut); cursor: pointer; white-space: nowrap; }
   .itemchk input { vertical-align: -2px; margin-right: 3px; }
   /* loop states: open -> addressed by the care team -> closed once the patient confirms */
-  .entryfoot { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 6px; }
+  .entryfoot { display: flex; align-items: center; justify-content: space-between; gap: 6px 10px; margin-top: 6px; flex-wrap: wrap; }
   .entryfoot .heardchk { margin-top: 0; }
   .ctbadge { font-size: 11px; font-weight: 600; white-space: nowrap; color: var(--amber); }
   .entry.closed .ctbadge { color: var(--green); }
@@ -496,7 +496,7 @@ function copyText(jsonStr){
 }
 function entryHTML(e, i, closed){
   const badge = e.addressed
-    ? '<span class="ctbadge">&#10003; Heard by care team</span>'
+    ? '<span class="ctbadge">&#10003; Heard by your care team</span>'
     : '<span class="ctbadge" style="color:var(--mut);font-weight:400">Waiting for your care team</span>';
   return '<div class="entry' + (closed ? ' closed' : (e.addressed ? ' addressed' : '')) + '">' +
     '<time>' + new Date(e.ts).toLocaleString() + '</time>' + esc(e.text) +
