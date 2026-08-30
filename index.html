@@ -68,7 +68,9 @@
   .bucket li q { display: block; font-size: 12px; color: var(--mut); font-style: italic; margin-top: 3px; }
   .b-urgent h3 { background: var(--red); } .b-urgent ul { background: var(--red-lt); }
   .b-md h3 { background: var(--blue); }
-  .b-rn h3 { background: var(--green); }
+  /* Nursing header is yellow. White text on yellow is unreadable, so this one
+     header uses dark ink. Every other bucket keeps white on its own colour. */
+  .b-rn h3 { background: #f2c200; color: var(--ink); }
   .b-other h3 { background: #6b7683; }
   .empty { color: var(--mut); font-size: 13px; padding: 10px 4px; }
   .exportrow { display: flex; gap: 8px; margin-top: 14px; }
