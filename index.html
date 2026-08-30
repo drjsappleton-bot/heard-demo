@@ -130,7 +130,7 @@
     <h1 onclick="goHome()">Heard</h1>
     <p id="tagline">Patient-controlled concern capture &mdash; demo</p>
   </header>
-  <div class="demo-banner">DEMO ONLY &mdash; not a medical device, no real-time alerting, not HIPAA infrastructure. Do not enter real patient information. Use your call light for urgent needs.</div>
+  <div class="demo-banner">DEMO ONLY, not a medical device, no real-time alerting, not HIPAA infrastructure. Do not enter real patient information. Does not replace emergency care: in hospital use your call light, at home call your doctor's office or 911.</div>
 
   <div id="app"></div>
 
@@ -150,13 +150,13 @@
     </div>
   </div>
 
-  <footer>Prototype for concept demonstration only. Demo data is stored in a shared demo database and expires automatically. Not for clinical use.</footer>
+  <footer>Prototype for concept demonstration only. Demo data is stored in a demo database on this site and is not automatically deleted. Not for clinical use.</footer>
 </div>
 
 <script>
 "use strict";
 /* ================= config / storage ================= */
-const KV = "https://jsonblob.com/api/jsonBlob/";
+const KV = "/api/store/";
 const LS = {
   bucket: "heard_bucket_v2", pin: "heard_pin", key: "heard_apikey",
   myPatient: "heard_my_patient", localdb: "heard_localdb"
@@ -170,7 +170,7 @@ function link(path){ return baseURL() + "#/b/" + bucket + path; }
 function rnd(n){ let s = ""; const c = "abcdefghjkmnpqrstuvwxyz23456789"; for (let i=0;i<n;i++) s += c[Math.floor(Math.random()*c.length)]; return s; }
 function esc(s){ return String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
 
-/* ================= data layer (jsonblob.com or local) ================= */
+/* ================= data layer (Netlify Blobs via /api/store, or local) ================= */
 const EMPTY_DOC = () => ({ idx: [], pts: {}, providers: [] });
 function normDoc(d){ if (!d || typeof d !== "object") return null; if (!Array.isArray(d.idx)) d.idx = []; if (!d.pts || typeof d.pts !== "object") d.pts = {}; if (!Array.isArray(d.providers)) d.providers = []; return d; }
 function normRec(r){ if (r) { if (!Array.isArray(r.entries)) r.entries = []; if (!Array.isArray(r.deleted)) r.deleted = []; } return r; }
@@ -200,11 +200,15 @@ async function saveDoc(doc){
   if (!r.ok) throw new Error("write failed (" + r.status + ")");
 }
 async function createSite(){
-  const r = await fetch("https://jsonblob.com/api/jsonBlob", { method: "POST", headers: { "Content-Type": "application/json", "Accept": "application/json" }, body: JSON.stringify(EMPTY_DOC()) });
-  if (!r.ok) throw new Error("Could not create demo site (" + r.status + ")");
-  const loc = r.headers.get("Location") || r.headers.get("location");
-  if (!loc) throw new Error("The demo database did not return a site ID (browser blocked the Location header). Use single-device mode instead.");
-  const id = loc.split("/").pop().trim();
+  const r = await fetch("/api/store", { method: "POST", headers: { "Content-Type": "application/json", "Accept": "application/json" }, body: JSON.stringify(EMPTY_DOC()) });
+  if (!r.ok) {
+    let detail = "";
+    try { const e = await r.json(); if (e && e.error) detail = ": " + e.error; } catch (e) {}
+    throw new Error("Could not create demo site (" + r.status + ")" + detail);
+  }
+  let d = null;
+  try { d = await r.json(); } catch (e) { throw new Error("The demo store returned an unreadable reply."); }
+  const id = d && d.id ? String(d.id).trim() : "";
   if (!id) throw new Error("Could not read new site ID.");
   return id;
 }
@@ -275,7 +279,7 @@ function renderSetup(){
   document.getElementById("tagline").textContent = "Demo site setup";
   app().innerHTML =
     '<div class="card"><h2 class="sec">Create your demo site</h2>' +
-    '<p style="font-size:14px;margin-bottom:10px">One-time setup. This creates a free shared demo database (jsonblob.com) so patient and provider phones can talk to each other. No account needed. Links and QR codes will carry your site ID automatically.</p>' +
+    '<p style="font-size:14px;margin-bottom:10px">One-time setup. This creates a shared demo database on this site itself, so patient and provider phones can talk to each other. No account needed. Links and QR codes will carry your site ID automatically.</p>' +
     '<button class="btn" onclick="doSetup()">Create demo site</button>' +
     '<div class="note" id="suMsg"></div></div>' +
     '<div class="card"><h2 class="sec">Or</h2>' +

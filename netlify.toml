@@ -1,0 +1,9 @@
+# Heard demo: static site plus one serverless function for the shared store.
+[build]
+  publish = "."
+
+[build.environment]
+  NODE_VERSION = "22"
+
+[functions]
+  node_bundler = "esbuild"
