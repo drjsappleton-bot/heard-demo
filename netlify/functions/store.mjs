@@ -24,7 +24,9 @@ function siteId(req, context) {
 export default async (req, context) => {
   let store;
   try {
-    store = getStore(STORE);
+    // Strong consistency: without it a read straight after a write can miss,
+    // which showed up as "Patient page not found" right after signing in.
+    store = getStore({ name: STORE, consistency: "strong" });
   } catch (e) {
     return json({ error: "Blob store unavailable: " + (e.message || e) }, 500);
   }
