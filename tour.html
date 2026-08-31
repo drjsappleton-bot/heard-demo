@@ -8,128 +8,162 @@
 <style>
   :root {
     --blue:#1f4e79; --blue-lt:#eaf1f8; --accent:#2e75b6;
+    --red:#b3261e; --red-lt:#fdecea;
     --green:#1e7d46; --green-lt:#e8f5ee;
     --amber:#9a6700; --amber-lt:#fff8e1;
     --ink:#1a1d21; --mut:#5f6b76; --bg:#f4f6f8; --card:#fff; --line:#dde3e9;
     --teal:#12807c; --teal-deep:#0b5f5c; --coral:#e8735a; --coral-deep:#d45f47; --cream:#fdf8f3;
+    --hi:#ffcc00;
   }
   * { box-sizing:border-box; }
   body { margin:0; background:var(--bg); color:var(--ink);
     font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; }
-  .wrap { max-width:520px; margin:0 auto; padding:18px 16px 40px; }
-  .top { text-align:center; margin-bottom:14px; }
-  .top img { width:46px; height:46px; border-radius:12px; }
-  .top h1 { font-size:22px; margin:8px 0 2px; color:var(--teal-deep); }
-  .top p { margin:0; font-size:13px; color:var(--mut); }
-  .back { display:inline-block; margin-top:10px; font-size:13px; color:var(--blue); text-decoration:none; font-weight:600; }
+  .wrap { max-width:560px; margin:0 auto; padding:16px 16px 46px; }
+  .top { text-align:center; }
+  .top img { width:42px; height:42px; border-radius:11px; }
+  .top h1 { font-size:21px; margin:7px 0 2px; color:var(--teal-deep); }
+  .top p { margin:0; font-size:12.5px; color:var(--mut); }
+  .back { display:inline-block; margin-top:8px; font-size:13px; color:var(--blue);
+    text-decoration:none; font-weight:600; }
 
-  .stage { position:relative; margin:14px auto 0; width:300px; }
-  .phone { width:300px; height:604px; border-radius:38px; background:#10161c; padding:11px 10px 14px;
+  .stage { position:relative; width:302px; margin:16px auto 0; }
+  .phone { width:302px; height:606px; border-radius:38px; background:#10161c; padding:11px 10px 14px;
     box-shadow:0 18px 44px rgba(16,22,28,.34); position:relative; }
   .notch { position:absolute; top:11px; left:50%; transform:translateX(-50%); width:104px; height:20px;
-    background:#10161c; border-radius:0 0 14px 14px; z-index:6; }
-  .screen { position:relative; width:100%; height:100%; background:var(--bg); border-radius:29px;
-    overflow:hidden; }
-  .scene { position:absolute; inset:0; padding:34px 14px 14px; overflow:hidden;
-    opacity:0; transform:translateX(16px); transition:opacity .34s ease, transform .34s ease; }
-  .scene.on { opacity:1; transform:none; }
+    background:#10161c; border-radius:0 0 14px 14px; z-index:9; }
+  .screen { position:relative; width:100%; height:100%; background:var(--bg);
+    border-radius:29px; overflow:hidden; }
+  .view { position:absolute; inset:0; padding:32px 12px 12px; overflow:hidden;
+    opacity:0; transition:opacity .45s ease; }
+  .view.on { opacity:1; }
 
-  .cap { position:absolute; left:0; right:0; bottom:-52px; text-align:center; font-size:14px;
-    color:var(--ink); font-weight:600; min-height:40px; line-height:1.35;
-    opacity:0; transition:opacity .3s ease; }
-  .cap.on { opacity:1; }
-  .cap small { display:block; font-weight:400; color:var(--mut); font-size:12.5px; margin-top:2px; }
+  /* yellow highlight around whatever is being talked about */
+  .hl { position:absolute; border:3px solid var(--hi); border-radius:11px; pointer-events:none;
+    box-shadow:0 0 0 3px rgba(255,204,0,.28); opacity:0; transition:opacity .3s ease; z-index:14; }
+  .hl.on { opacity:1; }
 
-  .bar { width:300px; height:4px; background:var(--line); border-radius:3px; margin:74px auto 0; overflow:hidden; }
-  .bar i { display:block; height:100%; width:0; background:var(--teal); border-radius:3px; }
-  .ctrls { display:flex; gap:8px; justify-content:center; margin-top:14px; }
-  .ctrls button { border:1px solid var(--line); background:var(--card); color:var(--blue);
-    font-size:13px; font-weight:600; padding:9px 16px; border-radius:9px; cursor:pointer; }
-  .ctrls button.pri { background:var(--teal); border-color:var(--teal); color:#fff; }
+  /* the pointer */
+  .cur { position:absolute; width:26px; height:26px; z-index:16; opacity:0; left:0; top:0;
+    transition:transform 1s cubic-bezier(.35,.1,.25,1), opacity .3s ease; pointer-events:none; }
+  .cur.on { opacity:1; }
+  .cur svg { display:block; filter:drop-shadow(0 2px 3px rgba(0,0,0,.4)); }
+  .ripple { position:absolute; left:-13px; top:-13px; width:52px; height:52px; border-radius:50%;
+    border:2px solid var(--coral); opacity:0; }
+  .ripple.go { animation:rip .65s ease-out; }
+  @keyframes rip { 0% { transform:scale(.3); opacity:.85; } 100% { transform:scale(1.15); opacity:0; } }
 
-  /* app-alike bits */
-  .card { background:var(--card); border-radius:14px; padding:11px 12px; margin-bottom:9px;
-    box-shadow:0 1px 2px rgba(16,22,28,.06); }
-  .sec { font-size:10px; text-transform:uppercase; letter-spacing:.7px; color:var(--mut); margin:0 0 7px; }
-  .fld { height:38px; border:1px solid var(--line); border-radius:9px; background:#fff; font-size:13px;
-    display:flex; align-items:center; padding:0 11px; color:var(--ink); margin-bottom:8px; }
+  .cap { min-height:52px; text-align:center; margin-top:16px; }
+  .cap b { display:block; font-size:15px; }
+  .cap small { display:block; font-size:13px; color:var(--mut); margin-top:3px; line-height:1.4; }
+
+  .bar { width:302px; height:5px; background:var(--line); border-radius:3px; margin:6px auto 0; overflow:hidden; }
+  .bar i { display:block; height:100%; width:0; background:var(--teal); transition:width .4s ease; }
+  .nav { display:flex; align-items:center; justify-content:center; gap:8px; margin-top:14px; }
+  .nav button { border:1px solid var(--line); background:var(--card); color:var(--blue); font-size:14px;
+    font-weight:700; padding:11px 18px; border-radius:10px; cursor:pointer; min-width:88px; }
+  .nav button.pri { background:var(--teal); border-color:var(--teal); color:#fff; }
+  .nav button:disabled { opacity:.4; cursor:default; }
+  .count { font-size:13px; color:var(--mut); min-width:62px; text-align:center; }
+
+  /* ---- app-alike chrome ---- */
+  .c { background:var(--card); border-radius:13px; padding:10px 11px; margin-bottom:8px; }
+  .sec { font-size:9.5px; text-transform:uppercase; letter-spacing:.7px; color:var(--mut); margin:0 0 7px; }
+  .note { font-size:10.5px; color:var(--mut); line-height:1.42; }
+  .fld { height:36px; border:1px solid var(--line); border-radius:9px; background:#fff; font-size:12.5px;
+    display:flex; align-items:center; padding:0 10px; color:var(--ink); margin-bottom:7px; }
   .fld.ph { color:#9aa4ad; }
   .fld.sel { justify-content:space-between; }
-  .fld.sel::after { content:"\25BE"; color:var(--mut); }
-  .fld.focus { border-color:var(--accent); box-shadow:0 0 0 3px rgba(46,117,182,.16); }
-  .cta { height:40px; border-radius:11px; background:linear-gradient(150deg,var(--coral),var(--coral-deep));
-    color:#fff; font-weight:700; font-size:13.5px; display:flex; align-items:center; justify-content:center; }
-  .cta.blue { background:var(--blue); }
-  .cta.tealb { background:linear-gradient(150deg,var(--teal),var(--teal-deep)); }
-  .hero { background:linear-gradient(150deg,var(--teal),var(--teal-deep)); border-radius:16px;
-    padding:14px; text-align:center; color:#fff; margin-bottom:9px; }
-  .hero b { font-size:19px; display:block; }
-  .hero span { font-size:11px; opacity:.92; }
+  .fld.sel::after { content:"\25BE"; color:var(--mut); font-size:11px; }
+  .btn { height:38px; border-radius:10px; display:flex; align-items:center; justify-content:center;
+    font-weight:700; font-size:12.5px; color:#fff; }
+  .btn.coral { background:linear-gradient(150deg,var(--coral),var(--coral-deep)); }
+  .btn.teal { background:linear-gradient(150deg,var(--teal),var(--teal-deep)); }
+  .btn.navy { background:var(--blue); }
+  .btn.sub { background:#fff; color:var(--blue); border:1px solid var(--line); font-weight:600; }
+  .hero { background:linear-gradient(150deg,var(--teal),var(--teal-deep)); border-radius:15px;
+    padding:13px; text-align:center; color:#fff; margin-bottom:8px; }
+  .hero b { font-size:18px; display:block; }
+  .hero span { font-size:10px; opacity:.92; }
+  .code { font-family:ui-monospace,Menlo,Consolas,monospace; font-size:20px; letter-spacing:3px;
+    font-weight:700; color:var(--blue); background:var(--blue-lt); border-radius:9px; padding:9px;
+    text-align:center; margin:7px 0; }
+  .warn { background:var(--amber-lt); border:1px solid #e6d9a8; color:var(--amber);
+    border-radius:9px; padding:8px 9px; font-size:9.5px; margin-top:7px; line-height:1.4; }
 
-  .code { font-family:ui-monospace,Menlo,Consolas,monospace; font-size:21px; letter-spacing:3px;
-    font-weight:700; color:var(--blue); background:var(--blue-lt); border-radius:9px;
-    padding:9px; text-align:center; margin:7px 0; }
+  .privacy { display:flex; align-items:center; gap:6px; font-size:10px; color:var(--mut);
+    justify-content:center; margin-bottom:6px; }
+  .dot { width:8px; height:8px; border-radius:50%; background:#c3ccd4; }
+  .dot.live { background:var(--green); }
+  .mic { width:92px; height:92px; border-radius:50%; margin:4px auto; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; color:#fff; font-size:11.5px; font-weight:700;
+    background:linear-gradient(150deg,#4a86c4,var(--blue)); transition:background .45s ease, transform .35s ease; }
+  .mic em { font-style:normal; font-size:19px; margin-bottom:1px; }
+  .mic.rec { background:linear-gradient(150deg,#34b46a,var(--green)); transform:scale(1.06);
+    box-shadow:0 0 0 9px rgba(30,125,70,.15); }
+  .live { background:var(--blue-lt); border-radius:9px; padding:7px 9px; font-size:11.5px;
+    min-height:30px; margin-top:7px; }
+  .typebox { display:flex; gap:6px; margin-top:7px; }
+  .typebox .f { flex:1; height:34px; border:1px solid var(--line); border-radius:9px; background:#fff;
+    display:flex; align-items:center; padding:0 9px; font-size:11.5px; color:#9aa4ad; }
+  .typebox .a { width:44px; height:34px; border-radius:9px; background:var(--blue); color:#fff;
+    font-size:11.5px; font-weight:700; display:flex; align-items:center; justify-content:center; }
 
-  .mic { width:96px; height:96px; border-radius:50%; margin:6px auto; display:flex; align-items:center;
-    justify-content:center; color:#fff; font-size:12px; font-weight:700; text-align:center;
-    background:linear-gradient(150deg,#4a86c4,var(--blue)); transition:background .3s ease, transform .2s ease; }
-  .mic.rec { background:linear-gradient(150deg,#34b46a,var(--green)); transform:scale(1.05);
-    box-shadow:0 0 0 8px rgba(30,125,70,.16); }
-  .live { background:var(--blue-lt); border-radius:9px; padding:8px 10px; font-size:12.5px; min-height:34px;
-    color:var(--ink); }
-
-  .entry { border-left:3px solid var(--accent); background:#fafcfe; padding:7px 10px;
-    border-radius:0 9px 9px 0; margin-top:7px; font-size:12px;
-    opacity:0; transform:translateY(8px); transition:opacity .34s ease, transform .34s ease; }
-  .entry.on { opacity:1; transform:none; }
+  .authhdr { font-size:9.5px; text-transform:uppercase; letter-spacing:.6px; color:var(--mut);
+    margin:9px 0 1px; }
+  .authhdr.cg { color:var(--accent); }
+  .entry { border-left:3px solid var(--accent); background:#fafcfe; padding:7px 9px;
+    border-radius:0 9px 9px 0; margin-top:6px; font-size:11.5px; line-height:1.35;
+    transition:background .4s ease, border-color .4s ease; }
+  .entry .t { display:block; font-size:8.5px; color:var(--mut); margin-bottom:1px; }
   .entry.addressed { border-left-color:var(--amber); background:var(--amber-lt); }
   .entry.closed { border-left-color:var(--green); background:var(--green-lt); }
-  .entry .foot { display:flex; justify-content:space-between; align-items:center; margin-top:5px;
-    font-size:10.5px; font-weight:600; }
-  .entry .foot .l { color:var(--green); }
-  .entry .foot .r { color:var(--mut); font-weight:400; }
-  .entry.addressed .foot .r, .entry.closed .foot .r { color:var(--green); font-weight:600; }
+  .foot { display:flex; justify-content:space-between; align-items:center; margin-top:5px;
+    font-size:9.5px; gap:6px; }
+  .foot .l { color:var(--green); font-weight:700; }
+  .foot .r { color:var(--mut); }
+  .entry.addressed .foot .r, .entry.closed .foot .r { color:var(--green); font-weight:700; }
 
-  .bucket h3 { font-size:11px; padding:6px 10px; border-radius:9px 9px 0 0; color:#fff;
-    background:var(--blue); margin:0; }
+  .bucket { margin-top:8px; }
+  .bucket h3 { font-size:10.5px; padding:6px 9px; border-radius:9px 9px 0 0; color:#fff; margin:0; }
+  .b-urgent h3 { background:var(--red); } .b-md h3 { background:var(--blue); }
+  .b-rn h3 { background:#f2c200; color:var(--ink); } .b-other h3 { background:#6b7683; }
+  .b-done h3 { background:var(--green); }
   .bucket ul { list-style:none; margin:0; padding:0; border:1px solid var(--line); border-top:0;
     border-radius:0 0 9px 9px; }
-  .bucket li { padding:8px 10px; font-size:11.5px; display:flex; justify-content:space-between; gap:8px; }
-  .chk { font-size:10px; color:var(--mut); white-space:nowrap; }
+  .bucket li { padding:7px 9px; font-size:11px; border-top:1px solid var(--line); display:flex;
+    justify-content:space-between; gap:7px; line-height:1.3; }
+  .bucket li:first-child { border-top:0; }
+  .chk { font-size:9px; color:var(--mut); white-space:nowrap; }
   .chk.done { color:var(--green); font-weight:700; }
+  .cgtag { display:inline-block; margin-left:5px; font-size:8.5px; font-weight:700; color:var(--accent);
+    background:var(--blue-lt); border-radius:5px; padding:1px 4px; }
 
-  /* messages sheet */
-  .sheet { position:absolute; left:0; right:0; bottom:0; height:70%; background:#f7f7fa;
-    border-radius:18px 18px 0 0; transform:translateY(100%); transition:transform .42s cubic-bezier(.22,.9,.3,1);
-    box-shadow:0 -8px 26px rgba(16,22,28,.2); padding:10px 12px; z-index:5; }
+  .sheet { position:absolute; left:0; right:0; bottom:0; height:68%; background:#f7f7fa;
+    border-radius:18px 18px 0 0; transform:translateY(100%);
+    transition:transform .8s cubic-bezier(.22,.9,.3,1); box-shadow:0 -8px 26px rgba(16,22,28,.2);
+    padding:10px 11px; z-index:8; }
   .sheet.up { transform:none; }
-  .sheet .hdr { text-align:center; font-size:12px; font-weight:700; padding-bottom:7px;
+  .sheet .h { text-align:center; font-size:11.5px; font-weight:700; padding-bottom:7px;
     border-bottom:1px solid #e2e2e8; color:#111; }
-  .to { display:flex; align-items:center; gap:6px; font-size:12.5px; padding:9px 8px; margin-top:7px;
-    border-radius:8px; border:1px solid transparent; }
+  .to { display:flex; align-items:center; gap:5px; font-size:12px; padding:9px 8px; margin-top:8px;
+    border-radius:8px; }
   .to b { color:var(--mut); font-weight:600; }
-  .to .cursor { width:1.5px; height:15px; background:var(--accent); animation:blink 1s steps(1) infinite; }
+  .to .cursorbar { width:1.5px; height:14px; background:var(--accent); animation:blink 1s steps(1) infinite; }
   @keyframes blink { 50% { opacity:0; } }
-  .to.hl { border-color:var(--coral); background:#fff3ef;
-    box-shadow:0 0 0 3px rgba(232,115,90,.18); }
-  .tohint { font-size:10.5px; color:var(--coral-deep); font-weight:700; margin:5px 2px 0; opacity:0;
-    transition:opacity .3s ease; }
-  .tohint.on { opacity:1; }
-  .bubble { margin-top:12px; background:#e9e9ee; border-radius:14px; padding:9px 11px; font-size:11.5px;
-    color:#111; line-height:1.4; }
+  .bubble { margin-top:11px; background:#e9e9ee; border-radius:14px; padding:9px 10px; font-size:11px;
+    color:#111; line-height:1.45; }
 
-  .final { display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%;
-    text-align:center; padding:0 18px; }
-  .final .tick { width:74px; height:74px; border-radius:50%; background:var(--green-lt); color:var(--green);
-    display:flex; align-items:center; justify-content:center; font-size:38px; margin-bottom:14px;
-    transform:scale(.6); opacity:0; transition:transform .4s cubic-bezier(.2,1.3,.4,1), opacity .4s ease; }
-  .final.on .tick { transform:scale(1); opacity:1; }
-  .final h2 { font-size:20px; margin:0 0 6px; color:var(--teal-deep); }
-  .final p { font-size:13px; color:var(--mut); margin:0; line-height:1.45; }
+  .final { display:flex; flex-direction:column; align-items:center; justify-content:center;
+    height:100%; text-align:center; padding:0 20px; }
+  .final .tick { width:72px; height:72px; border-radius:50%; background:var(--green-lt); color:var(--green);
+    display:flex; align-items:center; justify-content:center; font-size:36px; margin-bottom:14px; }
+  .final h2 { font-size:19px; margin:0 0 7px; color:var(--teal-deep); }
+  .final p { font-size:12.5px; color:var(--mut); margin:0; line-height:1.5; }
 
   @media (prefers-reduced-motion: reduce) {
-    .scene, .entry, .sheet, .final .tick, .mic { transition-duration:.01ms !important; }
-    .to .cursor { animation:none; }
+    .cur, .view, .sheet, .mic, .entry { transition-duration:.01ms !important; }
+    .ripple.go { animation:none; }
+    .to .cursorbar { animation:none; }
   }
 </style>
 </head>
@@ -138,193 +172,330 @@
   <div class="top">
     <img src="heard-icon.png" alt="">
     <h1>How Heard works</h1>
-    <p>About a minute. No sound needed.</p>
+    <p>Step through it at your own pace. No sound.</p>
     <a class="back" href="./">&#8592; Back to Heard</a>
   </div>
 
   <div class="stage">
     <div class="phone">
       <div class="notch"></div>
-      <div class="screen" id="screen"></div>
+      <div class="screen" id="screen">
+        <div class="hl" id="hl"></div>
+        <div class="cur" id="cur">
+          <div class="ripple" id="ripple"></div>
+          <svg width="26" height="26" viewBox="0 0 26 26"><path d="M4 2l16 9-7 1.6L9.8 21z" fill="#fff" stroke="#1a1d21" stroke-width="1.6" stroke-linejoin="round"/></svg>
+        </div>
+      </div>
     </div>
-    <div class="cap" id="cap"></div>
   </div>
 
+  <div class="cap" id="cap"></div>
   <div class="bar"><i id="prog"></i></div>
-  <div class="ctrls">
-    <button class="pri" id="replay">Replay</button>
-    <button id="skip">Skip to the end</button>
+  <div class="nav">
+    <button id="prev">&#8592; Back</button>
+    <button class="pri" id="play">Pause</button>
+    <span class="count" id="count">1 / 12</span>
+    <button id="next">Next &#8594;</button>
   </div>
 </div>
 
 <script>
 const screenEl = document.getElementById("screen");
+const hlEl  = document.getElementById("hl");
+const curEl = document.getElementById("cur");
+const rip   = document.getElementById("ripple");
 const capEl = document.getElementById("cap");
-const progEl = document.getElementById("prog");
-const REDUCED = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+const progEl= document.getElementById("prog");
+const countEl = document.getElementById("count");
+const REDUCED = matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-let token = 0;                     /* cancels an in-flight run when replayed */
-const sleep = ms => new Promise(r => setTimeout(r, REDUCED ? Math.min(ms, 120) : ms));
-function guard(my){ if (my !== token) throw "cancelled"; }
+let token = 0, idx = 0, auto = true, autoTimer = null;
+const sleep = ms => new Promise(r => setTimeout(r, REDUCED ? Math.min(ms, 80) : ms));
+function guard(my){ if (my !== token) throw "x"; }
 
-function scene(html){
-  screenEl.innerHTML = '<div class="scene" id="sc">' + html + '</div>';
-  const el = document.getElementById("sc");
-  requestAnimationFrame(() => el.classList.add("on"));
-  return el;
+function view(html){
+  const old = screenEl.querySelector(".view");
+  if (old) old.remove();
+  const d = document.createElement("div");
+  d.className = "view";
+  d.innerHTML = html;
+  screenEl.insertBefore(d, hlEl);
+  requestAnimationFrame(() => d.classList.add("on"));
+  return d;
 }
-function caption(main, sub){
-  capEl.classList.remove("on");
-  setTimeout(() => {
-    capEl.innerHTML = main + (sub ? "<small>" + sub + "</small>" : "");
-    capEl.classList.add("on");
-  }, 130);
+function caption(main, sub){ capEl.innerHTML = "<b>" + main + "</b>" + (sub ? "<small>" + sub + "</small>" : ""); }
+
+function rectOf(sel){
+  const el = screenEl.querySelector(sel); if (!el) return null;
+  const s = screenEl.getBoundingClientRect(), r = el.getBoundingClientRect();
+  return { x: r.left - s.left, y: r.top - s.top, w: r.width, h: r.height };
 }
-async function type(el, text, my, speed){
-  el.classList.remove("ph");
-  el.textContent = "";
-  for (let i = 0; i < text.length; i++) {
+/* yellow box around the control being described */
+async function highlight(sel, hold){
+  const r = rectOf(sel); if (!r) return;
+  hlEl.style.left = (r.x - 5) + "px"; hlEl.style.top = (r.y - 5) + "px";
+  hlEl.style.width = (r.w + 10) + "px"; hlEl.style.height = (r.h + 10) + "px";
+  hlEl.classList.add("on");
+  if (hold) { await sleep(hold); hlEl.classList.remove("on"); }
+}
+function clearHighlight(){ hlEl.classList.remove("on"); }
+/* pointer glides to the control over about a second */
+async function moveTo(sel, dx, dy){
+  const r = rectOf(sel); if (!r) return;
+  curEl.classList.add("on");
+  curEl.style.transform = "translate(" + (r.x + r.w / 2 + (dx || 0)) + "px," + (r.y + r.h / 2 + (dy || 0)) + "px)";
+  await sleep(REDUCED ? 60 : 1050);
+}
+function parkCursor(x, y){ curEl.classList.remove("on"); curEl.style.transition = "none";
+  curEl.style.transform = "translate(" + x + "px," + y + "px)";
+  void curEl.offsetWidth; curEl.style.transition = ""; }
+async function tap(){ rip.classList.remove("go"); void rip.offsetWidth; rip.classList.add("go"); await sleep(520); }
+async function typeInto(el, text, my, sp){
+  el.classList.remove("ph"); el.textContent = "";
+  for (let i = 0; i < text.length; i++) { guard(my); el.textContent += text[i]; await sleep(sp || 62); }
+}
+
+/* ---------- reusable screen fragments ---------- */
+const patientHead = (name) =>
+  '<div class="c"><div class="sec">Hello, ' + name + '</div>' +
+  '<div class="privacy"><span class="dot" id="dot"></span><span id="plabel">Microphone off &mdash; nothing is being recorded</span></div>' +
+  '<div class="mic" id="mic"><em>&#127908;</em><span id="miclabel">Tap to speak</span></div>' +
+  '<div class="live" id="live">&nbsp;</div>' +
+  '<div class="typebox"><div class="f">Or type a question / concern&hellip;</div><div class="a">Add</div></div></div>';
+const entry = (id, text, cls, left, right) =>
+  '<div class="entry ' + (cls || "") + '" id="' + id + '"><span class="t">Today, 9:12 AM</span>' + text +
+  '<div class="foot"><span class="l">' + left + '</span><span class="r">' + right + '</span></div></div>';
+
+/* ---------- the twelve steps ---------- */
+const STEPS = [
+{ cap:["Start on your phone","Your care team gives you the link. No app store, nothing to install."],
+  async run(my){
+    view('<div class="hero"><b>Heard</b><span>Your care team is listening, even between visits.</span></div>' +
+      '<div class="c"><div class="sec">I am a patient</div>' +
+      '<div class="fld ph" id="f1">First name</div><div class="fld ph" id="f2">Last name</div>' +
+      '<div class="fld sel ph" id="f3">Who is your doctor?</div>' +
+      '<div class="btn coral" id="go" style="margin-top:12px">Sign in &amp; get my link</div></div>');
+    parkCursor(150, 560); await sleep(900); guard(my);
+    await highlight("#f1"); await moveTo("#f1"); guard(my); await tap();
+    clearHighlight();
+    await typeInto(screenEl.querySelector("#f1"), "Margaret", my); guard(my);
+    await sleep(400); guard(my);
+    await moveTo("#f2"); await tap(); guard(my);
+    await typeInto(screenEl.querySelector("#f2"), "Ellis", my);
+    await sleep(1800);
+  }},
+
+{ cap:["Choose your doctor","The list fills in as the practice uses it. If yours is missing, type the name."],
+  async run(my){
+    view('<div class="hero"><b>Heard</b><span>Your care team is listening, even between visits.</span></div>' +
+      '<div class="c"><div class="sec">I am a patient</div>' +
+      '<div class="fld" id="f1">Margaret</div><div class="fld" id="f2">Ellis</div>' +
+      '<div class="fld sel ph" id="f3">Who is your doctor?</div>' +
+      '<div class="btn coral" id="go" style="margin-top:12px">Sign in &amp; get my link</div></div>');
+    parkCursor(150, 300); await sleep(800); guard(my);
+    await highlight("#f3"); await moveTo("#f3"); guard(my); await tap();
+    const f3 = screenEl.querySelector("#f3"); f3.classList.remove("ph"); f3.textContent = "Dr. Appleton";
+    await sleep(1400); clearHighlight(); guard(my);
+    await highlight("#go"); await moveTo("#go"); guard(my); await tap();
+    clearHighlight(); await sleep(2200);
+  }},
+
+{ cap:["This is your page","One button. Nothing to learn."],
+  async run(my){
+    view(patientHead("Margaret") + '<div class="c"><div class="sec">Captured so far (0)</div>' +
+      '<div class="note">Nothing captured yet.</div></div>');
+    parkCursor(150, 560); await sleep(1400); guard(my);
+    await highlight("#mic", 3200); guard(my);
+    await sleep(3200);
+  }},
+
+{ cap:["Tap, and say what is on your mind","Any hour. It does not have to wait for rounds."],
+  async run(my){
+    view(patientHead("Margaret") + '<div class="c"><div class="sec">Captured so far (0)</div>' +
+      '<div class="note">Nothing captured yet.</div></div>');
+    parkCursor(150, 540); await sleep(700); guard(my);
+    await moveTo("#mic"); guard(my); await tap();
+    const mic = screenEl.querySelector("#mic");
+    mic.classList.add("rec");
+    screenEl.querySelector("#miclabel").textContent = "Listening";
+    screenEl.querySelector("#dot").classList.add("live");
+    screenEl.querySelector("#plabel").textContent = "Recording — you are in control";
+    await sleep(700); guard(my);
+    await typeInto(screenEl.querySelector("#live"), "Is it normal for my calf to feel tight?", my, 46);
+    await sleep(1200); guard(my);
+    await moveTo("#mic"); await tap(); guard(my);
+    mic.classList.remove("rec");
+    screenEl.querySelector("#miclabel").textContent = "Tap to speak";
+    screenEl.querySelector("#dot").classList.remove("live");
+    screenEl.querySelector("#plabel").textContent = "Microphone off — nothing is being recorded";
+    await sleep(1600);
+  }},
+
+{ cap:["It joins your list","Nothing is lost between visits. It waits for the team, not for you."],
+  async run(my){
+    view(patientHead("Margaret") + '<div class="c"><div class="sec">Captured so far (1)</div>' +
+      entry("e1", "Is it normal for my calf to feel tight?", "", "&#9744; I was heard", "Waiting for your care team") +
+      '</div>');
+    parkCursor(150, 560); await sleep(1200); guard(my);
+    await highlight("#e1", 4200); guard(my);
+    await sleep(3000);
+  }},
+
+{ cap:["Bring in a family member","Scroll down to Share with a caregiver, and make a code."],
+  async run(my){
+    view('<div class="c"><div class="sec">Share with a caregiver</div>' +
+      '<div class="note">A family member or friend can add questions to this same list, from their own phone.</div>' +
+      '<div class="btn coral" id="mk" style="margin-top:10px">Create an invite code</div></div>');
+    parkCursor(150, 520); await sleep(1300); guard(my);
+    await highlight("#mk"); await moveTo("#mk"); guard(my); await tap(); clearHighlight();
+    view('<div class="c"><div class="sec">Share with a caregiver</div>' +
+      '<div class="note">Give this code to the person helping you. They enter it on their own phone, put in their name, and can then add questions to this list.</div>' +
+      '<div class="code" id="code">7KQ4MP</div>' +
+      '<div class="btn coral" id="txt">&#128241; Text this to a caregiver</div>' +
+      '<div class="btn sub" id="copy" style="margin-top:7px">Copy caregiver link</div>' +
+      '<div class="warn">Anyone who uses this code can see everything on this page, now and later.</div></div>');
+    await sleep(900); guard(my);
+    await highlight("#code", 3400);
+    await sleep(1600);
+  }},
+
+{ cap:["Send it as a text","Tap the button and your own message app opens."],
+  async run(my){
+    view('<div class="c"><div class="sec">Share with a caregiver</div>' +
+      '<div class="note">Give this code to the person helping you.</div>' +
+      '<div class="code">7KQ4MP</div>' +
+      '<div class="btn coral" id="txt">&#128241; Text this to a caregiver</div>' +
+      '<div class="btn sub" style="margin-top:7px">Copy caregiver link</div></div>' +
+      '<div class="sheet" id="sheet"><div class="h">New Message</div>' +
+      '<div class="to" id="to"><b>To:</b> <span id="toname"></span><span class="cursorbar"></span></div>' +
+      '<div class="bubble">I am using Heard to keep track of questions for my care team. Join with code <b>7KQ4MP</b> or open imheard.com</div></div>');
+    parkCursor(150, 520); await sleep(900); guard(my);
+    await highlight("#txt"); await moveTo("#txt"); guard(my); await tap(); clearHighlight();
+    screenEl.querySelector("#sheet").classList.add("up");
+    await sleep(1500); guard(my);
+    await sleep(2400);
+  }},
+
+{ cap:["You only choose who it goes to","The invite and the code are already written for you."],
+  async run(my){
+    view('<div class="c"><div class="sec">Share with a caregiver</div>' +
+      '<div class="code">7KQ4MP</div>' +
+      '<div class="btn coral">&#128241; Text this to a caregiver</div></div>' +
+      '<div class="sheet up" id="sheet"><div class="h">New Message</div>' +
+      '<div class="to" id="to"><b>To:</b> <span id="toname"></span><span class="cursorbar"></span></div>' +
+      '<div class="bubble">I am using Heard to keep track of questions for my care team. Join with code <b>7KQ4MP</b> or open imheard.com</div></div>');
+    parkCursor(150, 300); await sleep(700); guard(my);
+    await highlight("#to"); await moveTo("#to"); guard(my); await tap();
+    await typeInto(screenEl.querySelector("#toname"), "Sarah (daughter)", my, 78);
+    await sleep(2600); clearHighlight();
+    await sleep(700);
+  }},
+
+{ cap:["Sarah joins with the code","She adds her name, so the team knows who is asking."],
+  async run(my){
+    view('<div class="c"><div class="sec">You have been invited to help Margaret</div>' +
+      '<div class="note" style="margin-bottom:8px">Add your name so the care team knows who asked. Your questions appear on the same list, under your name.</div>' +
+      '<div class="fld ph" id="nm">Your name</div>' +
+      '<div class="btn coral" id="join">Join</div>' +
+      '<div class="warn">You will be able to see everything Margaret has recorded.</div></div>');
+    parkCursor(150, 520); await sleep(900); guard(my);
+    await moveTo("#nm"); await tap(); guard(my);
+    await typeInto(screenEl.querySelector("#nm"), "Sarah (daughter)", my, 68);
+    await sleep(500); guard(my);
+    await highlight("#join"); await moveTo("#join"); guard(my); await tap(); clearHighlight();
+    view('<div class="c"><div class="sec">Captured so far (2)</div>' +
+      '<div class="authhdr">From Margaret</div>' +
+      entry("e1", "Is it normal for my calf to feel tight?", "", "&#9744; I was heard", "Waiting for your care team") +
+      '<div class="authhdr cg">Caregiver &mdash; Sarah (daughter)</div>' +
+      entry("e2", "Does she keep taking the blood thinner at home?", "", "&#9744; I was heard", "Waiting for your care team") +
+      '</div>');
+    await sleep(2600);
+  }},
+
+{ cap:["The care team sees both","Sorted by who can answer. Sarah's question is labelled as hers."],
+  async run(my){
+    view('<div class="c"><div class="sec">Rounding list &middot; Ellis, Margaret</div>' +
+      '<div class="bucket b-md"><h3>Physician / APP list</h3><ul>' +
+      '<li><span>Is it normal for my calf to feel tight?</span><span class="chk" id="k1">&#9744; Addressed</span></li>' +
+      '<li><span>Blood thinner after discharge<span class="cgtag">Caregiver &mdash; Sarah</span></span><span class="chk">&#9744; Addressed</span></li>' +
+      '</ul></div>' +
+      '<div class="bucket b-rn"><h3>Nursing list</h3><ul><li><span class="note">None</span></li></ul></div></div>');
+    parkCursor(150, 540); await sleep(1600); guard(my);
+    await highlight("#k1"); await moveTo("#k1"); guard(my); await tap();
+    const k = screenEl.querySelector("#k1"); k.classList.add("done"); k.innerHTML = "&#9745; Addressed";
+    clearHighlight(); await sleep(1200); guard(my);
+    view('<div class="c"><div class="sec">Rounding list &middot; Ellis, Margaret</div>' +
+      '<div class="bucket b-md"><h3>Physician / APP list</h3><ul>' +
+      '<li><span>Blood thinner after discharge<span class="cgtag">Caregiver &mdash; Sarah</span></span><span class="chk">&#9744; Addressed</span></li>' +
+      '</ul></div>' +
+      '<div class="bucket b-done"><h3>Addressed (1)</h3><ul>' +
+      '<li><span>&#10003; Is it normal for my calf to feel tight?</span><span class="chk">&#9744; Awaiting patient</span></li>' +
+      '</ul></div></div>');
+    await sleep(2600);
+  }},
+
+{ cap:["You can see they answered","Then you say so. That tick is yours alone."],
+  async run(my){
+    view('<div class="c"><div class="sec">Captured so far (1)</div>' +
+      entry("e1", "Is it normal for my calf to feel tight?", "addressed",
+            "&#9744; I was heard", "&#10003; Heard by your care team") + '</div>');
+    parkCursor(150, 500); await sleep(1700); guard(my);
+    await highlight("#e1 .l"); await moveTo("#e1 .l"); guard(my); await tap();
+    screenEl.querySelector("#e1 .l").innerHTML = "&#9745; I was heard";
+    clearHighlight(); await sleep(900); guard(my);
+    view('<div class="c"><div class="sec">Captured so far (0)</div>' +
+      '<div class="note">Everything so far has been answered and closed.</div></div>' +
+      '<div class="c"><div class="sec">Heard by your care team (1)</div>' +
+      entry("e2", "Is it normal for my calf to feel tight?", "closed",
+            "&#9745; I was heard", "&#10003; Heard by your care team") + '</div>');
+    await sleep(2800);
+  }},
+
+{ cap:["That is the whole loop","Ask when it occurs to you. They answer. You both know it landed."],
+  async run(my){
+    curEl.classList.remove("on");
+    view('<div class="final"><div class="tick">&#10003;</div><h2>You have been heard.</h2>' +
+      '<p>Your care team knows your question was answered.<br>And now you know it too.</p></div>');
+    await sleep(4000);
+  }}
+];
+
+/* ---------- driver ---------- */
+async function show(i, autoAdvance){
+  token++; const my = token;
+  clearTimeout(autoTimer);
+  idx = Math.max(0, Math.min(STEPS.length - 1, i));
+  const st = STEPS[idx];
+  caption(st.cap[0], st.cap[1]);
+  countEl.textContent = (idx + 1) + " / " + STEPS.length;
+  progEl.style.width = Math.round(((idx + 1) / STEPS.length) * 100) + "%";
+  document.getElementById("prev").disabled = idx === 0;
+  document.getElementById("next").disabled = idx === STEPS.length - 1;
+  clearHighlight();
+  try {
+    await st.run(my);
     guard(my);
-    el.textContent += text[i];
-    await sleep(speed || 46);
-  }
+    if (autoAdvance && auto && idx < STEPS.length - 1) autoTimer = setTimeout(() => show(idx + 1, true), 900);
+    if (auto && idx === STEPS.length - 1) setAuto(false);
+  } catch (e) { if (e !== "x") console.error(e); }
 }
-
-const TOTAL = 6;
-function progress(step){ progEl.style.width = Math.round((step / TOTAL) * 100) + "%"; }
-
-/* ---------------- the walkthrough ---------------- */
-async function run(){
-  const my = ++token;
-  progress(0);
-
-  /* 1. sign in */
-  caption("Sign in once", "First name, last name, and your doctor.");
-  let el = scene(
-    '<div class="hero"><b>Heard</b><span>Your care team is listening, even between visits.</span></div>' +
-    '<div class="card"><div class="sec">I am a patient</div>' +
-    '<div class="fld ph" id="f1">First name</div>' +
-    '<div class="fld ph" id="f2">Last name</div>' +
-    '<div class="fld sel ph" id="f3">Who is your doctor?</div>' +
-    '<div class="cta" style="margin-top:12px">Sign in &amp; get my link</div></div>');
-  await sleep(700); guard(my);
-  const f1 = el.querySelector("#f1"), f2 = el.querySelector("#f2"), f3 = el.querySelector("#f3");
-  f1.classList.add("focus"); await type(f1, "Margaret", my); f1.classList.remove("focus");
-  await sleep(200); guard(my);
-  f2.classList.add("focus"); await type(f2, "Ellis", my); f2.classList.remove("focus");
-  await sleep(280); guard(my);
-  caption("Pick your doctor", "The list fills in as the practice uses it.");
-  f3.classList.add("focus"); await sleep(520); guard(my);
-  f3.classList.remove("ph"); f3.textContent = "Dr. Appleton";
-  await sleep(900); guard(my);
-  progress(1);
-
-  /* 2. caregiver code */
-  caption("Bring in a family member", "One code links their phone to your list.");
-  el = scene(
-    '<div class="card"><div class="sec">Share with a caregiver</div>' +
-    '<div style="font-size:11.5px;color:var(--mut);line-height:1.4">Give this code to the person helping you.</div>' +
-    '<div class="code">7KQ4MP</div>' +
-    '<div class="cta" id="txt">&#128241; Text this to a caregiver</div></div>' +
-    '<div class="sheet" id="sheet">' +
-      '<div class="hdr">New Message</div>' +
-      '<div class="to" id="to"><b>To:</b> <span id="toname"></span><span class="cursor"></span></div>' +
-      '<div class="tohint" id="tohint">&#8593; Just choose who it goes to</div>' +
-      '<div class="bubble">I am using Heard to keep track of questions for my care team. Join with code <b>7KQ4MP</b> or open imheard.com</div>' +
-    '</div>');
-  await sleep(900); guard(my);
-  el.querySelector("#txt").style.transform = "scale(.97)";
-  await sleep(240); guard(my);
-  el.querySelector("#sheet").classList.add("up");
-  await sleep(700); guard(my);
-  caption("Your message app opens", "The invite is already written for you.");
-  await sleep(900); guard(my);
-  el.querySelector("#to").classList.add("hl");
-  el.querySelector("#tohint").classList.add("on");
-  await sleep(600); guard(my);
-  await type(el.querySelector("#toname"), "Sarah (daughter)", my, 62);
-  await sleep(1000); guard(my);
-  progress(2);
-
-  /* 3. asking */
-  caption("Ask whenever it occurs to you", "Tap, speak, tap again.");
-  el = scene(
-    '<div class="card"><div class="sec">Hello, Margaret</div>' +
-    '<div class="mic" id="mic">Tap to speak</div>' +
-    '<div class="live" id="live">&nbsp;</div></div>' +
-    '<div class="card"><div class="sec">Captured so far (<span id="n">0</span>)</div>' +
-    '<div id="list"></div></div>');
-  await sleep(800); guard(my);
-  const mic = el.querySelector("#mic"), live = el.querySelector("#live");
-  mic.classList.add("rec"); mic.textContent = "Listening";
-  await sleep(500); guard(my);
-  await type(live, "Is it normal for my calf to feel tight?", my, 34);
-  await sleep(600); guard(my);
-  mic.classList.remove("rec"); mic.textContent = "Tap to speak";
-  live.innerHTML = "&nbsp;";
-  el.querySelector("#list").innerHTML =
-    '<div class="entry" id="e1">Is it normal for my calf to feel tight?' +
-    '<div class="foot"><span class="l">&#9744; I was heard</span><span class="r">Waiting for your care team</span></div></div>';
-  el.querySelector("#n").textContent = "1";
-  requestAnimationFrame(() => el.querySelector("#e1").classList.add("on"));
-  await sleep(1100); guard(my);
-  caption("It joins your list", "Nothing is lost between visits.");
-  await sleep(1100); guard(my);
-  progress(3);
-
-  /* 4. the care team */
-  caption("Your care team sees it", "Sorted by who can answer it.");
-  el = scene(
-    '<div class="card"><div class="sec">Rounding list &middot; Margaret Ellis</div>' +
-    '<div class="bucket"><h3>Physician / APP list</h3><ul>' +
-      '<li><span>Is it normal for my calf to feel tight?</span><span class="chk" id="c1">&#9744; Addressed</span></li>' +
-    '</ul></div></div>');
-  await sleep(1300); guard(my);
-  const c1 = el.querySelector("#c1");
-  c1.classList.add("done"); c1.innerHTML = "&#9745; Addressed";
-  caption("They mark it addressed", "It is never deleted.");
-  await sleep(1400); guard(my);
-  progress(4);
-
-  /* 5. patient confirms */
-  caption("You see that they answered", "Then you close the loop.");
-  el = scene(
-    '<div class="card"><div class="sec">Captured so far (1)</div>' +
-    '<div class="entry addressed on" id="e2">Is it normal for my calf to feel tight?' +
-    '<div class="foot"><span class="l" id="lchk">&#9744; I was heard</span>' +
-    '<span class="r">&#10003; Heard by your care team</span></div></div></div>');
-  await sleep(1500); guard(my);
-  const lchk = el.querySelector("#lchk");
-  lchk.innerHTML = "&#9745; I was heard";
-  el.querySelector("#e2").classList.remove("addressed");
-  el.querySelector("#e2").classList.add("closed");
-  await sleep(700); guard(my);
-  caption("Tap “I was heard”", "That control is yours alone.");
-  await sleep(1300); guard(my);
-  progress(5);
-
-  /* 6. close */
-  caption("");
-  capEl.classList.remove("on");
-  el = scene('<div class="final" id="fin"><div class="tick">&#10003;</div>' +
-    '<h2>You have been heard.</h2>' +
-    '<p>Your care team knows your question was answered.<br>And now you know it too.</p></div>');
-  await sleep(60); guard(my);
-  el.querySelector("#fin").classList.add("on");
-  progress(6);
+function setAuto(on){
+  auto = on;
+  document.getElementById("play").textContent = on ? "Pause" : "Play";
+  document.getElementById("play").classList.toggle("pri", on);
+  if (!on) clearTimeout(autoTimer);
 }
-
-function start(){ run().catch(e => { if (e !== "cancelled") console.error(e); }); }
-document.getElementById("replay").onclick = start;
-document.getElementById("skip").onclick = () => {
-  token++;
-  capEl.classList.remove("on");
-  progress(6);
-  screenEl.innerHTML = '<div class="scene on"><div class="final on"><div class="tick">&#10003;</div>' +
-    '<h2>You have been heard.</h2>' +
-    '<p>Your care team knows your question was answered.<br>And now you know it too.</p></div></div>';
+document.getElementById("next").onclick = () => { setAuto(false); show(idx + 1, false); };
+document.getElementById("prev").onclick = () => { setAuto(false); show(idx - 1, false); };
+document.getElementById("play").onclick = () => {
+  if (auto) { setAuto(false); }
+  else { setAuto(true); show(idx >= STEPS.length - 1 ? 0 : idx, true); }
 };
-start();
+addEventListener("keydown", e => {
+  if (e.key === "ArrowRight") { setAuto(false); show(idx + 1, false); }
+  if (e.key === "ArrowLeft")  { setAuto(false); show(idx - 1, false); }
+});
+show(0, true);
 </script>
 </body>
 </html>
