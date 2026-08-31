@@ -194,6 +194,85 @@ let pinAfter = null;     // route to go to after PIN success
 function baseURL(){ return location.origin === "null" ? location.href.split("#")[0] : location.origin + location.pathname; }
 function link(path){ return baseURL() + "#/b/" + bucket + path; }
 function rnd(n){ let s = ""; const c = "abcdefghjkmnpqrstuvwxyz23456789"; for (let i=0;i<n;i++) s += c[Math.floor(Math.random()*c.length)]; return s; }
+/* ---- provider name matching ----
+   "Steve Appleton" and "Dr. Appleton" are one person. Honorifics and credentials
+   are stripped, "Last, First" is handled, and a one-character typo in a surname
+   of five letters or more still matches. */
+const RE_HONORIFIC = /\b(dr|doctor|mr|mrs|ms|miss|prof|professor)\b/g;
+const RE_CREDENTIAL = /\b(md|do|pa|pac|np|aprn|fnp|rn|bsn|msn|dnp|phd|facs|faaos|dpm|dds)\b/g;
+const PARTICLES = new Set(["o","mc","mac","de","del","della","di","da","du","van","von","der","den","la","le","st"]);
+function normName(x){
+  const n = String(x || "").toLowerCase()
+    .replace(/[.,]/g, " ")
+    .replace(RE_HONORIFIC, " ")
+    .replace(RE_CREDENTIAL, " ")
+    .replace(/['\u2019-]/g, "")            /* O'Brien and O\u2019Brien both become obrien */
+    .replace(/[^a-z\s]/g, " ")
+    .replace(/\s+/g, " ").trim();
+  /* glue a name particle to the token after it, so "O Brien" matches "O'Brien" */
+  const p = n.split(" ").filter(Boolean), out = [];
+  let i = 0;
+  while (i < p.length) {
+    let tok = "";
+    while (i < p.length && PARTICLES.has(p[i])) { tok += p[i]; i++; }   /* van + der + ... */
+    if (i < p.length) { tok += p[i]; i++; }
+    out.push(tok);
+  }
+  return out.join(" ");
+}
+function nameParts(x){
+  const n = normName(x);
+  const p = n.split(" ").filter(Boolean);
+  if (!p.length) return { first: "", last: "" };
+  if (String(x).indexOf(",") > -1) return { last: p[0], first: p[1] || "" };
+  return { first: p.length > 1 ? p[0] : "", last: p[p.length - 1] };
+}
+function lev(a, b){
+  const m = a.length, n = b.length;
+  if (!m || !n) return Math.max(m, n);
+  const d = [];
+  for (let i = 0; i <= m; i++) { d[i] = [i]; }
+  for (let j = 0; j <= n; j++) { d[0][j] = j; }
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      const cost = a[i-1] === b[j-1] ? 0 : 1;
+      d[i][j] = Math.min(d[i-1][j] + 1, d[i][j-1] + 1, d[i-1][j-1] + cost);
+      if (i > 1 && j > 1 && a[i-1] === b[j-2] && a[i-2] === b[j-1]) d[i][j] = Math.min(d[i][j], d[i-2][j-2] + 1);
+    }
+  }
+  return d[m][n];
+}
+/* Same words in any order is the same name: "Appleton, Steve" is "Steve Appleton". */
+function tokenKey(x){ return normName(x).split(" ").filter(Boolean).sort().join(" "); }
+function nameMatch(a, b){
+  const na = normName(a), nb = normName(b);
+  if (!na || !nb) return "none";
+  if (na === nb || tokenKey(a) === tokenKey(b)) return "exact";
+  const A = nameParts(a), B = nameParts(b);
+  if (!A.last || !B.last) return "none";
+  const lastSame = A.last === B.last ||
+    (A.last.length >= 5 && B.last.length >= 5 && lev(A.last, B.last) <= 1);
+  if (!lastSame) return "none";
+  if (!A.first || !B.first) return "strong";        /* "Dr. Appleton" vs "Steve Appleton" */
+  if (A.first === B.first) return "strong";
+  if (A.first[0] === B.first[0]) return "strong";   /* "S. Appleton" vs "Steve Appleton" */
+  return "weak";                                     /* two different Appletons */
+}
+function findProvider(list, name){
+  let strong = null;
+  for (const p of (list || [])) {
+    const m = nameMatch(p.name, name);
+    if (m === "exact") return { p: p, how: "exact" };
+    if (m === "strong" && !strong) strong = p;
+  }
+  return strong ? { p: strong, how: "strong" } : null;
+}
+/* Prefers the fuller, more formal spelling as the one to keep. */
+function betterName(a, b){
+  const fa = /\b(dr|doctor)\b/i.test(a), fb = /\b(dr|doctor)\b/i.test(b);
+  if (fa !== fb) return fa ? a : b;
+  return b.length > a.length ? b : a;
+}
 function esc(s){ return String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
 
 /* ================= data layer (Netlify Blobs via /api/store, or local) ================= */
@@ -466,8 +545,18 @@ async function newPatient(){
     doc.pts[id] = { first: f, last: l, doctor: doctor, team: team, created: Date.now(), entries: [], deleted: [] };
     doc.idx.push({ id: id, first: f, last: l, doctor: doctor, team: team, created: Date.now() });
     // A doctor the patient typed joins the directory, so the dropdown fills as the demo is used.
-    if (typedDoctor && !doc.providers.some(p => String(p.name).toLowerCase() === doctor.toLowerCase())) {
-      doc.providers.push({ name: doctor, team: team, created: Date.now(), addedBy: "patient", linked: false });
+    if (typedDoctor && doctor) {
+      const hit = findProvider(doc.providers, doctor);
+      if (hit && hit.how === "exact") {
+        doctor = hit.p.name;                       /* use the spelling already on file */
+      } else if (hit && hit.how === "strong" && confirm('Did you mean "' + hit.p.name + '"?')) {
+        hit.p.aka = [...new Set((hit.p.aka || []).concat([doctor]))];
+        doctor = hit.p.name;
+      } else {
+        doc.providers.push({ name: doctor, team: team, created: Date.now(), addedBy: "patient", linked: false });
+      }
+      doc.pts[id].doctor = doctor;
+      doc.idx[doc.idx.length - 1].doctor = doctor;
     }
     await saveDoc(doc);
     localStorage.setItem(LS.myPatient, id);
@@ -932,9 +1021,15 @@ async function renderDrHome(){
         '<div><div class="nm">' + esc(p.last) + ', ' + esc(p.first) + '</div><div class="dt">Signed in ' + new Date(p.created).toLocaleString() + ' &middot; code ' + p.id + (p.doctor ? ' &middot; ' + esc(p.doctor) : '') + (p.team ? ' &middot; ' + esc(p.team) : '') + '</div></div>' +
         '<span class="arrow">&#8250;</span></div>').join("")
     : '<div class="empty">No patients have signed in yet. New patients sign in from the landing page.</div>';
-  document.getElementById("provList").innerHTML = provs.length
+  const dupes = duplicateGroups(provs);
+  const dupeHTML = dupes.map(g => {
+    const names = g.map(x => x.name);
+    return '<div class="warnbox" style="margin-top:8px">These look like the same provider: <b>' + names.map(esc).join("</b>, <b>") + '</b>' +
+      '<button class="btn sub" style="margin-top:8px" onclick=\'mergeProviders(' + esc(JSON.stringify(JSON.stringify(names))) + ')\'>Merge into one</button></div>';
+  }).join("");
+  document.getElementById("provList").innerHTML = (provs.length
     ? provs.map(p => '<span class="provtag">' + esc(p.name) + (p.addedBy === "patient" ? ' <em>&middot; added by a patient, not linked</em>' : '') + '</span>').join(" ")
-    : 'No providers registered yet. Add your name below.';
+    : 'No providers registered yet. Add your name below.') + dupeHTML;
   document.getElementById("provList").className = provs.length ? "" : "empty";
 }
 async function addProvider(){
@@ -942,10 +1037,59 @@ async function addProvider(){
   const n = inp.value.trim(); if (!n) return;
   try {
     const doc = (await loadDoc()) || EMPTY_DOC();
-    if (!doc.providers.some(p => p.name.toLowerCase() === n.toLowerCase())) doc.providers.push({ name: n, created: Date.now() });
+    const hit = findProvider(doc.providers, n);
+    if (hit && hit.how === "exact") { alert('You are already in the directory as "' + hit.p.name + '".'); inp.value = ""; return; }
+    if (hit && hit.how === "strong") {
+      const keep = confirm('The directory already lists "' + hit.p.name + '".\n\nAre you that provider?\n\nOK  keeps "' + hit.p.name + '" and does not add a second entry.\nCancel  adds "' + n + '" as a separate provider.');
+      if (keep) {
+        /* remember the spelling they typed, so the next match is easier */
+        hit.p.aka = [...new Set((hit.p.aka || []).concat([n]))];
+        await saveDoc(doc);
+        inp.value = "";
+        renderDrHome();
+        return;
+      }
+    }
+    doc.providers.push({ name: n, created: Date.now() });
     await saveDoc(doc);
+    inp.value = "";
     renderDrHome();
   } catch (e) { alert("Could not save provider name: " + e.message); }
+}
+/* Groups entries that look like the same person, for the merge prompt. */
+function duplicateGroups(provs){
+  const used = new Set(), groups = [];
+  (provs || []).forEach((p, i) => {
+    if (used.has(i)) return;
+    const g = [p]; used.add(i);
+    (provs || []).forEach((q, j) => {
+      if (j <= i || used.has(j)) return;
+      const m = nameMatch(p.name, q.name);
+      if (m === "exact" || m === "strong") { g.push(q); used.add(j); }
+    });
+    if (g.length > 1) groups.push(g);
+  });
+  return groups;
+}
+async function mergeProviders(namesJSON){
+  const names = JSON.parse(namesJSON);
+  let canonical = names[0];
+  names.forEach(n => { canonical = betterName(canonical, n); });
+  if (!confirm("Treat these as one provider?\n\n" + names.join("\n") + '\n\nThey will all become "' + canonical + '".')) return;
+  try {
+    const doc = (await loadDoc()) || EMPTY_DOC();
+    const set = new Set(names.map(x => x.toLowerCase()));
+    const aka = [...new Set(names.filter(x => x !== canonical))];
+    doc.providers = doc.providers.filter(p => !set.has(String(p.name).toLowerCase()) || p.name === canonical);
+    let target = doc.providers.find(p => p.name === canonical);
+    if (!target) { target = { name: canonical, created: Date.now() }; doc.providers.push(target); }
+    target.aka = [...new Set((target.aka || []).concat(aka))];
+    /* patients who chose one of the old spellings now point at the canonical one */
+    Object.keys(doc.pts || {}).forEach(k => { if (doc.pts[k] && set.has(String(doc.pts[k].doctor || "").toLowerCase())) doc.pts[k].doctor = canonical; });
+    (doc.idx || []).forEach(r => { if (set.has(String(r.doctor || "").toLowerCase())) r.doctor = canonical; });
+    await saveDoc(doc);
+    renderDrHome();
+  } catch (e) { alert("Could not merge: " + e.message); }
 }
 function openByCode(){
   const c = document.getElementById("ptCode").value.trim().toLowerCase();
