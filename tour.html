@@ -33,20 +33,24 @@
     background:#10161c; border-radius:0 0 15px 15px; z-index:9; }
   .screen { position:relative; width:100%; height:100%; background:var(--bg);
     border-radius:32px; overflow:hidden; }
-  .viewport { position:absolute; inset:0; overflow:hidden; }
+  .viewport { position:absolute; inset:0; overflow:hidden; transition:transform .5s ease; }
   .view { position:absolute; inset:0; padding:34px 13px 8px; opacity:0; transition:opacity .45s ease; }
   .view.on { opacity:1; }
 
-  /* The caption is a note laid ON the phone, not part of it. Ringed in green and
-     set well above the app's own type so nobody mistakes it for the interface. */
-  .capnote { position:absolute; left:8px; right:8px; bottom:14px; z-index:20;
-    background:#fff; border:12px solid var(--green); border-radius:22px;
-    padding:12px 12px 13px; text-align:center; transform-origin:50% 100%;
-    box-shadow:0 0 0 4px rgba(30,125,70,.28), 0 14px 32px rgba(16,22,28,.34); }
+  /* Captions are notes laid ON the phone, not part of it. They stack in the empty
+     space below the app content, first one on top, and every one stays on screen
+     until the viewer presses Next. */
+  .capstack { position:absolute; left:8px; right:8px; top:0; z-index:20; display:flex;
+    flex-direction:column; gap:8px; transition:top .5s ease; }
+  .capstack.instant { transition:none; }
+  .capnote { background:#fff; border:12px solid var(--green); border-radius:22px;
+    padding:9px 11px 10px; text-align:center; transform-origin:50% 100%;
+    box-shadow:0 6px 18px rgba(16,22,28,.22); }
+  .capnote.cur { box-shadow:0 0 0 4px rgba(30,125,70,.28), 0 14px 32px rgba(16,22,28,.34); }
   .capnote.pop { animation:pop .4s cubic-bezier(.2,.9,.3,1.25); }
   @keyframes pop { 0% { transform:scale(.93); } 100% { transform:scale(1); } }
-  .capnote b { display:block; font-size:21px; line-height:1.24; color:var(--ink); }
-  .capnote small { display:block; font-size:15px; line-height:1.4; color:#33414b; margin-top:7px; }
+  .capnote b { display:block; font-size:21px; line-height:1.18; color:var(--ink); }
+  .capnote small { display:block; font-size:15px; line-height:1.32; color:#33414b; margin-top:4px; }
 
   .hl { position:absolute; border:3px solid var(--hi); border-radius:11px; pointer-events:none;
     box-shadow:0 0 0 3px rgba(255,204,0,.3); opacity:0; transition:opacity .3s ease; z-index:14; }
@@ -148,8 +152,8 @@
   .bubble { margin-top:12px; background:#e9e9ee; border-radius:15px; padding:10px 11px; font-size:12px;
     color:#111; line-height:1.45; }
 
-  .final { display:flex; flex-direction:column; align-items:center; justify-content:center;
-    height:100%; text-align:center; padding:0 22px; }
+  .final { display:flex; flex-direction:column; align-items:center; text-align:center;
+    padding:56px 22px 0; }
   .final .tick { width:78px; height:78px; border-radius:50%; background:var(--green-lt); color:var(--green);
     display:flex; align-items:center; justify-content:center; font-size:38px; margin-bottom:15px; }
   .final h2 { font-size:20px; margin:0 0 8px; color:var(--teal-deep); }
@@ -176,7 +180,7 @@
       <div class="notch"></div>
       <div class="screen" id="screen">
         <div class="viewport" id="viewport"></div>
-        <div class="capnote"><b id="capMain"></b><small id="capSub"></small></div>
+        <div class="capstack" id="capstack"></div>
         <div class="hl" id="hl"></div>
         <div class="cur" id="cur">
           <div class="ripple" id="ripple"></div>
@@ -202,13 +206,13 @@ const vp     = document.getElementById("viewport");
 const hlEl   = document.getElementById("hl");
 const curEl  = document.getElementById("cur");
 const rip    = document.getElementById("ripple");
-const capM   = document.getElementById("capMain");
-const capS   = document.getElementById("capSub");
+const stack  = document.getElementById("capstack");
 const progEl = document.getElementById("prog");
 const countEl= document.getElementById("count");
 const REDUCED = matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-let token = 0, idx = 0, finished = false;
+let token = 0, idx = 0, finished = false, firstCap = null, shift = 0;
+const CAP_GAP = 12, CAP_EDGE = 8, CAP_HOLD = 2200;
 const sleep = ms => new Promise(r => setTimeout(r, REDUCED ? Math.min(ms, 80) : ms));
 function guard(my){ if (my !== token) throw "x"; }
 
@@ -219,11 +223,57 @@ function view(html){
   vp.appendChild(d);
   void d.offsetWidth;                 /* deterministic; rAF stalls in a background tab */
   d.classList.add("on");
+  if (firstCap) { const c = firstCap; firstCap = null; addNote(c[0], c[1]); }
+  else layoutCaptions();
   return d;
 }
-function caption(main, sub){
-  capM.textContent = main; capS.textContent = sub || "";
-  const n = capM.parentElement; n.classList.remove("pop"); void n.offsetWidth; n.classList.add("pop");
+
+/* Bottom edge of the app content, relative to the screen and ignoring any shift.
+   The message sheet and the closing card stretch to the bottom, so their children
+   are measured instead. Anything still off the bottom (a sheet before it slides
+   up) does not count. */
+function contentBottom(){
+  const s = screenEl.getBoundingClientRect(), v = vp.getBoundingClientRect();
+  const cur = s.top - v.top, H = screenEl.clientHeight;
+  let b = 0;
+  vp.querySelectorAll(".view > :not(.sheet):not(.final), .view > .sheet > *, .view > .final > *").forEach(el => {
+    const r = el.getBoundingClientRect();
+    const top = r.top - s.top + cur, bottom = r.bottom - s.top + cur;
+    if (r.height && top < H) b = Math.max(b, Math.min(bottom, H));
+  });
+  return b;
+}
+function setShift(px){ shift = px; vp.style.transform = px ? "translateY(-" + px + "px)" : ""; }
+/* Stack goes just under the content. If it would run off the bottom, the app
+   content slides up by the difference, the way a phone page scrolls. */
+function layoutCaptions(instant){
+  if (!stack.children.length) { setShift(0); return; }
+  const H = screenEl.clientHeight;
+  let top = contentBottom() + CAP_GAP;
+  const over = top + stack.offsetHeight + CAP_EDGE - H;
+  const sh = over > 0 ? Math.ceil(over) : 0;
+  setShift(sh);
+  stack.classList.toggle("instant", !!instant);
+  stack.style.top = (top - sh) + "px";
+  if (instant) { void stack.offsetWidth; stack.classList.remove("instant"); }
+}
+function addNote(main, sub){
+  const wasEmpty = !stack.children.length;
+  stack.querySelectorAll(".capnote.cur").forEach(n => n.classList.remove("cur"));
+  const n = document.createElement("div");
+  n.className = "capnote cur pop";
+  n.innerHTML = "<b></b><small></small>";
+  n.firstChild.textContent = main; n.lastChild.textContent = sub || "";
+  stack.appendChild(n);
+  layoutCaptions(wasEmpty);
+}
+/* Mid-screen captions: add the note, then hold long enough to read it before the
+   pointer moves again. Abandons if the viewer has moved on. */
+async function caption(main, sub){
+  const t = token;
+  addNote(main, sub);
+  await sleep(CAP_HOLD);
+  if (t !== token) throw "x";
 }
 function rectOf(sel){
   const el = screenEl.querySelector(sel); if (!el) return null;
@@ -305,18 +355,18 @@ const STEPS = [
       '<div class="fld ph" id="f1">First name</div><div class="fld ph" id="f2">Last name</div>' +
       '<div class="fld sel ph" id="f3">Who is your doctor? (choose if listed)</div>' +
       '<div class="btn coral" id="go" style="margin-top:16px">Sign in &amp; get my link</div></div>');
-    parkCursor(160, 520); await sleep(800); guard(my);
+    parkCursor(160, 520); await sleep(2400); guard(my);
     await highlight("#f1"); await moveTo("#f1"); guard(my); await tap(); clearHighlight();
     await typeInto(vp.querySelector("#f1"), "Margaret", my); guard(my);
     await sleep(300);
     await moveTo("#f2"); await tap(); guard(my);
     await typeInto(vp.querySelector("#f2"), "Ellis", my); guard(my);
     await sleep(600);
-    caption("Choose your doctor", "The list fills in as the practice uses it. Not there? Type the name.");
+    await caption("Choose your doctor", "The list fills in as the practice uses it. Not there? Type the name.");
     await highlight("#f3"); await moveTo("#f3"); guard(my); await tap();
     const f3 = vp.querySelector("#f3"); f3.classList.remove("ph"); f3.textContent = "Dr. Appleton";
     await sleep(1500); clearHighlight(); guard(my);
-    caption("Then sign in", "You get your own page, and a link you can bookmark.");
+    await caption("Then sign in", "You get your own page, and a link you can bookmark.");
     await highlight("#go"); await moveTo("#go"); guard(my); await tap(); clearHighlight();
     await sleep(2000);
   }},
@@ -325,7 +375,7 @@ const STEPS = [
   async run(my){
     view(patientHead() + '<div class="c"><div class="sec">Captured so far (0)</div>' +
       '<div class="note">Nothing captured yet.</div></div>');
-    parkCursor(160, 520); await sleep(1600); guard(my);
+    parkCursor(160, 520); await sleep(2400); guard(my);
     await highlight("#mic", 4000); guard(my);
     await sleep(3200);
   }},
@@ -334,7 +384,7 @@ const STEPS = [
   async run(my){
     view(patientHead() + '<div class="c"><div class="sec">Captured so far (0)</div>' +
       '<div class="note">Nothing captured yet.</div></div>');
-    parkCursor(160, 500); await sleep(700); guard(my);
+    parkCursor(160, 500); await sleep(2400); guard(my);
     await moveTo("#mic"); guard(my); await tap();
     vp.querySelector("#mic").classList.add("rec");
     vp.querySelector("#miclabel").textContent = "Listening…";
@@ -343,7 +393,7 @@ const STEPS = [
     await sleep(800); guard(my);
     await typeInto(vp.querySelector("#live"), "Is it normal for my calf to feel tight?", my, 48);
     await sleep(1300); guard(my);
-    caption("Tap again to stop", "The microphone is only on while you say so.");
+    await caption("Tap again to stop", "The microphone is only on while you say so.");
     await moveTo("#mic"); await tap(); guard(my);
     vp.querySelector("#mic").classList.remove("rec");
     vp.querySelector("#miclabel").textContent = "Tap to speak";
@@ -356,7 +406,7 @@ const STEPS = [
   async run(my){
     view(patientHead() + '<div class="c"><div class="sec">Captured so far (1)</div>' +
       entry("e1","Is it normal for my calf to feel tight?","","&#9744; I was heard","Waiting for your care team") + '</div>');
-    parkCursor(160, 520); await sleep(1400); guard(my);
+    parkCursor(160, 520); await sleep(2400); guard(my);
     await highlight("#e1", 4600); guard(my);
     await sleep(3400);
   }},
@@ -364,11 +414,11 @@ const STEPS = [
 { cap:["Bring in a family member","Further down your page: Share with a caregiver."],
   async run(my){
     view(shareCard(false));
-    parkCursor(160, 480); await sleep(1600); guard(my);
+    parkCursor(160, 480); await sleep(2400); guard(my);
     await highlight("#mk"); await moveTo("#mk"); guard(my); await tap(); clearHighlight();
     view(shareCard(true));
     await sleep(900); guard(my);
-    caption("You get a six character code", "Read it out, or send it. Anyone who uses it sees your whole page.");
+    await caption("You get a six character code", "Read it out, or send it. Anyone who uses it sees your whole page.");
     await highlight("#code", 4200);
     await sleep(2200);
   }},
@@ -379,11 +429,11 @@ const STEPS = [
       '<div class="sheet" id="sheet"><div class="h">New Message</div>' +
       '<div class="to" id="to"><b>To:</b> <span id="toname"></span><span class="cursorbar"></span></div>' +
       '<div class="bubble">I am using Heard to keep track of questions for my care team. Join with code 7KQ4MP or open https://imheard.com/#/b/demo/c/7KQ4MP</div></div>');
-    parkCursor(160, 480); await sleep(1200); guard(my);
+    parkCursor(160, 480); await sleep(2400); guard(my);
     await highlight("#txt"); await moveTo("#txt"); guard(my); await tap(); clearHighlight();
     vp.querySelector("#sheet").classList.add("up");
     await sleep(1600); guard(my);
-    caption("You only choose who it goes to", "The invite and the code are already written for you.");
+    await caption("You only choose who it goes to", "The invite and the code are already written for you.");
     await highlight("#to"); await moveTo("#to"); guard(my); await tap();
     await typeInto(vp.querySelector("#toname"), "Sarah (daughter)", my, 80);
     await sleep(2600); clearHighlight(); await sleep(800);
@@ -396,7 +446,7 @@ const STEPS = [
       '<div class="fld ph" id="nm">Your name</div>' +
       '<div class="btn coral" id="join">Join</div>' +
       '<div class="warn">You will be able to see everything Margaret has recorded.</div></div>');
-    parkCursor(160, 480); await sleep(1400); guard(my);
+    parkCursor(160, 480); await sleep(2400); guard(my);
     await moveTo("#nm"); await tap(); guard(my);
     await typeInto(vp.querySelector("#nm"), "Sarah (daughter)", my, 72);
     await sleep(600); guard(my);
@@ -412,7 +462,7 @@ const STEPS = [
       '<div class="authhdr cg" id="cgh">Caregiver &mdash; Sarah (daughter)</div>' +
       entry("e2","Does she keep taking the blood thinner at home?","","&#9744; I was heard","Waiting for your care team") +
       '</div>');
-    parkCursor(160, 500); await sleep(1800); guard(my);
+    parkCursor(160, 500); await sleep(2400); guard(my);
     await highlight("#cgh", 4600); guard(my);
     await sleep(3000);
   }},
@@ -425,7 +475,7 @@ const STEPS = [
       '<div class="authhdr cg">Caregiver &mdash; Sarah (daughter)</div>' +
       entry("e2","Does she keep taking the blood thinner at home?","","&#9744; I was heard","Waiting for your care team") +
       '</div>');
-    parkCursor(160, 300); await sleep(2200); guard(my);
+    parkCursor(160, 300); await sleep(2400); guard(my);
     await highlight("#e1", 5200); guard(my);
     await sleep(2600);
   }},
@@ -434,7 +484,7 @@ const STEPS = [
   async run(my){
     view('<div class="c"><div class="sec">Captured so far (1)</div>' +
       entry("e1","Is it normal for my calf to feel tight?","addressed","&#9744; I was heard","&#10003; Heard by your care team") + '</div>');
-    parkCursor(160, 300); await sleep(2000); guard(my);
+    parkCursor(160, 300); await sleep(2400); guard(my);
     await highlight("#e1 .l"); await moveTo("#e1 .l"); guard(my); await tap();
     vp.querySelector("#e1 .l").innerHTML = "&#9745; I was heard";
     clearHighlight(); await sleep(1000); guard(my);
@@ -461,7 +511,7 @@ async function show(i){
   idx = Math.max(0, Math.min(STEPS.length - 1, i));
   const st = STEPS[idx];
   const nextBtn = document.getElementById("next");
-  caption(st.cap[0], st.cap[1]);
+  stack.innerHTML = ""; setShift(0); firstCap = st.cap;
   countEl.textContent = (idx + 1) + " / " + STEPS.length;
   progEl.style.width = Math.round(((idx + 1) / STEPS.length) * 100) + "%";
   document.getElementById("prev").disabled = idx === 0;

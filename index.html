@@ -144,13 +144,21 @@
   .authhdr { font-size: 12px; text-transform: uppercase; letter-spacing: .6px; color: var(--mut); margin: 14px 0 2px; }
   .authhdr:first-child { margin-top: 2px; }
   .authhdr.cg { color: var(--accent); }
-  .tourrow { display: flex; justify-content: flex-end; margin: -8px 2px 12px; }
-  .tourlink { display: inline-flex; align-items: center; gap: 7px; background: var(--card); color: var(--teal-deep);
-    border: 1px solid #d9e6e5; border-radius: 999px; padding: 9px 15px; font-size: 13.5px; font-weight: 700;
-    text-decoration: none; box-shadow: 0 2px 6px rgba(11,95,92,.10); }
-  .tourlink .play { width: 20px; height: 20px; border-radius: 50%; background: var(--coral); color: #fff;
-    font-size: 9px; display: flex; align-items: center; justify-content: center; padding-left: 2px; }
-  .tourlink small { font-weight: 500; color: var(--mut); font-size: 12px; }
+  /* Two buttons under the hero, side by side, filling the width: save the site, and see how it works. */
+  .toprow { display: flex; gap: 10px; margin: -6px 0 12px; }
+  .toprow > * { flex: 1 1 0; min-width: 0; min-height: 76px; display: flex; flex-direction: column; align-items: center;
+    justify-content: center; text-align: center; border-radius: 18px; text-decoration: none; font-family: inherit;
+    cursor: pointer; padding: 6px 8px; box-sizing: border-box; line-height: 1.2; }
+  .toprow b { font-size: 15px; font-weight: 800; }
+  .toprow small { font-size: 12px; font-weight: 500; margin-top: 3px; }
+  .bm { background: #fff; color: var(--green); border: 12px solid var(--green);
+    box-shadow: 0 0 0 4px rgba(30,125,70,.22), 0 4px 12px rgba(11,95,92,.14); }
+  .bm small { color: #33414b; }
+  .tourlink { background: var(--card); color: var(--teal-deep); border: 2px solid #cfe0df; box-shadow: 0 2px 6px rgba(11,95,92,.10); }
+  .tourlink .play { color: var(--coral); font-size: 12px; margin-right: 5px; }
+  .tourlink small { color: var(--mut); }
+  #bmPanel { background: #fff; border: 2px solid var(--green); }
+  #bmPanel .how { font-size: 15.5px; line-height: 1.5; color: var(--ink); margin: 0 0 12px; }
   .cgtag { display: inline-block; margin-left: 8px; font-size: 11px; font-weight: 600; color: var(--accent); background: var(--blue-lt); border-radius: 6px; padding: 1px 6px; vertical-align: 1px; }
   .sharecode { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 28px; letter-spacing: 4px; font-weight: 700; color: var(--blue); text-align: center; background: var(--blue-lt); border-radius: 10px; padding: 12px; margin: 8px 0; }
   .warnbox { background: var(--amber-lt); border: 1px solid #e6d9a8; color: var(--amber); border-radius: 10px; padding: 10px 12px; font-size: 12px; margin-top: 8px; }
@@ -499,7 +507,11 @@ async function renderLanding(){
     '<div class="tag">Your care team is listening, even between visits.</div>' +
     '<div class="tagsub">Speak your questions and concerns any time. Your care team sees them at their next visit.</div>' +
     '</div>' +
-    '<div class="tourrow"><a class="tourlink" href="tour.html"><span class="play">&#9654;</span>See how it works <small>step by step</small></a></div>' +
+    '<div class="toprow">' +
+    '<button class="bm" onclick="toggleBookmarkHelp()"><b>&#128278; Bookmark my site</b><small>so you can come back</small></button>' +
+    '<a class="tourlink" href="tour.html"><b><span class="play">&#9654;</span>See how it works</b><small>step by step</small></a>' +
+    '</div>' +
+    '<div class="choice" id="bmPanel" style="display:none"></div>' +
     '<div class="heroimg"><img src="' + HERO_IMG_URL + '" alt="A patient speaking, and walking out of the hospital satisfied" onerror="heroFallback(this)"></div>' +
     '<div class="choice"><h2>I\'m a patient</h2>' +
     '<p>Sign in once to get your personal page. Everything you capture is under your control.</p>' +
@@ -732,6 +744,42 @@ function makeQR(elId, text){
   const el = document.getElementById(elId);
   if (typeof QRCode !== "undefined") new QRCode(el, { text: text, width: 150, height: 150, correctLevel: QRCode.CorrectLevel.M });
   else el.innerHTML = '<div class="linkline">' + esc(text) + '</div>';
+}
+/* ---- "Bookmark my site" ----
+   A web page cannot add a bookmark by itself. This shows the steps for the browser
+   in hand and the exact link to save: the person's own page if they have signed in
+   on this device, otherwise the site. If the browser offers to install the site
+   (Chrome does, given a web app manifest, which this site does not yet have), that
+   is offered as well. */
+let installEvt = null;
+addEventListener("beforeinstallprompt", e => { e.preventDefault(); installEvt = e; });
+function bookmarkTarget(){
+  const my = localStorage.getItem(LS.myPatient);
+  return my ? { url: link("/p/" + my), mine: true } : { url: baseURL() + "#/b/" + bucket, mine: false };
+}
+function toggleBookmarkHelp(){
+  const p = document.getElementById("bmPanel"); if (!p) return;
+  if (p.style.display !== "none") { p.style.display = "none"; return; }
+  const t = bookmarkTarget();
+  const android = /Android/i.test(navigator.userAgent);
+  const mac = /Mac/i.test(navigator.platform);
+  let how;
+  if (IS_IOS && !IS_IOS_NON_SAFARI) how = "Tap the <b>Share</b> button at the bottom of Safari (the square with an arrow pointing up), then <b>Add to Home Screen</b>. Heard will sit on your home screen like an app.";
+  else if (IS_IOS) how = "Tap your browser's <b>Share</b> or menu button, then <b>Add to Home Screen</b> or <b>Add to Bookmarks</b>.";
+  else if (android) how = "Tap the <b>three dots</b> at the top right of your browser, then <b>Add to Home screen</b>.";
+  else how = "Press <b>" + (mac ? "&#8984; D" : "Ctrl + D") + "</b> to bookmark this page. On a phone, use the browser's Share or menu button and choose Add to Home Screen.";
+  p.innerHTML = '<h2>Save Heard on this device</h2>' +
+    '<p class="how">' + how + '</p>' +
+    (installEvt ? '<button class="btn teal" id="bmInstall">Add Heard to this device</button><div style="height:10px"></div>' : '') +
+    '<div class="note" style="text-align:left;margin:0 0 4px">' + (t.mine
+      ? 'This is the link to your own page. Anyone who has it can see your list, so keep it to yourself.'
+      : 'This is the link to save. Once you sign in, your personal page has its own link you can save too.') + '</div>' +
+    '<div class="linkline">' + esc(t.url) + '</div>' +
+    '<button class="btn sub" id="bmCopy" style="margin-top:10px">Copy the link</button>';
+  p.style.display = "block";
+  document.getElementById("bmCopy").onclick = () => copyText(JSON.stringify(t.url));
+  const i = document.getElementById("bmInstall"); if (i) i.onclick = () => installEvt.prompt();
+  p.scrollIntoView({ behavior: "smooth", block: "nearest" });
 }
 function copyText(jsonStr){
   const t = JSON.parse(jsonStr);
