@@ -39,12 +39,14 @@
 
   /* The caption is a note laid ON the phone, not part of it. Ringed in green and
      set well above the app's own type so nobody mistakes it for the interface. */
-  .capnote { position:absolute; left:11px; right:11px; bottom:16px; z-index:20;
-    background:rgba(255,255,255,.975); border:3px solid var(--green); border-radius:15px;
-    padding:14px 15px; text-align:center;
-    box-shadow:0 10px 28px rgba(16,22,28,.3), 0 0 0 4px rgba(30,125,70,.14); }
+  .capnote { position:absolute; left:8px; right:8px; bottom:14px; z-index:20;
+    background:#fff; border:12px solid var(--green); border-radius:22px;
+    padding:12px 12px 13px; text-align:center; transform-origin:50% 100%;
+    box-shadow:0 0 0 4px rgba(30,125,70,.28), 0 14px 32px rgba(16,22,28,.34); }
+  .capnote.pop { animation:pop .4s cubic-bezier(.2,.9,.3,1.25); }
+  @keyframes pop { 0% { transform:scale(.93); } 100% { transform:scale(1); } }
   .capnote b { display:block; font-size:21px; line-height:1.24; color:var(--ink); }
-  .capnote small { display:block; font-size:15px; line-height:1.4; color:#41505b; margin-top:7px; }
+  .capnote small { display:block; font-size:15px; line-height:1.4; color:#33414b; margin-top:7px; }
 
   .hl { position:absolute; border:3px solid var(--hi); border-radius:11px; pointer-events:none;
     box-shadow:0 0 0 3px rgba(255,204,0,.3); opacity:0; transition:opacity .3s ease; z-index:14; }
@@ -63,8 +65,11 @@
   .nav button { border:1px solid var(--line); background:var(--card); color:var(--blue); font-size:14px;
     font-weight:700; padding:11px 18px; border-radius:10px; cursor:pointer; min-width:90px; }
   .nav button.pri { background:var(--teal); border-color:var(--teal); color:#fff; }
+  .nav button.pri.ready { animation:nudge 1.7s ease-in-out infinite; }
+  @keyframes nudge { 0%,100% { box-shadow:0 0 0 0 rgba(18,128,124,0); } 50% { box-shadow:0 0 0 8px rgba(18,128,124,.3); } }
   .nav button:disabled { opacity:.4; cursor:default; }
   .count { font-size:13px; color:var(--mut); min-width:60px; text-align:center; }
+  .hint { text-align:center; font-size:12.5px; color:var(--mut); margin:10px 0 0; }
 
   /* ---- app chrome, matched to the live app ---- */
   .c { background:var(--card); border-radius:14px; padding:11px 12px; margin-bottom:9px; }
@@ -153,6 +158,7 @@
   @media (prefers-reduced-motion: reduce) {
     .cur, .view, .sheet, .mic, .entry { transition-duration:.01ms !important; }
     .ripple.go { animation:none; } .to .cursorbar { animation:none; }
+    .capnote.pop { animation:none; } .nav button.pri.ready { animation:none; }
   }
 </style>
 </head>
@@ -183,10 +189,11 @@
   <div class="bar"><i id="prog"></i></div>
   <div class="nav">
     <button id="prev">&#8592; Back</button>
-    <button class="pri" id="play">Pause</button>
+    <button id="replay">&#8635; Replay</button>
     <span class="count" id="count">1 / 11</span>
-    <button id="next">Next &#8594;</button>
+    <button class="pri" id="next">Next &#8594;</button>
   </div>
+  <p class="hint">Each screen plays once, then waits. Press Next when you are ready, or Replay to see it again.</p>
 </div>
 
 <script>
@@ -201,7 +208,7 @@ const progEl = document.getElementById("prog");
 const countEl= document.getElementById("count");
 const REDUCED = matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-let token = 0, idx = 0, auto = true, autoTimer = null;
+let token = 0, idx = 0, finished = false;
 const sleep = ms => new Promise(r => setTimeout(r, REDUCED ? Math.min(ms, 80) : ms));
 function guard(my){ if (my !== token) throw "x"; }
 
@@ -214,7 +221,10 @@ function view(html){
   d.classList.add("on");
   return d;
 }
-function caption(main, sub){ capM.textContent = main; capS.textContent = sub || ""; }
+function caption(main, sub){
+  capM.textContent = main; capS.textContent = sub || "";
+  const n = capM.parentElement; n.classList.remove("pop"); void n.offsetWidth; n.classList.add("pop");
+}
 function rectOf(sel){
   const el = screenEl.querySelector(sel); if (!el) return null;
   const s = screenEl.getBoundingClientRect(), r = el.getBoundingClientRect();
@@ -436,7 +446,7 @@ const STEPS = [
     await sleep(5200);
   }},
 
-{ cap:["That is the whole loop","Ask when it occurs to you. They answer. You both know it landed."],
+{ cap:["That's the whole loop","Ask when it occurs to you. Your team will hear you. You both know you've been heard."],
   async run(my){
     curEl.classList.remove("on");
     view('<div class="final"><div class="tick">&#10003;</div><h2>You have been heard.</h2>' +
@@ -445,51 +455,44 @@ const STEPS = [
   }}
 ];
 
-async function show(i, autoAdvance){
+async function show(i){
   token++; const my = token;
-  clearTimeout(autoTimer);
+  finished = false;
   idx = Math.max(0, Math.min(STEPS.length - 1, i));
   const st = STEPS[idx];
+  const nextBtn = document.getElementById("next");
   caption(st.cap[0], st.cap[1]);
   countEl.textContent = (idx + 1) + " / " + STEPS.length;
   progEl.style.width = Math.round(((idx + 1) / STEPS.length) * 100) + "%";
   document.getElementById("prev").disabled = idx === 0;
-  document.getElementById("next").disabled = idx === STEPS.length - 1;
+  nextBtn.innerHTML = idx === STEPS.length - 1 ? "&#8635; Start over" : "Next &#8594;";
+  nextBtn.classList.remove("ready");
   clearHighlight();
   try {
     await st.run(my); guard(my);
-    if (autoAdvance && auto && idx < STEPS.length - 1) autoTimer = setTimeout(() => show(idx + 1, true), 900);
-    if (auto && idx === STEPS.length - 1) setAuto(false);
+    finished = true;
+    nextBtn.classList.add("ready");   /* this screen is done; the next move is the viewer's */
   } catch (e) { if (e !== "x") console.error(e); }
 }
-function setAuto(on){
-  auto = on;
-  const b = document.getElementById("play");
-  b.textContent = on ? "Pause" : "Play"; b.classList.toggle("pri", on);
-  if (!on) clearTimeout(autoTimer);
-}
-document.getElementById("next").onclick = () => { setAuto(false); show(idx + 1, false); };
-document.getElementById("prev").onclick = () => { setAuto(false); show(idx - 1, false); };
-document.getElementById("play").onclick = () => {
-  if (auto) setAuto(false);
-  else { setAuto(true); show(idx >= STEPS.length - 1 ? 0 : idx, true); }
-};
+function goNext(){ show(idx >= STEPS.length - 1 ? 0 : idx + 1); }
+function goPrev(){ if (idx > 0) show(idx - 1); }
+document.getElementById("next").onclick = goNext;
+document.getElementById("prev").onclick = goPrev;
+document.getElementById("replay").onclick = () => show(idx);
 addEventListener("keydown", e => {
-  if (e.key === "ArrowRight") { setAuto(false); show(idx + 1, false); }
-  if (e.key === "ArrowLeft")  { setAuto(false); show(idx - 1, false); }
+  if (e.key === "ArrowRight") goNext();
+  if (e.key === "ArrowLeft")  goPrev();
+  if (e.key === "r" || e.key === "R") show(idx);
 });
 
-/* A hidden tab freezes CSS transitions, so a slide left running in the background
-   comes back half drawn. Stop on hide, replay the current slide on return. */
-let wasAuto = true;
+/* A hidden tab freezes CSS transitions, so a screen left running in the background
+   comes back half drawn. Cancel on hide; on return, replay it only if it had not finished. */
 document.addEventListener("visibilitychange", () => {
-  if (document.hidden) { wasAuto = auto; token++; clearTimeout(autoTimer); }
-  else { auto = wasAuto; const b = document.getElementById("play");
-         b.textContent = auto ? "Pause" : "Play"; b.classList.toggle("pri", auto);
-         show(idx, auto); }
+  if (document.hidden) { if (!finished) token++; }
+  else if (!finished) show(idx);
 });
 
-show(0, true);
+show(0);
 </script>
 </body>
 </html>
