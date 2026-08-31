@@ -220,7 +220,10 @@ function view(html){
   d.className = "view";
   d.innerHTML = html;
   screenEl.insertBefore(d, hlEl);
-  requestAnimationFrame(() => d.classList.add("on"));
+  /* A forced reflow, not requestAnimationFrame: rAF is throttled or paused when the
+     tab is not in the foreground, which left slides stuck part way through the fade. */
+  void d.offsetWidth;
+  d.classList.add("on");
   return d;
 }
 function caption(main, sub){ capEl.innerHTML = "<b>" + main + "</b>" + (sub ? "<small>" + sub + "</small>" : ""); }
