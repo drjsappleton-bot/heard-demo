@@ -1,0 +1,330 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Heard — how it works</title>
+<link rel="icon" href="heard-icon.png">
+<style>
+  :root {
+    --blue:#1f4e79; --blue-lt:#eaf1f8; --accent:#2e75b6;
+    --green:#1e7d46; --green-lt:#e8f5ee;
+    --amber:#9a6700; --amber-lt:#fff8e1;
+    --ink:#1a1d21; --mut:#5f6b76; --bg:#f4f6f8; --card:#fff; --line:#dde3e9;
+    --teal:#12807c; --teal-deep:#0b5f5c; --coral:#e8735a; --coral-deep:#d45f47; --cream:#fdf8f3;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; }
+  .wrap { max-width:520px; margin:0 auto; padding:18px 16px 40px; }
+  .top { text-align:center; margin-bottom:14px; }
+  .top img { width:46px; height:46px; border-radius:12px; }
+  .top h1 { font-size:22px; margin:8px 0 2px; color:var(--teal-deep); }
+  .top p { margin:0; font-size:13px; color:var(--mut); }
+  .back { display:inline-block; margin-top:10px; font-size:13px; color:var(--blue); text-decoration:none; font-weight:600; }
+
+  .stage { position:relative; margin:14px auto 0; width:300px; }
+  .phone { width:300px; height:604px; border-radius:38px; background:#10161c; padding:11px 10px 14px;
+    box-shadow:0 18px 44px rgba(16,22,28,.34); position:relative; }
+  .notch { position:absolute; top:11px; left:50%; transform:translateX(-50%); width:104px; height:20px;
+    background:#10161c; border-radius:0 0 14px 14px; z-index:6; }
+  .screen { position:relative; width:100%; height:100%; background:var(--bg); border-radius:29px;
+    overflow:hidden; }
+  .scene { position:absolute; inset:0; padding:34px 14px 14px; overflow:hidden;
+    opacity:0; transform:translateX(16px); transition:opacity .34s ease, transform .34s ease; }
+  .scene.on { opacity:1; transform:none; }
+
+  .cap { position:absolute; left:0; right:0; bottom:-52px; text-align:center; font-size:14px;
+    color:var(--ink); font-weight:600; min-height:40px; line-height:1.35;
+    opacity:0; transition:opacity .3s ease; }
+  .cap.on { opacity:1; }
+  .cap small { display:block; font-weight:400; color:var(--mut); font-size:12.5px; margin-top:2px; }
+
+  .bar { width:300px; height:4px; background:var(--line); border-radius:3px; margin:74px auto 0; overflow:hidden; }
+  .bar i { display:block; height:100%; width:0; background:var(--teal); border-radius:3px; }
+  .ctrls { display:flex; gap:8px; justify-content:center; margin-top:14px; }
+  .ctrls button { border:1px solid var(--line); background:var(--card); color:var(--blue);
+    font-size:13px; font-weight:600; padding:9px 16px; border-radius:9px; cursor:pointer; }
+  .ctrls button.pri { background:var(--teal); border-color:var(--teal); color:#fff; }
+
+  /* app-alike bits */
+  .card { background:var(--card); border-radius:14px; padding:11px 12px; margin-bottom:9px;
+    box-shadow:0 1px 2px rgba(16,22,28,.06); }
+  .sec { font-size:10px; text-transform:uppercase; letter-spacing:.7px; color:var(--mut); margin:0 0 7px; }
+  .fld { height:38px; border:1px solid var(--line); border-radius:9px; background:#fff; font-size:13px;
+    display:flex; align-items:center; padding:0 11px; color:var(--ink); margin-bottom:8px; }
+  .fld.ph { color:#9aa4ad; }
+  .fld.sel { justify-content:space-between; }
+  .fld.sel::after { content:"\25BE"; color:var(--mut); }
+  .fld.focus { border-color:var(--accent); box-shadow:0 0 0 3px rgba(46,117,182,.16); }
+  .cta { height:40px; border-radius:11px; background:linear-gradient(150deg,var(--coral),var(--coral-deep));
+    color:#fff; font-weight:700; font-size:13.5px; display:flex; align-items:center; justify-content:center; }
+  .cta.blue { background:var(--blue); }
+  .cta.tealb { background:linear-gradient(150deg,var(--teal),var(--teal-deep)); }
+  .hero { background:linear-gradient(150deg,var(--teal),var(--teal-deep)); border-radius:16px;
+    padding:14px; text-align:center; color:#fff; margin-bottom:9px; }
+  .hero b { font-size:19px; display:block; }
+  .hero span { font-size:11px; opacity:.92; }
+
+  .code { font-family:ui-monospace,Menlo,Consolas,monospace; font-size:21px; letter-spacing:3px;
+    font-weight:700; color:var(--blue); background:var(--blue-lt); border-radius:9px;
+    padding:9px; text-align:center; margin:7px 0; }
+
+  .mic { width:96px; height:96px; border-radius:50%; margin:6px auto; display:flex; align-items:center;
+    justify-content:center; color:#fff; font-size:12px; font-weight:700; text-align:center;
+    background:linear-gradient(150deg,#4a86c4,var(--blue)); transition:background .3s ease, transform .2s ease; }
+  .mic.rec { background:linear-gradient(150deg,#34b46a,var(--green)); transform:scale(1.05);
+    box-shadow:0 0 0 8px rgba(30,125,70,.16); }
+  .live { background:var(--blue-lt); border-radius:9px; padding:8px 10px; font-size:12.5px; min-height:34px;
+    color:var(--ink); }
+
+  .entry { border-left:3px solid var(--accent); background:#fafcfe; padding:7px 10px;
+    border-radius:0 9px 9px 0; margin-top:7px; font-size:12px;
+    opacity:0; transform:translateY(8px); transition:opacity .34s ease, transform .34s ease; }
+  .entry.on { opacity:1; transform:none; }
+  .entry.addressed { border-left-color:var(--amber); background:var(--amber-lt); }
+  .entry.closed { border-left-color:var(--green); background:var(--green-lt); }
+  .entry .foot { display:flex; justify-content:space-between; align-items:center; margin-top:5px;
+    font-size:10.5px; font-weight:600; }
+  .entry .foot .l { color:var(--green); }
+  .entry .foot .r { color:var(--mut); font-weight:400; }
+  .entry.addressed .foot .r, .entry.closed .foot .r { color:var(--green); font-weight:600; }
+
+  .bucket h3 { font-size:11px; padding:6px 10px; border-radius:9px 9px 0 0; color:#fff;
+    background:var(--blue); margin:0; }
+  .bucket ul { list-style:none; margin:0; padding:0; border:1px solid var(--line); border-top:0;
+    border-radius:0 0 9px 9px; }
+  .bucket li { padding:8px 10px; font-size:11.5px; display:flex; justify-content:space-between; gap:8px; }
+  .chk { font-size:10px; color:var(--mut); white-space:nowrap; }
+  .chk.done { color:var(--green); font-weight:700; }
+
+  /* messages sheet */
+  .sheet { position:absolute; left:0; right:0; bottom:0; height:70%; background:#f7f7fa;
+    border-radius:18px 18px 0 0; transform:translateY(100%); transition:transform .42s cubic-bezier(.22,.9,.3,1);
+    box-shadow:0 -8px 26px rgba(16,22,28,.2); padding:10px 12px; z-index:5; }
+  .sheet.up { transform:none; }
+  .sheet .hdr { text-align:center; font-size:12px; font-weight:700; padding-bottom:7px;
+    border-bottom:1px solid #e2e2e8; color:#111; }
+  .to { display:flex; align-items:center; gap:6px; font-size:12.5px; padding:9px 8px; margin-top:7px;
+    border-radius:8px; border:1px solid transparent; }
+  .to b { color:var(--mut); font-weight:600; }
+  .to .cursor { width:1.5px; height:15px; background:var(--accent); animation:blink 1s steps(1) infinite; }
+  @keyframes blink { 50% { opacity:0; } }
+  .to.hl { border-color:var(--coral); background:#fff3ef;
+    box-shadow:0 0 0 3px rgba(232,115,90,.18); }
+  .tohint { font-size:10.5px; color:var(--coral-deep); font-weight:700; margin:5px 2px 0; opacity:0;
+    transition:opacity .3s ease; }
+  .tohint.on { opacity:1; }
+  .bubble { margin-top:12px; background:#e9e9ee; border-radius:14px; padding:9px 11px; font-size:11.5px;
+    color:#111; line-height:1.4; }
+
+  .final { display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%;
+    text-align:center; padding:0 18px; }
+  .final .tick { width:74px; height:74px; border-radius:50%; background:var(--green-lt); color:var(--green);
+    display:flex; align-items:center; justify-content:center; font-size:38px; margin-bottom:14px;
+    transform:scale(.6); opacity:0; transition:transform .4s cubic-bezier(.2,1.3,.4,1), opacity .4s ease; }
+  .final.on .tick { transform:scale(1); opacity:1; }
+  .final h2 { font-size:20px; margin:0 0 6px; color:var(--teal-deep); }
+  .final p { font-size:13px; color:var(--mut); margin:0; line-height:1.45; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .scene, .entry, .sheet, .final .tick, .mic { transition-duration:.01ms !important; }
+    .to .cursor { animation:none; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <img src="heard-icon.png" alt="">
+    <h1>How Heard works</h1>
+    <p>About a minute. No sound needed.</p>
+    <a class="back" href="./">&#8592; Back to Heard</a>
+  </div>
+
+  <div class="stage">
+    <div class="phone">
+      <div class="notch"></div>
+      <div class="screen" id="screen"></div>
+    </div>
+    <div class="cap" id="cap"></div>
+  </div>
+
+  <div class="bar"><i id="prog"></i></div>
+  <div class="ctrls">
+    <button class="pri" id="replay">Replay</button>
+    <button id="skip">Skip to the end</button>
+  </div>
+</div>
+
+<script>
+const screenEl = document.getElementById("screen");
+const capEl = document.getElementById("cap");
+const progEl = document.getElementById("prog");
+const REDUCED = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+let token = 0;                     /* cancels an in-flight run when replayed */
+const sleep = ms => new Promise(r => setTimeout(r, REDUCED ? Math.min(ms, 120) : ms));
+function guard(my){ if (my !== token) throw "cancelled"; }
+
+function scene(html){
+  screenEl.innerHTML = '<div class="scene" id="sc">' + html + '</div>';
+  const el = document.getElementById("sc");
+  requestAnimationFrame(() => el.classList.add("on"));
+  return el;
+}
+function caption(main, sub){
+  capEl.classList.remove("on");
+  setTimeout(() => {
+    capEl.innerHTML = main + (sub ? "<small>" + sub + "</small>" : "");
+    capEl.classList.add("on");
+  }, 130);
+}
+async function type(el, text, my, speed){
+  el.classList.remove("ph");
+  el.textContent = "";
+  for (let i = 0; i < text.length; i++) {
+    guard(my);
+    el.textContent += text[i];
+    await sleep(speed || 46);
+  }
+}
+
+const TOTAL = 6;
+function progress(step){ progEl.style.width = Math.round((step / TOTAL) * 100) + "%"; }
+
+/* ---------------- the walkthrough ---------------- */
+async function run(){
+  const my = ++token;
+  progress(0);
+
+  /* 1. sign in */
+  caption("Sign in once", "First name, last name, and your doctor.");
+  let el = scene(
+    '<div class="hero"><b>Heard</b><span>Your care team is listening, even between visits.</span></div>' +
+    '<div class="card"><div class="sec">I am a patient</div>' +
+    '<div class="fld ph" id="f1">First name</div>' +
+    '<div class="fld ph" id="f2">Last name</div>' +
+    '<div class="fld sel ph" id="f3">Who is your doctor?</div>' +
+    '<div class="cta" style="margin-top:12px">Sign in &amp; get my link</div></div>');
+  await sleep(700); guard(my);
+  const f1 = el.querySelector("#f1"), f2 = el.querySelector("#f2"), f3 = el.querySelector("#f3");
+  f1.classList.add("focus"); await type(f1, "Margaret", my); f1.classList.remove("focus");
+  await sleep(200); guard(my);
+  f2.classList.add("focus"); await type(f2, "Ellis", my); f2.classList.remove("focus");
+  await sleep(280); guard(my);
+  caption("Pick your doctor", "The list fills in as the practice uses it.");
+  f3.classList.add("focus"); await sleep(520); guard(my);
+  f3.classList.remove("ph"); f3.textContent = "Dr. Appleton";
+  await sleep(900); guard(my);
+  progress(1);
+
+  /* 2. caregiver code */
+  caption("Bring in a family member", "One code links their phone to your list.");
+  el = scene(
+    '<div class="card"><div class="sec">Share with a caregiver</div>' +
+    '<div style="font-size:11.5px;color:var(--mut);line-height:1.4">Give this code to the person helping you.</div>' +
+    '<div class="code">7KQ4MP</div>' +
+    '<div class="cta" id="txt">&#128241; Text this to a caregiver</div></div>' +
+    '<div class="sheet" id="sheet">' +
+      '<div class="hdr">New Message</div>' +
+      '<div class="to" id="to"><b>To:</b> <span id="toname"></span><span class="cursor"></span></div>' +
+      '<div class="tohint" id="tohint">&#8593; Just choose who it goes to</div>' +
+      '<div class="bubble">I am using Heard to keep track of questions for my care team. Join with code <b>7KQ4MP</b> or open imheard.com</div>' +
+    '</div>');
+  await sleep(900); guard(my);
+  el.querySelector("#txt").style.transform = "scale(.97)";
+  await sleep(240); guard(my);
+  el.querySelector("#sheet").classList.add("up");
+  await sleep(700); guard(my);
+  caption("Your message app opens", "The invite is already written for you.");
+  await sleep(900); guard(my);
+  el.querySelector("#to").classList.add("hl");
+  el.querySelector("#tohint").classList.add("on");
+  await sleep(600); guard(my);
+  await type(el.querySelector("#toname"), "Sarah (daughter)", my, 62);
+  await sleep(1000); guard(my);
+  progress(2);
+
+  /* 3. asking */
+  caption("Ask whenever it occurs to you", "Tap, speak, tap again.");
+  el = scene(
+    '<div class="card"><div class="sec">Hello, Margaret</div>' +
+    '<div class="mic" id="mic">Tap to speak</div>' +
+    '<div class="live" id="live">&nbsp;</div></div>' +
+    '<div class="card"><div class="sec">Captured so far (<span id="n">0</span>)</div>' +
+    '<div id="list"></div></div>');
+  await sleep(800); guard(my);
+  const mic = el.querySelector("#mic"), live = el.querySelector("#live");
+  mic.classList.add("rec"); mic.textContent = "Listening";
+  await sleep(500); guard(my);
+  await type(live, "Is it normal for my calf to feel tight?", my, 34);
+  await sleep(600); guard(my);
+  mic.classList.remove("rec"); mic.textContent = "Tap to speak";
+  live.innerHTML = "&nbsp;";
+  el.querySelector("#list").innerHTML =
+    '<div class="entry" id="e1">Is it normal for my calf to feel tight?' +
+    '<div class="foot"><span class="l">&#9744; I was heard</span><span class="r">Waiting for your care team</span></div></div>';
+  el.querySelector("#n").textContent = "1";
+  requestAnimationFrame(() => el.querySelector("#e1").classList.add("on"));
+  await sleep(1100); guard(my);
+  caption("It joins your list", "Nothing is lost between visits.");
+  await sleep(1100); guard(my);
+  progress(3);
+
+  /* 4. the care team */
+  caption("Your care team sees it", "Sorted by who can answer it.");
+  el = scene(
+    '<div class="card"><div class="sec">Rounding list &middot; Margaret Ellis</div>' +
+    '<div class="bucket"><h3>Physician / APP list</h3><ul>' +
+      '<li><span>Is it normal for my calf to feel tight?</span><span class="chk" id="c1">&#9744; Addressed</span></li>' +
+    '</ul></div></div>');
+  await sleep(1300); guard(my);
+  const c1 = el.querySelector("#c1");
+  c1.classList.add("done"); c1.innerHTML = "&#9745; Addressed";
+  caption("They mark it addressed", "It is never deleted.");
+  await sleep(1400); guard(my);
+  progress(4);
+
+  /* 5. patient confirms */
+  caption("You see that they answered", "Then you close the loop.");
+  el = scene(
+    '<div class="card"><div class="sec">Captured so far (1)</div>' +
+    '<div class="entry addressed on" id="e2">Is it normal for my calf to feel tight?' +
+    '<div class="foot"><span class="l" id="lchk">&#9744; I was heard</span>' +
+    '<span class="r">&#10003; Heard by your care team</span></div></div></div>');
+  await sleep(1500); guard(my);
+  const lchk = el.querySelector("#lchk");
+  lchk.innerHTML = "&#9745; I was heard";
+  el.querySelector("#e2").classList.remove("addressed");
+  el.querySelector("#e2").classList.add("closed");
+  await sleep(700); guard(my);
+  caption("Tap “I was heard”", "That control is yours alone.");
+  await sleep(1300); guard(my);
+  progress(5);
+
+  /* 6. close */
+  caption("");
+  capEl.classList.remove("on");
+  el = scene('<div class="final" id="fin"><div class="tick">&#10003;</div>' +
+    '<h2>You have been heard.</h2>' +
+    '<p>Your care team knows your question was answered.<br>And now you know it too.</p></div>');
+  await sleep(60); guard(my);
+  el.querySelector("#fin").classList.add("on");
+  progress(6);
+}
+
+function start(){ run().catch(e => { if (e !== "cancelled") console.error(e); }); }
+document.getElementById("replay").onclick = start;
+document.getElementById("skip").onclick = () => {
+  token++;
+  capEl.classList.remove("on");
+  progress(6);
+  screenEl.innerHTML = '<div class="scene on"><div class="final on"><div class="tick">&#10003;</div>' +
+    '<h2>You have been heard.</h2>' +
+    '<p>Your care team knows your question was answered.<br>And now you know it too.</p></div></div>';
+};
+start();
+</script>
+</body>
+</html>

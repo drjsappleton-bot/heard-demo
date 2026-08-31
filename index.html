@@ -144,6 +144,13 @@
   .authhdr { font-size: 12px; text-transform: uppercase; letter-spacing: .6px; color: var(--mut); margin: 14px 0 2px; }
   .authhdr:first-child { margin-top: 2px; }
   .authhdr.cg { color: var(--accent); }
+  .tourrow { display: flex; justify-content: flex-end; margin: -8px 2px 12px; }
+  .tourlink { display: inline-flex; align-items: center; gap: 7px; background: var(--card); color: var(--teal-deep);
+    border: 1px solid #d9e6e5; border-radius: 999px; padding: 9px 15px; font-size: 13.5px; font-weight: 700;
+    text-decoration: none; box-shadow: 0 2px 6px rgba(11,95,92,.10); }
+  .tourlink .play { width: 20px; height: 20px; border-radius: 50%; background: var(--coral); color: #fff;
+    font-size: 9px; display: flex; align-items: center; justify-content: center; padding-left: 2px; }
+  .tourlink small { font-weight: 500; color: var(--mut); font-size: 12px; }
   .cgtag { display: inline-block; margin-left: 8px; font-size: 11px; font-weight: 600; color: var(--accent); background: var(--blue-lt); border-radius: 6px; padding: 1px 6px; vertical-align: 1px; }
   .sharecode { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 28px; letter-spacing: 4px; font-weight: 700; color: var(--blue); text-align: center; background: var(--blue-lt); border-radius: 10px; padding: 12px; margin: 8px 0; }
   .warnbox { background: var(--amber-lt); border: 1px solid #e6d9a8; color: var(--amber); border-radius: 10px; padding: 10px 12px; font-size: 12px; margin-top: 8px; }
@@ -492,6 +499,7 @@ async function renderLanding(){
     '<div class="tag">Your care team is listening, even between visits.</div>' +
     '<div class="tagsub">Speak your questions and concerns any time. Your care team sees them at their next visit.</div>' +
     '</div>' +
+    '<div class="tourrow"><a class="tourlink" href="tour.html"><span class="play">&#9654;</span>See how it works <small>1 min</small></a></div>' +
     '<div class="heroimg"><img src="' + HERO_IMG_URL + '" alt="A patient speaking, and walking out of the hospital satisfied" onerror="heroFallback(this)"></div>' +
     '<div class="choice"><h2>I\'m a patient</h2>' +
     '<p>Sign in once to get your personal page. Everything you capture is under your control.</p>' +
