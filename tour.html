@@ -95,7 +95,7 @@
 
   .privacy { display:flex; align-items:center; gap:7px; font-size:11px; color:var(--mut);
     justify-content:center; margin-bottom:8px; }
-  .dot { width:9px; height:9px; border-radius:50%; background:#c3ccd4; }
+  .dot { width:9px; height:9px; flex:0 0 9px; border-radius:50%; background:#c3ccd4; }
   .dot.live { background:var(--green); }
   .mic { width:104px; height:104px; border-radius:50%; margin:5px auto; display:flex; flex-direction:column;
     align-items:center; justify-content:center; color:#fff; font-size:12.5px; font-weight:700;
@@ -231,8 +231,23 @@ function rectOf(sel){
   const s = screenEl.getBoundingClientRect(), r = el.getBoundingClientRect();
   return { x:r.left - s.left, y:r.top - s.top, w:r.width, h:r.height };
 }
+/* An element part way through a CSS transition reports where it is now, not where
+   it is going. Read it until two reads agree, so highlights and the cursor land on
+   the finished position. setTimeout, not rAF: rAF stalls in a background tab. */
+async function settled(sel){
+  let prev = rectOf(sel);
+  if (!prev) return null;
+  for (let i = 0; i < 40; i++){
+    await new Promise(r => setTimeout(r, 50));
+    const now = rectOf(sel);
+    if (!now) return prev;
+    if (Math.abs(now.y - prev.y) < 0.5 && Math.abs(now.x - prev.x) < 0.5) return now;
+    prev = now;
+  }
+  return prev;
+}
 async function highlight(sel, hold){
-  const r = rectOf(sel); if (!r) return;
+  const r = await settled(sel); if (!r) return;
   hlEl.style.left = (r.x - 5) + "px"; hlEl.style.top = (r.y - 5) + "px";
   hlEl.style.width = (r.w + 10) + "px"; hlEl.style.height = (r.h + 10) + "px";
   hlEl.classList.add("on");
@@ -240,7 +255,7 @@ async function highlight(sel, hold){
 }
 function clearHighlight(){ hlEl.classList.remove("on"); }
 async function moveTo(sel, dx, dy){
-  const r = rectOf(sel); if (!r) return;
+  const r = await settled(sel); if (!r) return;
   curEl.classList.add("on");
   curEl.style.transform = "translate(" + (r.x + r.w/2 + (dx||0)) + "px," + (r.y + r.h/2 + (dy||0)) + "px)";
   await sleep(REDUCED ? 60 : 1050);
@@ -480,6 +495,17 @@ addEventListener("keydown", e => {
   if (e.key === "ArrowRight") { setAuto(false); show(idx + 1, false); }
   if (e.key === "ArrowLeft")  { setAuto(false); show(idx - 1, false); }
 });
+
+/* A hidden tab freezes CSS transitions, so a slide left running in the background
+   comes back half drawn. Stop on hide, replay the current slide on return. */
+let wasAuto = true;
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) { wasAuto = auto; token++; clearTimeout(autoTimer); }
+  else { auto = wasAuto; const b = document.getElementById("play");
+         b.textContent = auto ? "Pause" : "Play"; b.classList.toggle("pri", auto);
+         show(idx, auto); }
+});
+
 show(0, true);
 </script>
 </body>
