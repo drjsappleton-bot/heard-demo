@@ -95,20 +95,23 @@
 
   .privacy { display:flex; align-items:center; gap:7px; font-size:11px; color:var(--mut);
     justify-content:center; margin-bottom:8px; }
-  .dot { width:9px; height:9px; flex:0 0 9px; border-radius:50%; background:#c3ccd4; }
+  .dot { width:10px; height:10px; flex:0 0 10px; border-radius:50%; background:#b7bfc7; }
+  .dot.live { background:var(--red); animation:pulse 1.2s infinite; }
+  @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:.35; } }
   .dot.live { background:var(--green); }
-  .mic { width:104px; height:104px; border-radius:50%; margin:5px auto; display:flex; flex-direction:column;
-    align-items:center; justify-content:center; color:#fff; font-size:12.5px; font-weight:700;
-    background:linear-gradient(150deg,#4a86c4,var(--blue)); transition:background .45s ease, transform .35s ease; }
-  .mic em { font-style:normal; font-size:22px; margin-bottom:2px; }
-  .mic.rec { background:linear-gradient(150deg,#34b46a,var(--green)); transform:scale(1.05);
-    box-shadow:0 0 0 10px rgba(30,125,70,.15); }
-  .live { background:var(--blue-lt); border-radius:10px; padding:8px 10px; font-size:12.5px;
-    min-height:34px; margin-top:8px; }
+  .mic { width:116px; height:116px; border-radius:50%; margin:6px auto; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; color:#fff; font-size:13px; font-weight:700;
+    background:radial-gradient(circle at 35% 30%,#3d86c8,var(--blue));
+    box-shadow:0 6px 18px rgba(31,78,121,.35); transition:background .45s ease, transform .35s ease; }
+  .mic em { font-style:normal; font-size:24px; margin-bottom:3px; }
+  .mic.rec { background:radial-gradient(circle at 35% 30%,#e05a52,var(--red)); transform:scale(1.04);
+    box-shadow:0 0 0 10px rgba(179,38,30,.14); }
+  .livebox { background:var(--blue-lt); border-radius:10px; padding:9px 11px; font-size:13px;
+    min-height:38px; margin-top:9px; }
   .typebox { display:flex; gap:7px; margin-top:8px; }
   .typebox .f { flex:1; height:38px; border:1px solid var(--line); border-radius:10px; background:#fff;
     display:flex; align-items:center; padding:0 10px; font-size:12.5px; color:#9aa4ad; }
-  .typebox .a { width:52px; height:38px; border-radius:10px; background:var(--blue); color:#fff;
+  .typebox .a { width:52px; height:38px; border-radius:10px; background:var(--accent); color:#fff;
     font-size:12.5px; font-weight:700; display:flex; align-items:center; justify-content:center; }
 
   .authhdr { font-size:10px; text-transform:uppercase; letter-spacing:.6px; color:var(--mut); margin:10px 0 1px; }
@@ -235,10 +238,12 @@ function rectOf(sel){
    it is going. Read it until two reads agree, so highlights and the cursor land on
    the finished position. setTimeout, not rAF: rAF stalls in a background tab. */
 async function settled(sel){
+  const t = token;
   let prev = rectOf(sel);
   if (!prev) return null;
   for (let i = 0; i < 40; i++){
     await new Promise(r => setTimeout(r, 50));
+    if (t !== token) return null;
     const now = rectOf(sel);
     if (!now) return prev;
     if (Math.abs(now.y - prev.y) < 0.5 && Math.abs(now.x - prev.x) < 0.5) return now;
@@ -247,15 +252,17 @@ async function settled(sel){
   return prev;
 }
 async function highlight(sel, hold){
-  const r = await settled(sel); if (!r) return;
+  const t = token;
+  const r = await settled(sel); if (!r || t !== token) return;
   hlEl.style.left = (r.x - 5) + "px"; hlEl.style.top = (r.y - 5) + "px";
   hlEl.style.width = (r.w + 10) + "px"; hlEl.style.height = (r.h + 10) + "px";
   hlEl.classList.add("on");
-  if (hold) { await sleep(hold); hlEl.classList.remove("on"); }
+  if (hold) { await sleep(hold); if (t !== token) return; hlEl.classList.remove("on"); }
 }
 function clearHighlight(){ hlEl.classList.remove("on"); }
 async function moveTo(sel, dx, dy){
-  const r = await settled(sel); if (!r) return;
+  const t = token;
+  const r = await settled(sel); if (!r || t !== token) return;
   curEl.classList.add("on");
   curEl.style.transform = "translate(" + (r.x + r.w/2 + (dx||0)) + "px," + (r.y + r.h/2 + (dy||0)) + "px)";
   await sleep(REDUCED ? 60 : 1050);
@@ -274,7 +281,7 @@ const patientHead = () =>
   '<div class="privacy"><span class="dot" id="dot"></span><span id="plabel">Microphone off &mdash; nothing is being recorded</span></div>' +
   '<div class="mic" id="mic"><em>&#127908;</em><span id="miclabel">Tap to speak</span></div>' +
   '<div class="note" style="text-align:center;margin-top:7px">Tap, say your question or concern, tap again to stop. Your care team will see it at their next visit.</div>' +
-  '<div class="live" id="live">&nbsp;</div>' +
+  '<div class="livebox" id="live">&nbsp;</div>' +
   '<div class="typebox"><div class="f">Or type a question / concern&hellip;</div><div class="a">Add</div></div></div>';
 const entry = (id, text, cls, left, right) =>
   '<div class="entry ' + (cls||"") + '" id="' + id + '"><span class="t">Today, 9:12 AM</span>' + text +
