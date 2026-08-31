@@ -33,17 +33,18 @@
     background:#10161c; border-radius:0 0 15px 15px; z-index:9; }
   .screen { position:relative; width:100%; height:100%; background:var(--bg);
     border-radius:32px; overflow:hidden; }
-  .viewport { position:absolute; left:0; right:0; top:0; bottom:126px; overflow:hidden; }
+  .viewport { position:absolute; inset:0; overflow:hidden; }
   .view { position:absolute; inset:0; padding:34px 13px 8px; opacity:0; transition:opacity .45s ease; }
   .view.on { opacity:1; }
 
-  /* caption band, inside the phone, in the empty space at the bottom */
-  .capband { position:absolute; left:0; right:0; bottom:0; height:126px; z-index:12;
-    background:linear-gradient(180deg, rgba(244,246,248,0) 0%, #eef2f5 14%, #eef2f5 100%);
-    border-top:1px solid #dbe2e8; padding:14px 16px; display:flex; flex-direction:column;
-    align-items:center; justify-content:center; text-align:center; }
-  .capband b { font-size:19px; line-height:1.25; color:var(--ink); }
-  .capband small { font-size:14px; line-height:1.35; color:var(--mut); margin-top:6px; display:block; }
+  /* The caption is a note laid ON the phone, not part of it. Ringed in green and
+     set well above the app's own type so nobody mistakes it for the interface. */
+  .capnote { position:absolute; left:11px; right:11px; bottom:16px; z-index:20;
+    background:rgba(255,255,255,.975); border:3px solid var(--green); border-radius:15px;
+    padding:14px 15px; text-align:center;
+    box-shadow:0 10px 28px rgba(16,22,28,.3), 0 0 0 4px rgba(30,125,70,.14); }
+  .capnote b { display:block; font-size:21px; line-height:1.24; color:var(--ink); }
+  .capnote small { display:block; font-size:15px; line-height:1.4; color:#41505b; margin-top:7px; }
 
   .hl { position:absolute; border:3px solid var(--hi); border-radius:11px; pointer-events:none;
     box-shadow:0 0 0 3px rgba(255,204,0,.3); opacity:0; transition:opacity .3s ease; z-index:14; }
@@ -127,20 +128,6 @@
   .foot .r { color:var(--mut); }
   .entry.addressed .foot .r, .entry.closed .foot .r { color:var(--green); font-weight:700; }
 
-  .bucket { margin-top:9px; }
-  .bucket h3 { font-size:11.5px; padding:7px 10px; border-radius:10px 10px 0 0; color:#fff; margin:0; }
-  .b-md h3 { background:var(--blue); } .b-rn h3 { background:#f2c200; color:var(--ink); }
-  .b-done h3 { background:var(--green); }
-  .bucket ul { list-style:none; margin:0; padding:0; border:1px solid var(--line); border-top:0;
-    border-radius:0 0 10px 10px; }
-  .bucket li { padding:8px 10px; font-size:12px; border-top:1px solid var(--line); display:flex;
-    justify-content:space-between; gap:8px; line-height:1.32; }
-  .bucket li:first-child { border-top:0; }
-  .chk { font-size:10px; color:var(--mut); white-space:nowrap; }
-  .chk.done { color:var(--green); font-weight:700; }
-  .cgtag { display:inline-block; margin-left:5px; font-size:9.5px; font-weight:700; color:var(--accent);
-    background:var(--blue-lt); border-radius:6px; padding:1px 5px; }
-
   .sheet { position:absolute; left:0; right:0; bottom:0; top:36%; background:#f7f7fa;
     border-radius:20px 20px 0 0; transform:translateY(100%);
     transition:transform .85s cubic-bezier(.22,.9,.3,1); box-shadow:0 -8px 26px rgba(16,22,28,.2);
@@ -183,7 +170,7 @@
       <div class="notch"></div>
       <div class="screen" id="screen">
         <div class="viewport" id="viewport"></div>
-        <div class="capband"><b id="capMain"></b><small id="capSub"></small></div>
+        <div class="capnote"><b id="capMain"></b><small id="capSub"></small></div>
         <div class="hl" id="hl"></div>
         <div class="cur" id="cur">
           <div class="ripple" id="ripple"></div>
@@ -420,34 +407,24 @@ const STEPS = [
     await sleep(3000);
   }},
 
-{ cap:["Your care team sees both","Sorted by who can answer. Sarah's question is marked as hers."],
+{ cap:["Your team answers it","When they have, your own page says so. You did not have to chase it."],
   async run(my){
-    view('<div class="c"><div class="sec">Rounding list &middot; Ellis, Margaret</div>' +
-      '<div class="bucket b-md"><h3>Physician / APP list</h3><ul>' +
-      '<li><span>Is it normal for my calf to feel tight?</span><span class="chk" id="k1">&#9744; Addressed</span></li>' +
-      '<li><span>Blood thinner after discharge<span class="cgtag">Caregiver &mdash; Sarah</span></span><span class="chk">&#9744; Addressed</span></li>' +
-      '</ul></div>' +
-      '<div class="bucket b-rn"><h3>Nursing list</h3><ul><li><span class="note">None</span></li></ul></div></div>');
-    parkCursor(160, 500); await sleep(2200); guard(my);
-    caption("They mark it addressed", "It is never deleted. It moves down to an Addressed list.");
-    await highlight("#k1"); await moveTo("#k1"); guard(my); await tap();
-    const k = vp.querySelector("#k1"); k.classList.add("done"); k.innerHTML = "&#9745; Addressed";
-    clearHighlight(); await sleep(1300); guard(my);
-    view('<div class="c"><div class="sec">Rounding list &middot; Ellis, Margaret</div>' +
-      '<div class="bucket b-md"><h3>Physician / APP list</h3><ul>' +
-      '<li><span>Blood thinner after discharge<span class="cgtag">Caregiver &mdash; Sarah</span></span><span class="chk">&#9744; Addressed</span></li>' +
-      '</ul></div>' +
-      '<div class="bucket b-done"><h3>Addressed (1)</h3><ul>' +
-      '<li><span>&#10003; Is it normal for my calf to feel tight?</span><span class="chk">&#9744; Awaiting patient</span></li>' +
-      '</ul></div></div>');
-    await sleep(4800);
+    view('<div class="c"><div class="sec">Captured so far (2)</div>' +
+      '<div class="authhdr">From Margaret</div>' +
+      entry("e1","Is it normal for my calf to feel tight?","addressed","&#9744; I was heard","&#10003; Heard by your care team") +
+      '<div class="authhdr cg">Caregiver &mdash; Sarah (daughter)</div>' +
+      entry("e2","Does she keep taking the blood thinner at home?","","&#9744; I was heard","Waiting for your care team") +
+      '</div>');
+    parkCursor(160, 300); await sleep(2200); guard(my);
+    await highlight("#e1", 5200); guard(my);
+    await sleep(2600);
   }},
 
-{ cap:["You can see they answered","Then you say so. That tick belongs to you and nobody else."],
+{ cap:["Then you close the loop","You tap I was heard. That tick belongs to you and nobody else."],
   async run(my){
     view('<div class="c"><div class="sec">Captured so far (1)</div>' +
       entry("e1","Is it normal for my calf to feel tight?","addressed","&#9744; I was heard","&#10003; Heard by your care team") + '</div>');
-    parkCursor(160, 470); await sleep(2000); guard(my);
+    parkCursor(160, 300); await sleep(2000); guard(my);
     await highlight("#e1 .l"); await moveTo("#e1 .l"); guard(my); await tap();
     vp.querySelector("#e1 .l").innerHTML = "&#9745; I was heard";
     clearHighlight(); await sleep(1000); guard(my);
