@@ -146,7 +146,7 @@
   .authhdr.cg { color: var(--accent); }
   /* Two buttons under the hero, side by side, filling the width: save the site, and see how it works. */
   .toprow { display: flex; gap: 10px; margin: -6px 0 12px; }
-  .toprow > * { flex: 1 1 0; min-width: 0; min-height: 76px; display: flex; flex-direction: column; align-items: center;
+  .toprow > * { flex: 1 1 50%; min-width: 0; min-height: 76px; display: flex; flex-direction: column; align-items: center;
     justify-content: center; text-align: center; border-radius: 18px; text-decoration: none; font-family: inherit;
     cursor: pointer; padding: 6px 8px; box-sizing: border-box; line-height: 1.2; }
   .toprow b { font-size: 15px; font-weight: 800; }
@@ -632,8 +632,8 @@ async function renderPatient(){
     '<div class="card"><h2 class="sec">Demo links (clickable)</h2>' +
     '<a class="btn sub" href="' + esc(myLink) + '">&#128100; My patient page &mdash; bookmark this</a>' +
     '<a class="btn sub" style="margin-top:10px" href="' + esc(drLink) + '" target="_blank" rel="noopener">&#129658; Provider view for this patient &mdash; opens new tab, PIN required</a>' +
-    '<button class="btn sub" style="margin-top:10px" onclick="copyText(' + JSON.stringify(JSON.stringify(myLink)) + ')">Copy patient link</button>' +
-    '<button class="btn sub" style="margin-top:10px" onclick="copyText(' + JSON.stringify(JSON.stringify(drLink)) + ')">Copy provider link</button>' +
+    '<button class="btn sub" style="margin-top:10px" data-l="' + esc(JSON.stringify(myLink)) + '" onclick="copyText(this.dataset.l)">Copy patient link</button>' +
+    '<button class="btn sub" style="margin-top:10px" data-l="' + esc(JSON.stringify(drLink)) + '" onclick="copyText(this.dataset.l)">Copy provider link</button>' +
     '<div class="linkline">' + esc(myLink) + '</div></div>';
   renderEntries();
   renderShare();
@@ -656,7 +656,7 @@ function renderShare(){
     '<div class="sharecode">' + esc(sh.code) + '</div>' +
     '<a class="btn coral" href="sms:?&body=' + encodeURIComponent(msg) + '">&#128241; Text this to a caregiver</a>' +
     (navigator.share ? '<button class="btn sub" style="margin-top:10px" onclick="shareInvite()">Share another way</button>' : '') +
-    '<button class="btn sub" style="margin-top:10px" onclick="copyText(' + JSON.stringify(JSON.stringify(url)) + ')">Copy caregiver link</button>' +
+    '<button class="btn sub" style="margin-top:10px" data-l="' + esc(JSON.stringify(url)) + '" onclick="copyText(this.dataset.l)">Copy caregiver link</button>' +
     '<div class="linkline">' + esc(url) + '</div>' +
     (joined ? '<div class="note" style="margin-top:8px">Joined so far: <b>' + joined + '</b></div>' : '') +
     '<div class="warnbox">Anyone who uses this code can see everything on this page, now and later. Replace the code to stop new people joining.</div>' +
