@@ -46,7 +46,7 @@
   .capnote { background:#fff; border:12px solid var(--green); border-radius:22px;
     padding:9px 11px 10px; text-align:center; transform-origin:50% 100%;
     box-shadow:0 6px 18px rgba(16,22,28,.22); }
-  .capnote.cur { box-shadow:0 0 0 4px rgba(30,125,70,.28), 0 14px 32px rgba(16,22,28,.34); }
+  .capnote.latest { box-shadow:0 0 0 4px rgba(30,125,70,.28), 0 14px 32px rgba(16,22,28,.34); }
   .capnote.pop { animation:pop .4s cubic-bezier(.2,.9,.3,1.25); }
   @keyframes pop { 0% { transform:scale(.93); } 100% { transform:scale(1); } }
   .capnote b { display:block; font-size:21px; line-height:1.18; color:var(--ink); }
@@ -259,9 +259,9 @@ function layoutCaptions(instant){
 }
 function addNote(main, sub){
   const wasEmpty = !stack.children.length;
-  stack.querySelectorAll(".capnote.cur").forEach(n => n.classList.remove("cur"));
+  stack.querySelectorAll(".capnote.latest").forEach(n => n.classList.remove("latest"));
   const n = document.createElement("div");
-  n.className = "capnote cur pop";
+  n.className = "capnote latest pop";
   n.innerHTML = "<b></b><small></small>";
   n.firstChild.textContent = main; n.lastChild.textContent = sub || "";
   stack.appendChild(n);
