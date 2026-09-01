@@ -119,6 +119,11 @@
   .choice h2 { font-size: 17px; color: var(--teal-deep); margin-bottom: 4px; }
   .choice p { font-size: 13px; color: var(--mut); margin-bottom: 12px; line-height: 1.4; }
   .btn.coral { background: linear-gradient(150deg, var(--coral), var(--coral-deep)); border-radius: 14px; }
+  /* The caregiver card runs two points larger throughout, after tester feedback. */
+  #shareCard h2.sec { font-size: 15px; }
+  #shareCard .note { font-size: 14px; }
+  #shareCard .btn { font-size: 18px; }
+  #shareCard .sharecode { font-size: 30px; }
   .btn.teal { background: linear-gradient(150deg, var(--teal), var(--teal-deep)); border-radius: 14px; }
   .choice input.txt, .choice select.txt { border-radius: 12px; }
   .heroimg { text-align: center; margin: -4px 0 14px; }
@@ -629,7 +634,7 @@ async function renderPatient(){
     '<div id="liveText"></div>' +
     '<div class="typebox"><input id="typeInput" type="text" placeholder="Or type a question / concern&hellip;" onkeydown="if(event.key===\'Enter\')addTyped()"><button onclick="addTyped()">Add</button></div>' +
     '<div id="capMsg" class="note"></div></div>' +
-    '<div class="card"><h2 class="sec">Share with a caregiver</h2><div id="shareBox"></div></div>' +
+    '<div class="card" id="shareCard"><h2 class="sec">Include your caregiver</h2><div id="shareBox"></div></div>' +
     '<div class="card"><h2 class="sec">Captured so far (<span id="count">' + ptRec.entries.length + '</span>)</h2><div id="entries"></div></div>' +
     '<div class="card" id="closedCard" style="display:none"><h2 class="sec">Heard by your care team (<span id="closedCount">0</span>)</h2>' +
     '<div class="note" style="margin-bottom:6px">Your care team answered these, and you confirmed you were heard.</div>' +
