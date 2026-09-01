@@ -184,7 +184,7 @@
 <div id="gate">
   <img src="heard-icon.png" alt="">
   <div class="gt">How Heard works</div>
-  <div class="gs">Step through it at your own pace, with narration.</div>
+  <div class="gs">Plays straight through, with narration. Two to three minutes.</div>
   <button id="gstart">&#9654;&#xFE0E;&nbsp; Start</button>
   <button id="gmute">Start without sound</button>
 </div>
@@ -192,7 +192,7 @@
   <div class="top">
     <img src="heard-icon.png" alt="">
     <h1>How Heard works</h1>
-    <p>Step through it at your own pace.</p>
+    <p>Plays straight through. Jump back any time.</p>
     <a class="back" href="./">&#8592; Back to Heard</a>
   </div>
 
@@ -214,11 +214,12 @@
   <div class="bar"><i id="prog"></i></div>
   <div class="nav">
     <button id="prev">&#8592; Back</button>
-    <button id="replay">&#8635; Replay</button>
-    <span class="count" id="count">1 / 11</span>
+    <button id="pause">Pause</button>
+    <button id="back30">&#8630; 30s</button>
+    <span class="count" id="count">1 / 10</span>
     <button class="pri" id="next">Next &#8594;</button>
   </div>
-  <p class="hint">Each screen plays once, then waits. Press Next when you are ready, or Replay to see it again.</p>
+  <p class="hint">Plays straight through. Back up thirty seconds any time, or use Back and Next to jump between screens.</p>
 </div>
 
 <script>
@@ -237,11 +238,15 @@ const CAP_GAP = 12, CAP_EDGE = 8, CAP_HOLD = 2200;
 
 /* ---- narration: the same voice as the intro film, one clip per caption ---- */
 const DUR_T = {"01":4.06,"02":5.47,"03":3.74,"04":3.22,"05":5.5,"06":3.89,"07":5.4,"08":3.96,
-  "09":5.93,"10":4.15,"11":4.46,"12":4.99,"13":4.99,"14":5.35,"15":5.04,"16":5.52};
+  "09":5.93,"10":4.15,"11":4.46,"12":4.99,"13":4.99,"14":5.35,"15":5.04,"16":5.52,
+  "17":3.17,"18":10.03,"19":4.56};
 const player = new Audio(); player.preload = "auto";
-let audioOn = false, voiceUntil = 0;
+let audioOn = false, voiceUntil = 0, needVoice = false;
+player.onended = () => { needVoice = false; };
+player.onerror = () => { if (player.error) needVoice = false; };
 function voice(id){
   if (!audioOn || !id){ voiceUntil = 0; return; }
+  needVoice = true;
   voiceUntil = performance.now() + (DUR_T[id] || 0) * 1000;
   try {
     player.src = "tvo-" + id + ".mp3";
@@ -249,10 +254,32 @@ function voice(id){
     if (p && p.catch) p.catch(() => { try { player.load(); player.play().catch(() => {}); } catch (e) {} });
   } catch (e) {}
 }
-function stopVoice(){ voiceUntil = 0; try { player.pause(); } catch (e) {} }
+function stopVoice(){ voiceUntil = 0; needVoice = false; try { player.pause(); } catch (e) {} }
+function setPaused(p){
+  paused = p;
+  const b = document.getElementById("pause");
+  if (b) b.textContent = p ? "Play" : "Pause";
+  if (audioOn){
+    if (p) player.pause();
+    else if (player.src && !player.ended && !player.error) player.play().catch(() => {});
+  }
+}
 /* Opening pause on each screen: at least the reading beat, and never shorter than the voice. */
 async function capWait(min){ await sleep(Math.max(min, voiceUntil - performance.now() + 450)); }
-const sleep = ms => new Promise(r => setTimeout(r, REDUCED ? Math.min(ms, 80) : ms));
+let paused = false;
+/* Chunked, pause-aware clock, as in the film. While a clip should be sounding and
+   the player has gone quiet without ending or erroring, it is restarted. */
+async function sleep(ms){
+  let left = REDUCED ? Math.min(ms, 80) : ms;
+  while (left > 0){
+    await new Promise(r => setTimeout(r, 110));
+    if (!paused){
+      left -= 110;
+      if (audioOn && needVoice && player.paused && !player.ended && !player.error)
+        player.play().catch(() => {});
+    }
+  }
+}
 function guard(my){ if (my !== token) throw "x"; }
 
 function view(html){
@@ -456,7 +483,9 @@ const STEPS = [
   async run(my){
     view(shareCard(false));
     parkCursor(160, 480); await capWait(2400); guard(my);
-    await highlight("#mk"); await moveTo("#mk"); guard(my); await tap(); clearHighlight();
+    await highlight("#mk"); guard(my);
+    await caption("Click on this button", "It adds a caregiver to your team.", "17");
+    await moveTo("#mk"); guard(my); await tap(); clearHighlight();
     view(shareCard(true));
     await sleep(900); guard(my);
     await caption("You get a six character code", "Read it out, or send it. Anyone who uses it sees your whole page.", "09");
@@ -508,33 +537,32 @@ const STEPS = [
     await sleep(3000);
   }},
 
-{ cap:["Your team answers it","When they have, your own page says so. You did not have to chase it.","14"],
+{ cap:["Your team sees your list","At their next point of contact. When a concern has been addressed with you, they mark it: Heard by your care team.","18"],
   async run(my){
     view('<div class="c"><div class="sec">Captured so far (2)</div>' +
       '<div class="authhdr">From Margaret</div>' +
-      entry("e1","Is it normal for my calf to feel tight?","addressed","&#9744; I was heard","&#10003; Heard by your care team") +
+      entry("e1","Is it normal for my calf to feel tight?","","&#9744; I was heard","Waiting for your care team") +
       '<div class="authhdr cg">Caregiver &mdash; Sarah (daughter)</div>' +
       entry("e2","Does she keep taking the blood thinner at home?","","&#9744; I was heard","Waiting for your care team") +
       '</div>');
-    parkCursor(160, 300); await capWait(2400); guard(my);
-    await highlight("#e1", 5200); guard(my);
-    await sleep(2600);
-  }},
-
-{ cap:["Then you close the loop","You tap I was heard. That tick belongs to you and nobody else.","15"],
-  async run(my){
-    view('<div class="c"><div class="sec">Captured so far (1)</div>' +
-      entry("e1","Is it normal for my calf to feel tight?","addressed","&#9744; I was heard","&#10003; Heard by your care team") + '</div>');
-    parkCursor(160, 300); await capWait(2400); guard(my);
+    parkCursor(160, 300); await sleep(3200); guard(my);
+    const e1 = vp.querySelector("#e1");
+    e1.classList.add("addressed");
+    e1.querySelector(".foot .r").innerHTML = "&#10003; Heard by your care team";
+    await highlight("#e1 .foot .r", 3400); guard(my);
+    await capWait(0); guard(my);
+    await caption("If you feel it has been, close the loop", "That is where you tap I was heard.", "19");
     await highlight("#e1 .l"); await moveTo("#e1 .l"); guard(my); await tap();
     vp.querySelector("#e1 .l").innerHTML = "&#9745; I was heard";
     clearHighlight(); await sleep(1000); guard(my);
-    view('<div class="c"><div class="sec">Captured so far (0)</div>' +
-      '<div class="note">Everything so far has been answered and closed.</div></div>' +
+    view('<div class="c"><div class="sec">Captured so far (1)</div>' +
+      '<div class="authhdr cg">Caregiver &mdash; Sarah (daughter)</div>' +
+      entry("e2","Does she keep taking the blood thinner at home?","","&#9744; I was heard","Waiting for your care team") +
+      '</div>' +
       '<div class="c"><div class="sec">Heard by your care team (1)</div>' +
       '<div class="note" style="margin-bottom:6px">Your care team answered these, and you confirmed you were heard.</div>' +
-      entry("e2","Is it normal for my calf to feel tight?","closed","&#9745; I was heard","&#10003; Heard by your care team") + '</div>');
-    await sleep(5200);
+      entry("e3","Is it normal for my calf to feel tight?","closed","&#9745; I was heard","&#10003; Heard by your care team") + '</div>');
+    await sleep(2800); guard(my);
   }},
 
 { cap:["That's the whole loop","Ask when it occurs to you. Your team will hear you. You both know you've been heard.","16"],
@@ -546,16 +574,30 @@ const STEPS = [
   }}
 ];
 
+/* Rough seconds per screen, for the continuous time bar and the 30 second backup.
+   The bar is a guide, not a stopwatch. */
+const EST = [24, 10, 13, 9, 22, 17, 14, 9, 22, 11];
+const CUM = EST.reduce((a, v) => (a.push((a[a.length-1] || 0) + v), a), []);
+const TOTAL = CUM[CUM.length - 1];
+let inScreen = 0, timer = null;
+setInterval(() => {
+  if (!paused && !document.hidden) inScreen = Math.min(inScreen + 0.25, EST[idx]);
+  const done = (idx ? CUM[idx - 1] : 0) + inScreen;
+  progEl.style.width = (done / TOTAL * 100).toFixed(2) + "%";
+}, 250);
+
 async function show(i){
   token++; const my = token;
+  clearTimeout(timer);
   stopVoice();
   finished = false;
   idx = Math.max(0, Math.min(STEPS.length - 1, i));
+  inScreen = 0;
   const st = STEPS[idx];
   const nextBtn = document.getElementById("next");
   stack.innerHTML = ""; setShift(0); firstCap = st.cap;
+  setPaused(false);
   countEl.textContent = (idx + 1) + " / " + STEPS.length;
-  progEl.style.width = Math.round(((idx + 1) / STEPS.length) * 100) + "%";
   document.getElementById("prev").disabled = idx === 0;
   nextBtn.innerHTML = idx === STEPS.length - 1 ? "&#8635; Start over" : "Next &#8594;";
   nextBtn.classList.remove("ready");
@@ -563,25 +605,34 @@ async function show(i){
   try {
     await st.run(my); guard(my);
     finished = true;
-    nextBtn.classList.add("ready");   /* this screen is done; the next move is the viewer's */
+    inScreen = EST[idx];
+    if (idx < STEPS.length - 1) timer = setTimeout(() => show(idx + 1), 600);
+    else nextBtn.classList.add("ready");
   } catch (e) { if (e !== "x") console.error(e); }
 }
 function goNext(){ show(idx >= STEPS.length - 1 ? 0 : idx + 1); }
 function goPrev(){ if (idx > 0) show(idx - 1); }
+function back30(){
+  const now = (idx ? CUM[idx - 1] : 0) + inScreen;
+  const target = Math.max(0, now - 30);
+  let k = 0; while (k < CUM.length - 1 && CUM[k] <= target) k++;
+  show(k);
+}
 document.getElementById("next").onclick = goNext;
 document.getElementById("prev").onclick = goPrev;
-document.getElementById("replay").onclick = () => show(idx);
+document.getElementById("back30").onclick = back30;
+document.getElementById("pause").onclick = () => setPaused(!paused);
 addEventListener("keydown", e => {
   if (e.key === "ArrowRight") goNext();
   if (e.key === "ArrowLeft")  goPrev();
-  if (e.key === "r" || e.key === "R") show(idx);
+  if (e.key === " ") { e.preventDefault(); setPaused(!paused); }
 });
 
-/* A hidden tab freezes CSS transitions, so a screen left running in the background
-   comes back half drawn. Cancel on hide; on return, replay it only if it had not finished. */
+/* A hidden tab freezes everything; pause there and resume on return. */
+let pausedByTab = false;
 document.addEventListener("visibilitychange", () => {
-  if (document.hidden) { if (!finished) token++; }
-  else if (!finished) show(idx);
+  if (document.hidden) { if (!paused){ pausedByTab = true; setPaused(true); } }
+  else if (pausedByTab) { pausedByTab = false; setPaused(false); }
 });
 
 const SILENT = "data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEAIlYAAESsAAACABAAZGF0YQQAAAAAAA==";
