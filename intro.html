@@ -182,12 +182,12 @@ let token = 0, idx = 0, paused = false, timer = null;
    keeps allowing it. Durations are baked in so pacing is right from the start. */
 const DUR = {"01":2.74,"02":3.26,"03":3.41,"04":2.02,"05":9.07,"06":1.9,"07":7.2,
   "08":7.22,"09":5.18,"10":2.16,"11":4.78,"12":2.35,"13":6.26,"14":8.35,"15":4.08,
-  "16":1.39,"17":13.46,"18":1.39,"19":5.62,"20":5.04};
+  "16":1.39,"17":13.9,"18":1.39,"19":5.62,"20":5.04};
 const player = new Audio(); player.preload = "auto";
 let audioOn = false;
 function voice(id){
   if (!audioOn || !id) return;
-  try { player.src = "vo-" + id + ".mp3?v=2"; player.currentTime = 0; player.play().catch(()=>{}); }
+  try { player.src = "vo-" + id + ".mp3?v=3"; player.currentTime = 0; player.play().catch(()=>{}); }
   catch (e) {}
 }
 function stopVoice(){ try { player.pause(); } catch (e) {} }
@@ -381,7 +381,7 @@ async function(my){
   sc.appendChild(st);
   await line(st, "med", "One important note.", my, "16");
   const w = document.createElement("div"); w.className = "warnfilm";
-  w.textContent = "This tool records your questions. It is not real time communication with your care team. For anything urgent or emergent: use your call light in the hospital, call your doctor's office, or call 911.";
+  w.textContent = "This tool is for recording your questions. It is not real time communication with your care team. For anything urgent or emergent: use your call light in the hospital, call your doctor's office, or call 911.";
   st.appendChild(w); on(w);
   voice("17");
   await sleep(holdFor(w.textContent, "17"), my);
