@@ -629,11 +629,11 @@ async function renderPatient(){
     '<div id="liveText"></div>' +
     '<div class="typebox"><input id="typeInput" type="text" placeholder="Or type a question / concern&hellip;" onkeydown="if(event.key===\'Enter\')addTyped()"><button onclick="addTyped()">Add</button></div>' +
     '<div id="capMsg" class="note"></div></div>' +
+    '<div class="card"><h2 class="sec">Share with a caregiver</h2><div id="shareBox"></div></div>' +
     '<div class="card"><h2 class="sec">Captured so far (<span id="count">' + ptRec.entries.length + '</span>)</h2><div id="entries"></div></div>' +
     '<div class="card" id="closedCard" style="display:none"><h2 class="sec">Heard by your care team (<span id="closedCount">0</span>)</h2>' +
     '<div class="note" style="margin-bottom:6px">Your care team answered these, and you confirmed you were heard.</div>' +
     '<div id="closedEntries"></div></div>' +
-    '<div class="card"><h2 class="sec">Share with a caregiver</h2><div id="shareBox"></div></div>' +
     '<div class="card qrbox"><h2 class="sec">For your care team</h2><div class="qr" id="qrDr"></div>' +
     '<div class="note">A provider entering the room can scan this to open your provider view (their PIN required).</div></div>' +
     '<div class="card"><h2 class="sec">Demo links (clickable)</h2>' +
@@ -651,8 +651,8 @@ function renderShare(){
   const box = document.getElementById("shareBox"); if (!box) return;
   const sh = ptRec.share;
   if (!sh || !sh.code) {
-    box.innerHTML = '<div class="note">A family member or friend can add questions to this same list, from their own phone.</div>' +
-      '<button class="btn coral" style="margin-top:10px" onclick="makeShareCode()">Create an invite code</button>';
+    box.innerHTML = '<div class="note">Allow access to another person on your caregiving team. A family member or friend can add questions to this same list, from their own phone.</div>' +
+      '<button class="btn coral" style="margin-top:10px" onclick="makeShareCode()">Share with a caregiver</button>';
     return;
   }
   const url = careLink(sh.code);

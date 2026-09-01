@@ -237,7 +237,7 @@ let token = 0, idx = 0, finished = false, firstCap = null, shift = 0;
 const CAP_GAP = 12, CAP_EDGE = 8, CAP_HOLD = 2200;
 
 /* ---- narration: the same voice as the intro film, one clip per caption ---- */
-const DUR_T = {"01":4.06,"02":5.47,"03":3.74,"04":3.22,"05":5.5,"06":3.89,"07":5.4,"08":3.96,
+const DUR_T = {"01":4.06,"02":5.47,"03":3.74,"04":3.22,"05":5.5,"06":3.89,"07":5.4,"08":4.49,
   "09":5.93,"10":4.15,"11":4.46,"12":4.99,"13":4.99,"14":5.35,"15":5.04,"16":5.52,
   "17":3.17,"18":10.03,"19":4.56};
 const player = new Audio(); player.preload = "auto";
@@ -249,7 +249,7 @@ function voice(id){
   needVoice = true;
   voiceUntil = performance.now() + (DUR_T[id] || 0) * 1000;
   try {
-    player.src = "tvo-" + id + ".mp3";
+    player.src = "tvo-" + id + ".mp3?v=2";
     const p = player.play();
     if (p && p.catch) p.catch(() => { try { player.load(); player.play().catch(() => {}); } catch (e) {} });
   } catch (e) {}
@@ -410,8 +410,8 @@ const shareCard = (withCode) =>
       '<div class="btn sub">Copy caregiver link</div>' +
       '<div class="linkline">https://imheard.com/#/b/demo/c/7KQ4MP</div>' +
       '<div class="warn">Anyone who uses this code can see everything on this page, now and later. Replace the code to stop new people joining.</div>'
-    : '<div class="note">A family member or friend can add questions to this same list, from their own phone.</div>' +
-      '<div class="btn coral" id="mk" style="margin-top:10px">Create an invite code</div>') +
+    : '<div class="note">Allow access to another person on your caregiving team. A family member or friend can add questions to this same list, from their own phone.</div>' +
+      '<div class="btn coral" id="mk" style="margin-top:10px">Share with a caregiver</div>') +
   '</div>';
 
 /* ---------------- steps ---------------- */
@@ -479,7 +479,7 @@ const STEPS = [
     await sleep(3400);
   }},
 
-{ cap:["Bring in a family member","Further down your page: Share with a caregiver.","08"],
+{ cap:["Bring in a family member","Right below the capture button: Share with a caregiver.","08"],
   async run(my){
     view(shareCard(false));
     parkCursor(160, 480); await capWait(2400); guard(my);
