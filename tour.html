@@ -216,7 +216,7 @@
     <button id="prev">&#8592; Back</button>
     <button id="pause">Pause</button>
     <button id="back30">&#8630; 30s</button>
-    <span class="count" id="count">1 / 10</span>
+    <span class="count" id="count">1 / 11</span>
     <button class="pri" id="next">Next &#8594;</button>
   </div>
   <p class="hint">Plays straight through. Back up thirty seconds any time, or use Back and Next to jump between screens.</p>
@@ -239,7 +239,7 @@ const CAP_GAP = 12, CAP_EDGE = 8, CAP_HOLD = 2200;
 /* ---- narration: the same voice as the intro film, one clip per caption ---- */
 const DUR_T = {"01":4.06,"02":5.47,"03":3.74,"04":3.22,"05":5.5,"06":3.89,"07":5.4,"08":4.49,
   "09":5.93,"10":4.15,"11":4.46,"12":4.99,"13":4.99,"14":5.35,"15":5.04,"16":5.52,
-  "17":3.17,"18":10.03,"19":4.56};
+  "17":3.17,"18":10.03,"19":4.56,"20":10.78};
 const player = new Audio(); player.preload = "auto";
 let audioOn = false, voiceUntil = 0, needVoice = false;
 player.onended = () => { needVoice = false; };
@@ -565,6 +565,27 @@ const STEPS = [
     await sleep(2800); guard(my);
   }},
 
+{ cap:["Your caregiver's questions land on your page","And the loop is ultimately yours: only you can tick I was heard, on your questions and on theirs.","20"],
+  async run(my){
+    view('<div class="c"><div class="sec">Captured so far (1)</div>' +
+      '<div class="authhdr cg" id="cgh">Caregiver &mdash; Sarah (daughter)</div>' +
+      entry("e2","Does she keep taking the blood thinner at home?","addressed","&#9744; I was heard","&#10003; Heard by your care team") +
+      '</div>');
+    parkCursor(160, 300); await sleep(2600); guard(my);
+    await highlight("#cgh", 2600); guard(my);
+    await capWait(0); guard(my);
+    await highlight("#e2 .l"); await moveTo("#e2 .l"); guard(my); await tap();
+    vp.querySelector("#e2 .l").innerHTML = "&#9745; I was heard";
+    clearHighlight(); await sleep(1000); guard(my);
+    view('<div class="c"><div class="sec">Captured so far (0)</div>' +
+      '<div class="note">Everything so far has been answered and closed.</div></div>' +
+      '<div class="c"><div class="sec">Heard by your care team (2)</div>' +
+      '<div class="note" style="margin-bottom:6px">Your care team answered these, and you confirmed you were heard.</div>' +
+      entry("e3","Is it normal for my calf to feel tight?","closed","&#9745; I was heard","&#10003; Heard by your care team") +
+      entry("e4","Does she keep taking the blood thinner at home?","closed","&#9745; I was heard","&#10003; Heard by your care team") + '</div>');
+    await sleep(2600); guard(my);
+  }},
+
 { cap:["That's the whole loop","Ask when it occurs to you. Your team will hear you. You both know you've been heard.","16"],
   async run(my){
     curEl.classList.remove("on");
@@ -576,7 +597,7 @@ const STEPS = [
 
 /* Rough seconds per screen, for the continuous time bar and the 30 second backup.
    The bar is a guide, not a stopwatch. */
-const EST = [24, 10, 13, 9, 22, 17, 14, 9, 22, 11];
+const EST = [24, 10, 13, 9, 22, 17, 14, 9, 22, 15, 11];
 const CUM = EST.reduce((a, v) => (a.push((a[a.length-1] || 0) + v), a), []);
 const TOTAL = CUM[CUM.length - 1];
 let inScreen = 0, timer = null;
