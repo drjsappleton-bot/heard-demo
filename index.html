@@ -146,7 +146,7 @@
   .authhdr.cg { color: var(--accent); }
   /* Two buttons under the hero, side by side, filling the width: save the site, and see how it works. */
   .toprow { display: flex; gap: 10px; margin: -6px 0 12px; }
-  .toprow > * { flex: 1 1 50%; min-width: 0; min-height: 76px; display: flex; flex-direction: column; align-items: center;
+  .toprow > * { flex: 1 1 33.33%; min-width: 0; min-height: 76px; display: flex; flex-direction: column; align-items: center;
     justify-content: center; text-align: center; border-radius: 18px; text-decoration: none; font-family: inherit;
     cursor: pointer; padding: 6px 8px; box-sizing: border-box; line-height: 1.2; }
   .toprow b { font-size: 15px; font-weight: 800; }
@@ -157,6 +157,12 @@
   .tourlink { background: var(--card); color: var(--teal-deep); border: 2px solid #cfe0df; box-shadow: 0 2px 6px rgba(11,95,92,.10); }
   .tourlink .play { color: var(--coral); font-size: 12px; margin-right: 5px; }
   .tourlink small { color: var(--mut); }
+  @media (max-width: 480px) {
+    .toprow { gap: 7px; }
+    .toprow b { font-size: 13px; }
+    .toprow small { font-size: 10.5px; }
+    .bm { border-width: 9px; }
+  }
   #bmPanel { background: #fff; border: 2px solid var(--green); }
   #bmPanel .how { font-size: 15.5px; line-height: 1.5; color: var(--ink); margin: 0 0 12px; }
   .cgtag { display: inline-block; margin-left: 8px; font-size: 11px; font-weight: 600; color: var(--accent); background: var(--blue-lt); border-radius: 6px; padding: 1px 6px; vertical-align: 1px; }
@@ -509,6 +515,7 @@ async function renderLanding(){
     '</div>' +
     '<div class="toprow">' +
     '<button class="bm" onclick="toggleBookmarkHelp()"><b>&#128278; Bookmark my site</b><small>so you can come back</small></button>' +
+    '<a class="tourlink" href="intro.html"><b><span class="play">&#9654;</span>Intro</b><small>what is Heard</small></a>' +
     '<a class="tourlink" href="tour.html"><b><span class="play">&#9654;</span>See how it works</b><small>step by step</small></a>' +
     '</div>' +
     '<div class="choice" id="bmPanel" style="display:none"></div>' +

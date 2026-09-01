@@ -110,6 +110,28 @@
   .fbtn.pri { background:var(--teal); color:#fff; }
   .fbtn.sub { background:#fff; color:var(--teal-deep); border:2px solid #cfe0df; }
 
+  /* the one safety note: amber like the app's own notices, dark and very legible */
+  .warnfilm { background:#fff8e1; border:3px solid #d9b13b; border-radius:16px;
+    padding:16px 20px; max-width:660px; text-align:center;
+    font-size:clamp(17px, 2.3vw, 21px); font-weight:600; line-height:1.5; color:#4a3a05;
+    box-shadow:0 10px 26px rgba(16,22,28,.14);
+    opacity:0; transform:translateY(14px); transition:opacity .9s ease, transform .9s ease; }
+  .warnfilm.on { opacity:1; transform:none; }
+
+  /* start gate: browsers only allow sound after a tap */
+  #gate { position:fixed; inset:0; z-index:80; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; gap:16px; text-align:center; padding:24px;
+    background:linear-gradient(160deg, var(--teal) 0%, var(--teal-deep) 70%); color:var(--cream);
+    transition:opacity .6s ease; }
+  #gate img { width:86px; height:86px; border-radius:22px; box-shadow:0 8px 22px rgba(0,0,0,.3); }
+  .gtitle { font-size:clamp(26px, 4.4vw, 40px); font-weight:800; }
+  .gsub { font-size:clamp(15px, 2.2vw, 19px); opacity:.92; margin-bottom:8px; }
+  #gplay { border:0; border-radius:999px; background:var(--coral); color:#fff; cursor:pointer;
+    font-family:inherit; font-size:20px; font-weight:800; padding:16px 44px;
+    box-shadow:0 10px 26px rgba(0,0,0,.25); }
+  #gmute { border:0; background:none; color:rgba(255,255,255,.85); cursor:pointer;
+    font-family:inherit; font-size:14.5px; text-decoration:underline; padding:8px; }
+
   /* chrome: progress and controls */
   #prog { position:fixed; left:0; top:0; height:5px; width:0; background:var(--coral);
     z-index:60; transition:width .8s ease; }
@@ -135,6 +157,13 @@
 </head>
 <body>
 <div id="film"></div>
+<div id="gate">
+  <img src="heard-icon.png" alt="">
+  <div class="gtitle">Heard, and why it exists</div>
+  <div class="gsub">A short story with narration, under two minutes.</div>
+  <button id="gplay">&#9654;&#xFE0E;&nbsp; Play</button>
+  <button id="gmute">Play without sound</button>
+</div>
 <div id="prog"></div>
 <a id="home" href="./">Back to Heard</a>
 <div id="hint">Tap anywhere to move ahead</div>
@@ -146,7 +175,22 @@
 <script>
 const film = document.getElementById("film");
 const RM = matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
-let token = 0, idx = 0, paused = false, auto = true, timer = null;
+let token = 0, idx = 0, paused = false, timer = null;
+
+/* ---- narration ----
+   One reusable player, unlocked by the Play tap, reused for every clip so iOS
+   keeps allowing it. Durations are baked in so pacing is right from the start. */
+const DUR = {"01":2.52,"02":3.64,"03":3.46,"04":2.81,"05":7.78,"06":1.94,"07":6.41,
+  "08":7.88,"09":5.29,"10":2.05,"11":4.61,"12":2.81,"13":6.7,"14":7.63,"15":3.96,
+  "16":1.19,"17":12.38,"18":1.44,"19":5.33,"20":5.15};
+const player = new Audio(); player.preload = "auto";
+let audioOn = false;
+function voice(id){
+  if (!audioOn || !id) return;
+  try { player.src = "vo-" + id + ".mp3"; player.currentTime = 0; player.play().catch(()=>{}); }
+  catch (e) {}
+}
+function stopVoice(){ try { player.pause(); } catch (e) {} }
 
 function guard(my){ if (my !== token) throw "x"; }
 /* Chunked sleep: honors Pause, dies when the film moves on, and shortens for
@@ -173,11 +217,17 @@ function newScene(cls){
   void d.offsetWidth; d.classList.add("on");
   return d;
 }
-async function line(parent, cls, text, my){
+function holdFor(text, id){
+  /* With narration, the voice sets the pace; without it, the reading clock does. */
+  if (audioOn && id && DUR[id]) return DUR[id] * 1000 + 450;
+  return readTime(text);
+}
+async function line(parent, cls, text, my, id){
   const el = document.createElement("div");
   el.className = cls; el.textContent = text;
   parent.appendChild(el); on(el);
-  await sleep(readTime(text), my);
+  voice(id);
+  await sleep(holdFor(text, id), my);
   return el;
 }
 
@@ -232,6 +282,11 @@ function ringTo(scene, sel, pad){
   ring.classList.add("on");
 }
 function ringOff(scene){ const ring = scene.querySelector(".ring"); if (ring) ring.classList.remove("on"); }
+async function sayLine(scene, text, my, id){
+  say(scene, text);
+  voice(id);
+  await sleep(holdFor(text, id), my);
+}
 async function typeInto(el, text, my){
   el.textContent = "";
   for (let i = 0; i < text.length; i++){ el.textContent += text[i]; await sleep(52, my); }
@@ -244,8 +299,8 @@ const SCENES = [
 async function(my){
   const sc = newScene("dark");
   const st = document.createElement("div"); st.className = "stage"; sc.appendChild(st);
-  await line(st, "big", "Every patient has questions after surgery.", my);
-  const l2 = await line(st, "med", "Not all of them are heard. Not enough of them are answered.", my);
+  await line(st, "big", "Every patient has questions after surgery.", my, "01");
+  await line(st, "med", "Not all of them are heard. Not enough of them are answered.", my, "02");
   await sleep(900, my);
 },
 
@@ -253,9 +308,9 @@ async function(my){
 async function(my){
   const sc = newScene("dark");
   const st = document.createElement("div"); st.className = "stage"; sc.appendChild(st);
-  await line(st, "big", "Your questions come up spontaneously, not on a schedule.", my);
-  await line(st, "med", "They get forgotten. They get lost.", my);
-  await line(st, "med", "Some come from family and caregivers who are not there for the touch points with your care team, by phone, or face to face in the hospital or clinic.", my);
+  await line(st, "big", "Your questions come up spontaneously, not on a schedule.", my, "03");
+  await line(st, "med", "They get forgotten. They get lost.", my, "04");
+  await line(st, "med", "Some come from family and caregivers who are not there for the touch points with your care team, by phone, or face to face in the hospital or clinic.", my, "05");
   await sleep(900, my);
 },
 
@@ -268,10 +323,10 @@ async function(my){
   const bw = bd.querySelector(".phonewrap"); bw.style.left = "50%"; bw.style.transform = "translateX(-50%) scale(" + Math.min(1, (innerHeight - 40) / 724) + ")";
   const veil = document.createElement("div"); veil.className = "veil"; sc.appendChild(veil);
   const st = document.createElement("div"); st.className = "stage"; sc.appendChild(st);
-  await line(st, "big", "This is why Heard was developed.", my);
-  await line(st, "med", "A simple way to collect your questions as they arise, using something as simple as your words, transcribed into text.", my);
-  await line(st, "med", "Heard keeps your list for your provider team, stored in the cloud. Not a lost scrap of paper. Not a forgotten question.", my);
-  await line(st, "med", "Stored, and ready for your care team, so that at those touch points your concerns are addressed.", my);
+  await line(st, "big", "This is why Heard was developed.", my, "06");
+  await line(st, "med", "A simple way to collect your questions as they arise, using something as simple as your words, transcribed into text.", my, "07");
+  await line(st, "med", "Heard keeps your list for your provider team, stored in the cloud. Not a lost scrap of paper. Not a forgotten question.", my, "08");
+  await line(st, "med", "Stored, and ready for your care team, so that at those touch points your concerns are addressed.", my, "09");
   await sleep(900, my);
 },
 
@@ -282,9 +337,8 @@ async function(my){
   fitPhone(sc);
   await sleep(500, my);
 
-  let s1 = "Capturing a concern takes one tap.";
-  say(sc, s1); ringTo(sc, "#mic", 8);
-  await sleep(readTime(s1), my);
+  ringTo(sc, "#mic", 8);
+  await sayLine(sc, "Capturing a concern takes one tap.", my, "10");
 
   /* tap on */
   const mic = sc.querySelector("#mic");
@@ -292,24 +346,19 @@ async function(my){
   sc.querySelector("#miclabel").textContent = "Listening…";
   sc.querySelector("#dot").classList.add("live");
   sc.querySelector("#plabel").textContent = "Recording — you are in control";
-  s1 = "Tap the button, and the microphone turns on and hears your question or concern.";
-  say(sc, s1);
   const typing = typeInto(sc.querySelector("#live"), "Is it normal for my calf to feel tight?", my);
-  await sleep(readTime(s1), my); await typing;
+  await sayLine(sc, "Tap the button, and the microphone turns on and hears your question or concern.", my, "11");
+  await typing;
 
   /* tap off */
   mic.classList.remove("rec");
   sc.querySelector("#miclabel").textContent = "Tap to speak";
   sc.querySelector("#dot").classList.remove("live");
   sc.querySelector("#plabel").textContent = "Microphone off — nothing is being recorded";
-  s1 = "Tap again, and the microphone shuts off.";
-  say(sc, s1);
-  await sleep(readTime(s1), my);
+  await sayLine(sc, "Tap again, and the microphone shuts off.", my, "12");
 
   ringOff(sc);
-  s1 = "Only what you choose to capture is captured. That is completely within your control, and at your discretion.";
-  say(sc, s1);
-  await sleep(readTime(s1), my);
+  await sayLine(sc, "Only what you choose to capture is captured. That is completely within your control, and at your discretion.", my, "13");
 
   /* the list accrues, and the team sees it */
   const lc = sc.querySelector("#listcard");
@@ -317,23 +366,35 @@ async function(my){
     entry("Is it normal for my calf to feel tight?", "Today, 9:12 AM") +
     entry("When can I shower with the dressing on?", "Today, 4:40 PM"));
   sc.querySelector("#live").innerHTML = "&nbsp;";
-  s1 = "The questions you accrue are visible to your care team before and during your touch points: phone calls, visits in the hospital, or in clinic.";
-  say(sc, s1); ringTo(sc, "#listcard", 6);
-  await sleep(readTime(s1), my);
+  ringTo(sc, "#listcard", 6);
+  await sayLine(sc, "The questions you accrue are visible to your care team before and during your touch points: phone calls, visits in the hospital, or in clinic.", my, "14");
 
-  s1 = "So every question you have had along the way can be acknowledged and addressed.";
-  say(sc, s1);
-  await sleep(readTime(s1), my);
+  await sayLine(sc, "So every question you have had along the way can be acknowledged and addressed.", my, "15");
   ringOff(sc);
+},
+
+/* 5 · one important note */
+async function(my){
+  const sc = newScene("cream");
+  const st = document.createElement("div"); st.className = "stage";
+  st.style.justifyContent = "flex-end"; st.style.paddingBottom = "118px"; st.style.gap = "18px";
+  sc.appendChild(st);
+  await line(st, "med", "One important note.", my, "16");
+  const w = document.createElement("div"); w.className = "warnfilm";
+  w.textContent = "This tool records your questions. It is not real time communication with your care team. For anything urgent or emergent: use your call light in the hospital, call your doctor's office, or call 911.";
+  st.appendChild(w); on(w);
+  voice("17");
+  await sleep(holdFor(w.textContent, "17"), my);
+  await sleep(700, my);
 },
 
 /* 5 · the partnership */
 async function(my){
   const sc = newScene("cream");
   const st = document.createElement("div"); st.className = "stage"; sc.appendChild(st);
-  await line(st, "big", "We want you to be heard.", my);
-  await line(st, "med", "For all your questions and concerns, we strive to make this as simple and complete as possible.", my);
-  await line(st, "med", "You and your care team are a partnership. This tool helps strengthen that collaboration.", my);
+  await line(st, "big", "We want you to be heard.", my, "18");
+  await line(st, "med", "For all your questions and concerns, we strive to make this as simple and complete as possible.", my, "19");
+  await line(st, "med", "You and your care team are a partnership. This tool helps strengthen that collaboration.", my, "20");
   const img = document.createElement("img");
   img.src = "heard-icon.png"; img.alt = "Heard"; img.className = "endmark";
   st.appendChild(img); on(img);
@@ -350,6 +411,7 @@ async function(my){
 async function show(i){
   token++; const my = token;
   clearTimeout(timer);
+  stopVoice();
   idx = Math.max(0, Math.min(SCENES.length - 1, i));
   document.getElementById("prog").style.width = Math.round(((idx + 1) / SCENES.length) * 100) + "%";
   setPaused(false);
@@ -361,6 +423,10 @@ async function show(i){
 function setPaused(p){
   paused = p;
   document.getElementById("pause").textContent = p ? "Play" : "Pause";
+  if (audioOn){
+    if (p) player.pause();
+    else if (player.src && !player.ended) player.play().catch(() => {});
+  }
 }
 document.getElementById("pause").onclick = e => { e.stopPropagation(); setPaused(!paused); };
 document.getElementById("restart").onclick = e => { e.stopPropagation(); show(0); };
@@ -383,7 +449,18 @@ document.addEventListener("visibilitychange", () => {
   else if (pausedByTab) { pausedByTab = false; setPaused(false); }
 });
 
-show(0);
+/* Nothing plays until the person chooses; the tap is also what lets sound through. */
+const SILENT = "data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEAIlYAAESsAAACABAAZGF0YQQAAAAAAA==";
+function begin(sound){
+  audioOn = sound;
+  if (sound){ try { player.src = SILENT; player.play().catch(() => {}); } catch (e) {} }
+  const g = document.getElementById("gate");
+  g.style.opacity = "0"; g.style.pointerEvents = "none";
+  setTimeout(() => g.remove(), 700);
+  show(0);
+}
+document.getElementById("gplay").onclick = e => { e.stopPropagation(); begin(true); };
+document.getElementById("gmute").onclick = e => { e.stopPropagation(); begin(false); };
 </script>
 </body>
 </html>
