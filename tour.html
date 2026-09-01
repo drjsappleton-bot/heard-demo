@@ -159,6 +159,20 @@
   .final h2 { font-size:20px; margin:0 0 8px; color:var(--teal-deep); }
   .final p { font-size:13px; color:var(--mut); margin:0; line-height:1.5; }
 
+  /* start gate: browsers only allow sound after a tap */
+  #gate { position:fixed; inset:0; z-index:80; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; gap:15px; text-align:center; padding:24px;
+    background:linear-gradient(160deg, var(--teal) 0%, var(--teal-deep) 70%); color:var(--cream);
+    transition:opacity .6s ease; }
+  #gate img { width:74px; height:74px; border-radius:19px; box-shadow:0 8px 22px rgba(0,0,0,.3); }
+  #gate .gt { font-size:clamp(24px, 4.2vw, 36px); font-weight:800; }
+  #gate .gs { font-size:clamp(14px, 2.1vw, 17px); opacity:.92; margin-bottom:6px; }
+  #gstart { border:0; border-radius:999px; background:var(--coral); color:#fff; cursor:pointer;
+    font-family:inherit; font-size:19px; font-weight:800; padding:15px 42px;
+    box-shadow:0 10px 26px rgba(0,0,0,.25); }
+  #gmute { border:0; background:none; color:rgba(255,255,255,.85); cursor:pointer;
+    font-family:inherit; font-size:14px; text-decoration:underline; padding:8px; }
+
   @media (prefers-reduced-motion: reduce) {
     .cur, .view, .sheet, .mic, .entry { transition-duration:.01ms !important; }
     .ripple.go { animation:none; } .to .cursorbar { animation:none; }
@@ -167,11 +181,18 @@
 </style>
 </head>
 <body>
+<div id="gate">
+  <img src="heard-icon.png" alt="">
+  <div class="gt">How Heard works</div>
+  <div class="gs">Step through it at your own pace, with narration.</div>
+  <button id="gstart">&#9654;&#xFE0E;&nbsp; Start</button>
+  <button id="gmute">Start without sound</button>
+</div>
 <div class="wrap">
   <div class="top">
     <img src="heard-icon.png" alt="">
     <h1>How Heard works</h1>
-    <p>Step through it at your own pace. No sound.</p>
+    <p>Step through it at your own pace.</p>
     <a class="back" href="./">&#8592; Back to Heard</a>
   </div>
 
@@ -213,6 +234,24 @@ const REDUCED = matchMedia && matchMedia("(prefers-reduced-motion: reduce)").mat
 
 let token = 0, idx = 0, finished = false, firstCap = null, shift = 0;
 const CAP_GAP = 12, CAP_EDGE = 8, CAP_HOLD = 2200;
+
+/* ---- narration: the same voice as the intro film, one clip per caption ---- */
+const DUR_T = {"01":4.06,"02":5.47,"03":3.74,"04":3.22,"05":5.5,"06":3.89,"07":5.4,"08":3.96,
+  "09":5.93,"10":4.15,"11":4.46,"12":4.99,"13":4.99,"14":5.35,"15":5.04,"16":5.52};
+const player = new Audio(); player.preload = "auto";
+let audioOn = false, voiceUntil = 0;
+function voice(id){
+  if (!audioOn || !id){ voiceUntil = 0; return; }
+  voiceUntil = performance.now() + (DUR_T[id] || 0) * 1000;
+  try {
+    player.src = "tvo-" + id + ".mp3";
+    const p = player.play();
+    if (p && p.catch) p.catch(() => { try { player.load(); player.play().catch(() => {}); } catch (e) {} });
+  } catch (e) {}
+}
+function stopVoice(){ voiceUntil = 0; try { player.pause(); } catch (e) {} }
+/* Opening pause on each screen: at least the reading beat, and never shorter than the voice. */
+async function capWait(min){ await sleep(Math.max(min, voiceUntil - performance.now() + 450)); }
 const sleep = ms => new Promise(r => setTimeout(r, REDUCED ? Math.min(ms, 80) : ms));
 function guard(my){ if (my !== token) throw "x"; }
 
@@ -223,7 +262,7 @@ function view(html){
   vp.appendChild(d);
   void d.offsetWidth;                 /* deterministic; rAF stalls in a background tab */
   d.classList.add("on");
-  if (firstCap) { const c = firstCap; firstCap = null; addNote(c[0], c[1]); }
+  if (firstCap) { const c = firstCap; firstCap = null; addNote(c[0], c[1]); voice(c[2]); }
   else layoutCaptions();
   return d;
 }
@@ -269,10 +308,12 @@ function addNote(main, sub){
 }
 /* Mid-screen captions: add the note, then hold long enough to read it before the
    pointer moves again. Abandons if the viewer has moved on. */
-async function caption(main, sub){
+async function caption(main, sub, id){
   const t = token;
   addNote(main, sub);
-  await sleep(CAP_HOLD);
+  voice(id);
+  const hold = (audioOn && id && DUR_T[id]) ? Math.max(CAP_HOLD, DUR_T[id] * 1000 + 450) : CAP_HOLD;
+  await sleep(hold);
   if (t !== token) throw "x";
 }
 function rectOf(sel){
@@ -348,43 +389,43 @@ const shareCard = (withCode) =>
 
 /* ---------------- steps ---------------- */
 const STEPS = [
-{ cap:["Sign in once","Your name, then your doctor. Nothing to install."],
+{ cap:["Sign in once","Your name, then your doctor. Nothing to install.","01"],
   async run(my){
     view('<div class="choice"><h2>I\'m a patient</h2>' +
       '<p>Sign in once to get your personal page. Everything you capture is under your control.</p>' +
       '<div class="fld ph" id="f1">First name</div><div class="fld ph" id="f2">Last name</div>' +
       '<div class="fld sel ph" id="f3">Who is your doctor? (choose if listed)</div>' +
       '<div class="btn coral" id="go" style="margin-top:16px">Sign in &amp; get my link</div></div>');
-    parkCursor(160, 520); await sleep(2400); guard(my);
+    parkCursor(160, 520); await capWait(2400); guard(my);
     await highlight("#f1"); await moveTo("#f1"); guard(my); await tap(); clearHighlight();
     await typeInto(vp.querySelector("#f1"), "Margaret", my); guard(my);
     await sleep(300);
     await moveTo("#f2"); await tap(); guard(my);
     await typeInto(vp.querySelector("#f2"), "Ellis", my); guard(my);
     await sleep(600);
-    await caption("Choose your doctor", "The list fills in as the practice uses it. Not there? Type the name.");
+    await caption("Choose your doctor", "The list fills in as the practice uses it. Not there? Type the name.", "02");
     await highlight("#f3"); await moveTo("#f3"); guard(my); await tap();
     const f3 = vp.querySelector("#f3"); f3.classList.remove("ph"); f3.textContent = "Dr. Appleton";
     await sleep(1500); clearHighlight(); guard(my);
-    await caption("Then sign in", "You get your own page, and a link you can bookmark.");
+    await caption("Then sign in", "You get your own page, and a link you can bookmark.", "03");
     await highlight("#go"); await moveTo("#go"); guard(my); await tap(); clearHighlight();
     await sleep(2000);
   }},
 
-{ cap:["This is your page","One button. Nothing else to learn."],
+{ cap:["This is your page","One button. Nothing else to learn.","04"],
   async run(my){
     view(patientHead() + '<div class="c"><div class="sec">Captured so far (0)</div>' +
       '<div class="note">Nothing captured yet.</div></div>');
-    parkCursor(160, 520); await sleep(2400); guard(my);
+    parkCursor(160, 520); await capWait(2400); guard(my);
     await highlight("#mic", 4000); guard(my);
     await sleep(3200);
   }},
 
-{ cap:["Tap, and say what is on your mind","Any hour of the night. It does not have to wait for rounds."],
+{ cap:["Tap, and say what is on your mind","Any hour of the night. It does not have to wait for rounds.","05"],
   async run(my){
     view(patientHead() + '<div class="c"><div class="sec">Captured so far (0)</div>' +
       '<div class="note">Nothing captured yet.</div></div>');
-    parkCursor(160, 500); await sleep(2400); guard(my);
+    parkCursor(160, 500); await capWait(2400); guard(my);
     await moveTo("#mic"); guard(my); await tap();
     vp.querySelector("#mic").classList.add("rec");
     vp.querySelector("#miclabel").textContent = "Listening…";
@@ -393,7 +434,7 @@ const STEPS = [
     await sleep(800); guard(my);
     await typeInto(vp.querySelector("#live"), "Is it normal for my calf to feel tight?", my, 48);
     await sleep(1300); guard(my);
-    await caption("Tap again to stop", "The microphone is only on while you say so.");
+    await caption("Tap again to stop", "The microphone is only on while you say so.", "06");
     await moveTo("#mic"); await tap(); guard(my);
     vp.querySelector("#mic").classList.remove("rec");
     vp.querySelector("#miclabel").textContent = "Tap to speak";
@@ -402,51 +443,51 @@ const STEPS = [
     await sleep(2000);
   }},
 
-{ cap:["It joins your list","Nothing is lost between visits. It waits for the team, not for you."],
+{ cap:["It joins your list","Nothing is lost between visits. It waits for the team, not for you.","07"],
   async run(my){
     view(patientHead() + '<div class="c"><div class="sec">Captured so far (1)</div>' +
       entry("e1","Is it normal for my calf to feel tight?","","&#9744; I was heard","Waiting for your care team") + '</div>');
-    parkCursor(160, 520); await sleep(2400); guard(my);
+    parkCursor(160, 520); await capWait(2400); guard(my);
     await highlight("#e1", 4600); guard(my);
     await sleep(3400);
   }},
 
-{ cap:["Bring in a family member","Further down your page: Share with a caregiver."],
+{ cap:["Bring in a family member","Further down your page: Share with a caregiver.","08"],
   async run(my){
     view(shareCard(false));
-    parkCursor(160, 480); await sleep(2400); guard(my);
+    parkCursor(160, 480); await capWait(2400); guard(my);
     await highlight("#mk"); await moveTo("#mk"); guard(my); await tap(); clearHighlight();
     view(shareCard(true));
     await sleep(900); guard(my);
-    await caption("You get a six character code", "Read it out, or send it. Anyone who uses it sees your whole page.");
+    await caption("You get a six character code", "Read it out, or send it. Anyone who uses it sees your whole page.", "09");
     await highlight("#code", 4200);
     await sleep(2200);
   }},
 
-{ cap:["Send it as a text","Tap the button and your own messaging app opens."],
+{ cap:["Send it as a text","Tap the button and your own messaging app opens.","10"],
   async run(my){
     view(shareCard(true) +
       '<div class="sheet" id="sheet"><div class="h">New Message</div>' +
       '<div class="to" id="to"><b>To:</b> <span id="toname"></span><span class="cursorbar"></span></div>' +
       '<div class="bubble">I am using Heard to keep track of questions for my care team. Join with code 7KQ4MP or open https://imheard.com/#/b/demo/c/7KQ4MP</div></div>');
-    parkCursor(160, 480); await sleep(2400); guard(my);
+    parkCursor(160, 480); await capWait(2400); guard(my);
     await highlight("#txt"); await moveTo("#txt"); guard(my); await tap(); clearHighlight();
     vp.querySelector("#sheet").classList.add("up");
     await sleep(1600); guard(my);
-    await caption("You only choose who it goes to", "The invite and the code are already written for you.");
+    await caption("You only choose who it goes to", "The invite and the code are already written for you.", "11");
     await highlight("#to"); await moveTo("#to"); guard(my); await tap();
     await typeInto(vp.querySelector("#toname"), "Sarah (daughter)", my, 80);
     await sleep(2600); clearHighlight(); await sleep(800);
   }},
 
-{ cap:["Sarah joins with the code","She puts in her name, so the team knows who is asking."],
+{ cap:["Sarah joins with the code","She puts in her name, so the team knows who is asking.","12"],
   async run(my){
     view('<div class="c"><div class="sec">You have been invited to help Margaret</div>' +
       '<div class="note" style="margin-bottom:9px">Add your name so the care team knows who asked. Your questions appear on the same list, under your name.</div>' +
       '<div class="fld ph" id="nm">Your name</div>' +
       '<div class="btn coral" id="join">Join</div>' +
       '<div class="warn">You will be able to see everything Margaret has recorded.</div></div>');
-    parkCursor(160, 480); await sleep(2400); guard(my);
+    parkCursor(160, 480); await capWait(2400); guard(my);
     await moveTo("#nm"); await tap(); guard(my);
     await typeInto(vp.querySelector("#nm"), "Sarah (daughter)", my, 72);
     await sleep(600); guard(my);
@@ -454,7 +495,7 @@ const STEPS = [
     await sleep(3200);
   }},
 
-{ cap:["Her questions sit beside yours","Labelled with her name, never mixed up with yours."],
+{ cap:["Her questions sit beside yours","Labelled with her name, never mixed up with yours.","13"],
   async run(my){
     view('<div class="c"><div class="sec">Captured so far (2)</div>' +
       '<div class="authhdr">From Margaret</div>' +
@@ -462,12 +503,12 @@ const STEPS = [
       '<div class="authhdr cg" id="cgh">Caregiver &mdash; Sarah (daughter)</div>' +
       entry("e2","Does she keep taking the blood thinner at home?","","&#9744; I was heard","Waiting for your care team") +
       '</div>');
-    parkCursor(160, 500); await sleep(2400); guard(my);
+    parkCursor(160, 500); await capWait(2400); guard(my);
     await highlight("#cgh", 4600); guard(my);
     await sleep(3000);
   }},
 
-{ cap:["Your team answers it","When they have, your own page says so. You did not have to chase it."],
+{ cap:["Your team answers it","When they have, your own page says so. You did not have to chase it.","14"],
   async run(my){
     view('<div class="c"><div class="sec">Captured so far (2)</div>' +
       '<div class="authhdr">From Margaret</div>' +
@@ -475,16 +516,16 @@ const STEPS = [
       '<div class="authhdr cg">Caregiver &mdash; Sarah (daughter)</div>' +
       entry("e2","Does she keep taking the blood thinner at home?","","&#9744; I was heard","Waiting for your care team") +
       '</div>');
-    parkCursor(160, 300); await sleep(2400); guard(my);
+    parkCursor(160, 300); await capWait(2400); guard(my);
     await highlight("#e1", 5200); guard(my);
     await sleep(2600);
   }},
 
-{ cap:["Then you close the loop","You tap I was heard. That tick belongs to you and nobody else."],
+{ cap:["Then you close the loop","You tap I was heard. That tick belongs to you and nobody else.","15"],
   async run(my){
     view('<div class="c"><div class="sec">Captured so far (1)</div>' +
       entry("e1","Is it normal for my calf to feel tight?","addressed","&#9744; I was heard","&#10003; Heard by your care team") + '</div>');
-    parkCursor(160, 300); await sleep(2400); guard(my);
+    parkCursor(160, 300); await capWait(2400); guard(my);
     await highlight("#e1 .l"); await moveTo("#e1 .l"); guard(my); await tap();
     vp.querySelector("#e1 .l").innerHTML = "&#9745; I was heard";
     clearHighlight(); await sleep(1000); guard(my);
@@ -496,7 +537,7 @@ const STEPS = [
     await sleep(5200);
   }},
 
-{ cap:["That's the whole loop","Ask when it occurs to you. Your team will hear you. You both know you've been heard."],
+{ cap:["That's the whole loop","Ask when it occurs to you. Your team will hear you. You both know you've been heard.","16"],
   async run(my){
     curEl.classList.remove("on");
     view('<div class="final"><div class="tick">&#10003;</div><h2>You have been heard.</h2>' +
@@ -507,6 +548,7 @@ const STEPS = [
 
 async function show(i){
   token++; const my = token;
+  stopVoice();
   finished = false;
   idx = Math.max(0, Math.min(STEPS.length - 1, i));
   const st = STEPS[idx];
@@ -542,7 +584,17 @@ document.addEventListener("visibilitychange", () => {
   else if (!finished) show(idx);
 });
 
-show(0);
+const SILENT = "data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEAIlYAAESsAAACABAAZGF0YQQAAAAAAA==";
+function begin(sound){
+  audioOn = sound;
+  if (sound){ try { player.src = SILENT; player.play().catch(() => {}); } catch (e) {} }
+  const g = document.getElementById("gate");
+  g.style.opacity = "0"; g.style.pointerEvents = "none";
+  setTimeout(() => g.remove(), 700);
+  show(0);
+}
+document.getElementById("gstart").onclick = () => begin(true);
+document.getElementById("gmute").onclick = () => begin(false);
 </script>
 </body>
 </html>
