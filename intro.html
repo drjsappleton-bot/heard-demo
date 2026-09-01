@@ -180,14 +180,14 @@ let token = 0, idx = 0, paused = false, timer = null;
 /* ---- narration ----
    One reusable player, unlocked by the Play tap, reused for every clip so iOS
    keeps allowing it. Durations are baked in so pacing is right from the start. */
-const DUR = {"01":2.52,"02":3.64,"03":3.46,"04":2.81,"05":7.78,"06":1.94,"07":6.41,
-  "08":7.88,"09":5.29,"10":2.05,"11":4.61,"12":2.81,"13":6.7,"14":7.63,"15":3.96,
-  "16":1.19,"17":12.38,"18":1.44,"19":5.33,"20":5.15};
+const DUR = {"01":2.74,"02":3.26,"03":3.41,"04":2.02,"05":9.07,"06":1.9,"07":7.2,
+  "08":7.22,"09":5.18,"10":2.16,"11":4.78,"12":2.35,"13":6.26,"14":8.35,"15":4.08,
+  "16":1.39,"17":13.46,"18":1.39,"19":5.62,"20":5.04};
 const player = new Audio(); player.preload = "auto";
 let audioOn = false;
 function voice(id){
   if (!audioOn || !id) return;
-  try { player.src = "vo-" + id + ".mp3"; player.currentTime = 0; player.play().catch(()=>{}); }
+  try { player.src = "vo-" + id + ".mp3?v=2"; player.currentTime = 0; player.play().catch(()=>{}); }
   catch (e) {}
 }
 function stopVoice(){ try { player.pause(); } catch (e) {} }
