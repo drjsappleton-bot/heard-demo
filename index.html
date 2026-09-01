@@ -635,6 +635,12 @@ async function renderPatient(){
     '<div class="typebox"><input id="typeInput" type="text" placeholder="Or type a question / concern&hellip;" onkeydown="if(event.key===\'Enter\')addTyped()"><button onclick="addTyped()">Add</button></div>' +
     '<div id="capMsg" class="note"></div></div>' +
     '<div class="card" id="shareCard"><h2 class="sec">Include your caregiver</h2><div id="shareBox"></div></div>' +
+    '<div class="toprow" style="margin:0 0 12px">' +
+    '<button class="bm" onclick="toggleBookmarkHelp()"><b>&#128278; Bookmark my site</b><small>so you can come back</small></button>' +
+    '<a class="tourlink" href="intro.html"><b><span class="play">&#9654;</span>Intro</b><small>what is Heard</small></a>' +
+    '<a class="tourlink" href="tour.html"><b><span class="play">&#9654;</span>See how it works</b><small>step by step</small></a>' +
+    '</div>' +
+    '<div class="choice" id="bmPanel" style="display:none"></div>' +
     '<div class="card"><h2 class="sec">Captured so far (<span id="count">' + ptRec.entries.length + '</span>)</h2><div id="entries"></div></div>' +
     '<div class="card" id="closedCard" style="display:none"><h2 class="sec">Heard by your care team (<span id="closedCount">0</span>)</h2>' +
     '<div class="note" style="margin-bottom:6px">Your care team answered these, and you confirmed you were heard.</div>' +
@@ -766,6 +772,7 @@ function makeQR(elId, text){
 let installEvt = null;
 addEventListener("beforeinstallprompt", e => { e.preventDefault(); installEvt = e; });
 function bookmarkTarget(){
+  if (route && route.v === "patient" && route.id) return { url: link("/p/" + route.id), mine: true };
   const my = localStorage.getItem(LS.myPatient);
   return my ? { url: link("/p/" + my), mine: true } : { url: baseURL() + "#/b/" + bucket, mine: false };
 }
