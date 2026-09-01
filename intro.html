@@ -98,9 +98,12 @@
   @keyframes pop { 0% { transform:translateX(-50%) scale(.94); } 100% { transform:translateX(-50%) scale(1); } }
 
   /* closing card */
-  .endmark { width:84px; height:84px; border-radius:22px; box-shadow:0 6px 18px rgba(11,95,92,.25);
+  .endmark { width:min(252px, 30vh); height:auto; border-radius:13%; box-shadow:0 10px 30px rgba(11,95,92,.28);
     opacity:0; transform:translateY(14px); transition:opacity .9s ease, transform .9s ease; }
   .endmark.on { opacity:1; transform:none; }
+  .tagline { font-size:clamp(48px, 8.6vw, 84px); font-weight:800; color:var(--teal-deep); line-height:1.05;
+    opacity:0; transform:translateY(14px); transition:opacity .9s ease, transform .9s ease; }
+  .tagline.on { opacity:1; transform:none; }
   .btnrow { display:flex; gap:12px; flex-wrap:wrap; justify-content:center;
     opacity:0; transition:opacity .9s ease; }
   .btnrow.on { opacity:1; }
@@ -117,9 +120,6 @@
     box-shadow:0 10px 26px rgba(16,22,28,.14);
     opacity:0; transform:translateY(14px); transition:opacity .9s ease, transform .9s ease; }
   .warnfilm.on { opacity:1; transform:none; }
-  .finenote { max-width:660px; text-align:center; font-size:15.5px; font-weight:500; line-height:1.5;
-    color:#5a5346; opacity:0; transform:translateY(10px); transition:opacity .9s ease, transform .9s ease; }
-  .finenote.on { opacity:1; transform:none; }
 
   /* start gate: browsers only allow sound after a tap */
   #gate { position:fixed; inset:0; z-index:80; display:flex; flex-direction:column;
@@ -186,11 +186,12 @@ let token = 0, idx = 0, paused = false, timer = null;
 const DUR = {"01":2.74,"02":3.26,"03":3.41,"04":2.02,"05":9.07,"06":1.9,"07":7.2,
   "08":7.22,"09":5.18,"10":2.16,"11":4.78,"12":2.35,"13":6.26,"14":8.35,"15":4.08,
   "16":1.39,"17":13.9,"18":1.39,"19":5.62,"20":5.04};
-/* 13 and 14 re-voiced 2026-09-01 with Steve's reworded lines. */
-DUR["13"] = 6.31; DUR["14"] = 7.66;
+/* 13 and 14 re-voiced 2026-09-01 with Steve's reworded lines; 21 is the HIPAA box. */
+DUR["13"] = 6.31; DUR["14"] = 7.66; DUR["21"] = 9.72;
 const player = new Audio(); player.preload = "auto";
 let audioOn = false, needVoice = false;
 player.onended = () => { needVoice = false; };
+player.onerror = () => { needVoice = false; };
 function voice(id){
   if (!audioOn || !id) return;
   needVoice = true;
@@ -210,8 +211,11 @@ async function sleep(ms, my){
       left -= 110;
       /* Self-healing narration: a pause and resume once left the rest of a scene
          silent. If a clip should be sounding and the player has gone quiet for
-         any reason, start it again rather than waiting for the next scene. */
-      if (audioOn && needVoice && player.paused) player.play().catch(() => {});
+         any reason, start it again rather than waiting for the next scene. It
+         must stand down once the clip has ended or errored: restarting a clip
+         that finished naturally is what caused a line to play twice. */
+      if (audioOn && needVoice && player.paused && !player.ended && !player.error)
+        player.play().catch(() => {});
     }
   }
 }
@@ -397,23 +401,30 @@ async function(my){
   st.appendChild(w); on(w);
   voice("17");
   await sleep(holdFor(w.textContent, "17"), my);
-  const f = document.createElement("div"); f.className = "finenote";
-  f.textContent = "* Please note: currently, this website and service is not HIPAA compliant. Therefore, no medical or other information provided is protected by HIPAA.";
+  const f = document.createElement("div"); f.className = "warnfilm";
+  f.textContent = "Please note: currently, this website and service is not HIPAA compliant. Therefore, no medical or other information provided is protected by HIPAA.";
   st.appendChild(f); on(f);
-  await sleep(6500, my);
+  voice("21");
+  await sleep(holdFor(f.textContent, "21"), my);
+  await sleep(600, my);
 },
 
 /* 5 · the partnership */
 async function(my){
   const sc = newScene("cream");
-  const st = document.createElement("div"); st.className = "stage"; sc.appendChild(st);
+  const st = document.createElement("div"); st.className = "stage"; st.style.gap = "15px";
+  sc.appendChild(st);
   await line(st, "big", "We want you to be heard.", my, "18");
   await line(st, "med", "For all your questions and concerns, we strive to make this as simple and complete as possible.", my, "19");
   await line(st, "med", "You and your care team are a partnership. This tool helps strengthen that collaboration.", my, "20");
   const img = document.createElement("img");
   img.src = "heard-icon.png"; img.alt = "Heard"; img.className = "endmark";
   st.appendChild(img); on(img);
-  await sleep(1400, my);
+  await sleep(900, my);
+  const tag = document.createElement("div"); tag.className = "tagline";
+  tag.textContent = "Be heard.";
+  st.appendChild(tag); on(tag);
+  await sleep(1500, my);
   const row = document.createElement("div"); row.className = "btnrow";
   row.innerHTML =
     '<button class="fbtn pri" onclick="show(0)">&#8635; Watch again</button>' +
