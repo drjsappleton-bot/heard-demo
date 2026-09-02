@@ -553,6 +553,9 @@ const STEPS = [
     const e1 = vp.querySelector("#e1");
     e1.classList.add("addressed");
     e1.querySelector(".foot .r").innerHTML = "&#10003; Heard by your care team";
+    /* The X is stamped in only for entries built as addressed; this one flips
+       at runtime, so it gets its Not heard button here. */
+    e1.querySelector(".foot .r").insertAdjacentHTML("beforebegin", '<span class="nhx">&#10006; Not heard</span>');
     await highlight("#e1 .foot .r", 3400); guard(my);
     await capWait(0); guard(my);
     await caption("If you feel it has been, close the loop", "Tap I was heard. If it has not been, the red Not heard sends it back to your open list.", "19");
