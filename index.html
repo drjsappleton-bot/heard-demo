@@ -82,7 +82,12 @@
   .exportrow { display: flex; gap: 8px; margin-top: 14px; }
   .exportrow button { flex: 1; padding: 11px; border: 1px solid var(--line); background: var(--card); border-radius: 10px; font-size: 13px; font-weight: 600; color: var(--blue); cursor: pointer; }
   .alertbar { background: var(--red); color: #fff; padding: 10px 14px; border-radius: 10px; font-size: 13px; font-weight: 600; margin-bottom: 10px; }
-  .topbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+  .topbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; gap: 8px; }
+  .topbar select.txt { margin-bottom: 0; flex: 1 1 auto; min-width: 0; }
+  .bnc { display: inline-block; margin-left: 6px; font-size: 11px; font-weight: 700; color: var(--red);
+    background: #fdecea; border: 1px solid #e6b0ac; border-radius: 6px; padding: 1px 6px; white-space: nowrap; }
+  .rmx { border: 0; background: none; color: var(--mut); font-size: 17px; cursor: pointer; padding: 4px 10px; }
+  .rmx:hover { color: var(--red); }
   .topbar button, .topbar a { border: 1px solid var(--line); background: var(--card); border-radius: 8px; padding: 6px 12px; font-size: 12px; color: var(--mut); cursor: pointer; text-decoration: none; }
   .spin { display: inline-block; width: 16px; height: 16px; border: 2px solid rgba(255,255,255,.4); border-top-color: #fff; border-radius: 50%; animation: rot .8s linear infinite; vertical-align: -3px; margin-right: 6px; }
   @keyframes rot { to { transform: rotate(360deg); } }
@@ -214,7 +219,7 @@
 const KV = "/api/store/";
 const LS = {
   bucket: "heard_bucket_v2", pin: "heard_pin", key: "heard_apikey",
-  myPatient: "heard_my_patient", localdb: "heard_localdb", cgPrefix: "heard_cg_"
+  myPatient: "heard_my_patient", localdb: "heard_localdb", cgPrefix: "heard_cg_", prov: "heard_prov_"
 };
 let bucket = null;       // current site id ("local" = single-device mode)
 let route = {};          // parsed hash
@@ -305,6 +310,17 @@ function betterName(a, b){
 function esc(s){ return String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
 
 /* ================= data layer (Netlify Blobs via /api/store, or local) ================= */
+/* ---- provider identity and care teams (demo grade; the shared PIN stays) ----
+   A provider record may carry: role, lead (the physician whose team they joined),
+   approved, hidden (patient ids removed from their own list). Legacy records with
+   no role are physicians, approved. */
+function isPhysician(p){ return !p || !p.role || p.role === "Physician"; }
+function provKey(){ return LS.prov + bucket; }
+function provIdent(){ try { return JSON.parse(localStorage.getItem(provKey()) || "null"); } catch (e) { return null; } }
+function setProvIdent(o){ if (o) localStorage.setItem(provKey(), JSON.stringify(o)); else localStorage.removeItem(provKey()); }
+function provRecOf(provs, name){ const h = findProvider(provs || [], name || ""); return h ? h.p : null; }
+function teamLeadName(p){ return !p ? null : (isPhysician(p) ? p.name : (p.lead || null)); }
+
 const EMPTY_DOC = () => ({ idx: [], pts: {}, providers: [] });
 function normDoc(d){ if (!d || typeof d !== "object") return null; if (!Array.isArray(d.idx)) d.idx = []; if (!d.pts || typeof d.pts !== "object") d.pts = {}; if (!Array.isArray(d.providers)) d.providers = []; return d; }
 function normRec(r){ if (r) { if (!Array.isArray(r.entries)) r.entries = []; if (!Array.isArray(r.deleted)) r.deleted = []; if (!Array.isArray(r.caregivers)) r.caregivers = []; } return r; }
@@ -512,7 +528,7 @@ async function renderLanding(){
   const mine = localStorage.getItem(LS.myPatient);
   let provs = [];
   try { const doc = await loadDoc(); provs = doc && doc.providers ? doc.providers : []; } catch (e) {}
-  const known = provs.slice().sort((a, b) => String(a.name).localeCompare(String(b.name)));
+  const known = provs.filter(isPhysician).slice().sort((a, b) => String(a.name).localeCompare(String(b.name)));
   const hideFree = known.length ? ' style="display:none"' : '';
   const docOptions =
     (known.length
@@ -1101,36 +1117,167 @@ function stopUI(silent){
 /* ---------- provider home ---------- */
 async function renderDrHome(){
   document.getElementById("tagline").textContent = "Provider";
-  app().innerHTML =
-    '<div class="topbar"><span style="font-size:13px;font-weight:600;color:var(--blue)">Patient list</span><button onclick="lockProvider()">&#128274; Lock</button></div>' +
-    '<div class="card" id="ptList"><div class="empty">Loading…</div></div>' +
-    '<div class="card"><h2 class="sec">Open by patient code</h2>' +
-    '<div class="typebox"><input id="ptCode" placeholder="6-character code (e.g. from QR link)"><button onclick="openByCode()">Open</button></div></div>' +
-    '<div class="card"><h2 class="sec">Provider directory</h2>' +
-    '<div id="provList" class="empty">Loading…</div>' +
-    '<div class="typebox"><input id="provName" placeholder="Your name (e.g. Dr. Appleton)"><button onclick="addProvider()">Add me</button></div>' +
-    '<div class="note">Names added here appear in the patient sign-in dropdown.</div></div>' +
-    settingsHTML();
-  wireSettings();
-  let idx = [], provs = [];
-  try { const doc = await loadDoc(); idx = doc ? doc.idx : []; provs = doc && doc.providers ? doc.providers : []; } catch (e) { document.getElementById("ptList").innerHTML = '<div class="empty err">Could not load patient list: ' + esc(e.message) + '</div>'; return; }
-  const box = document.getElementById("ptList");
-  box.innerHTML = idx.length
-    ? idx.slice().reverse().map(p =>
-        '<div class="ptrow" onclick="location.hash=\'#/b/\'+bucket+\'/dr/' + p.id + '\'">' +
-        '<div><div class="nm">' + esc(p.last) + ', ' + esc(p.first) + '</div><div class="dt">Signed in ' + new Date(p.created).toLocaleString() + ' &middot; code ' + p.id + (p.doctor ? ' &middot; ' + esc(p.doctor) : '') + (p.team ? ' &middot; ' + esc(p.team) : '') + '</div></div>' +
-        '<span class="arrow">&#8250;</span></div>').join("")
-    : '<div class="empty">No patients have signed in yet. New patients sign in from the landing page.</div>';
+  app().innerHTML = '<div class="card"><div class="empty">Loading&hellip;</div></div>';
+  let doc = null, idx = [], provs = [];
+  try { doc = await loadDoc(); idx = doc ? doc.idx : []; provs = doc && doc.providers ? doc.providers : []; }
+  catch (e) { app().innerHTML = '<div class="card"><div class="empty err">Could not load: ' + esc(e.message) + '</div></div>'; return; }
+
+  const ident = provIdent();
+  const me = ident ? provRecOf(provs, ident.name) : null;
+  if (ident && !me) setProvIdent(null);
+  const roles = ["Physician", "APP (PA or NP)", "Nurse", "MA", "Other"];
+  const docsList = provs.filter(isPhysician).slice().sort((a, b) => String(a.name).localeCompare(String(b.name)));
+
+  /* who am I: one button, like the patient side */
+  let whoCard;
+  if (!me) {
+    whoCard =
+      '<div class="card"><h2 class="sec">Who are you?</h2>' +
+      '<p style="font-size:14px;color:var(--mut);margin-bottom:10px">Pick your role. If you are not the physician, choose whose care team you belong to; they approve you from their own page.</p>' +
+      '<input class="txt" id="tmName" placeholder="Your name (e.g. Katy Neary, PA)">' +
+      '<select class="txt" id="tmRole">' + roles.map(r => '<option>' + r + '</option>').join("") + '</select>' +
+      '<select class="txt" id="tmLead"><option value="__self">I am the physician (team lead)</option>' +
+      docsList.map(p => '<option>' + esc(p.name) + '</option>').join("") + '</select>' +
+      '<button class="btn teal" onclick="joinCareTeam()">I&rsquo;m part of this care team</button>' +
+      '<div class="note" id="tmMsg"></div></div>';
+  } else {
+    const lead = teamLeadName(me);
+    whoCard =
+      '<div class="card"><h2 class="sec">Signed in</h2>' +
+      '<div style="font-size:15px;font-weight:700">' + esc(me.name) + '</div>' +
+      '<div class="note" style="text-align:left;margin-top:4px">' + esc(me.role || "Physician") +
+      (isPhysician(me) ? ' &middot; team lead'
+        : ' &middot; care team of ' + esc(lead || "?") + (me.approved ? '' : ' &middot; <b>awaiting approval</b>')) + '</div>' +
+      '<button class="btn sub" style="margin-top:10px" onclick="setProvIdent(null); renderDrHome()">Not you? Switch</button></div>';
+  }
+
+  /* the physician sees join requests and approves from their own page */
+  let reqCard = "";
+  if (me && isPhysician(me)) {
+    const pending = provs.filter(q => !isPhysician(q) && !q.approved && q.lead && nameMatch(q.lead, me.name) !== "none");
+    if (pending.length) reqCard =
+      '<div class="card"><h2 class="sec">Care team requests</h2>' +
+      pending.map(q =>
+        '<div class="warnbox" style="margin-top:6px"><b>' + esc(q.name) + '</b> (' + esc(q.role || "team member") + ') asks to join your care team.' +
+        '<div style="display:flex;gap:8px;margin-top:8px">' +
+        '<button class="btn teal" style="flex:1" data-n="' + esc(JSON.stringify(q.name)) + '" onclick="approveTeam(this.dataset.n, true)">Approve</button>' +
+        '<button class="btn sub" style="flex:1;margin-top:0" data-n="' + esc(JSON.stringify(q.name)) + '" onclick="approveTeam(this.dataset.n, false)">Decline</button>' +
+        '</div></div>').join("") + '</div>';
+  }
+
+  const canSee = !me || isPhysician(me) || !!me.approved;
+  const leadName = me ? teamLeadName(me) : null;
+  const hidden = new Set((me && me.hidden) || []);
+  const mine = (me && canSee && leadName)
+    ? idx.filter(q => q.doctor && nameMatch(q.doctor, leadName) !== "none" && !hidden.has(q.id))
+    : [];
+
+  const ptRow = (q, removable) =>
+    '<div class="ptrow" onclick="location.hash=\'#/b/\'+bucket+\'/dr/' + q.id + '\'">' +
+    '<div><div class="nm">' + esc(q.last) + ', ' + esc(q.first) + '</div><div class="dt">Signed in ' + new Date(q.created).toLocaleString() + ' &middot; code ' + q.id + (q.doctor ? ' &middot; ' + esc(q.doctor) : '') + (q.team ? ' &middot; ' + esc(q.team) : '') + '</div></div>' +
+    (removable ? '<button class="rmx" title="Remove from my list (hides it from your view only)" data-id="' + q.id + '" onclick="event.stopPropagation(); removeMyPatient(this.dataset.id)">&#10006;</button>' : '<span class="arrow">&#8250;</span>') +
+    '</div>';
+
+  let topbar, listCard;
+  if (me && !canSee) {
+    topbar = '<div class="topbar"><span style="font-size:13px;font-weight:600;color:var(--blue)">Provider</span><button onclick="lockProvider()">&#128274; Lock</button></div>';
+    listCard = '<div class="card"><div class="warnbox">Waiting for <b>' + esc(leadName || "the physician") + '</b> to approve you. They approve care team requests from this same provider page.</div></div>';
+  } else if (me) {
+    topbar =
+      '<div class="topbar"><select class="txt" id="myPts" onchange="if (this.value) location.hash = \'#/b/\' + bucket + \'/dr/\' + this.value">' +
+      '<option value="">My patients (' + mine.length + ')</option>' +
+      mine.map(q => '<option value="' + q.id + '">' + esc(q.last) + ', ' + esc(q.first) + '</option>').join("") +
+      '</select><button onclick="lockProvider()">&#128274; Lock</button></div>';
+    const others = idx.filter(q => !mine.some(mq => mq.id === q.id));
+    listCard =
+      '<div class="card" id="ptList">' +
+      (mine.length ? mine.slice().reverse().map(q => ptRow(q, true)).join("")
+                   : '<div class="empty">No patients on your list yet. Patients who pick ' + esc(leadName || "your team") + ' at sign-in appear here.</div>') +
+      (others.length
+        ? '<details style="margin-top:10px"><summary style="cursor:pointer;font-size:13px;color:var(--mut)">Show all patients on this demo site (' + others.length + ' more)</summary>' +
+          others.slice().reverse().map(q => ptRow(q, false)).join("") + '</details>'
+        : '') +
+      '</div>';
+  } else {
+    topbar = '<div class="topbar"><span style="font-size:13px;font-weight:600;color:var(--blue)">Patient list</span><button onclick="lockProvider()">&#128274; Lock</button></div>';
+    listCard = '<div class="card" id="ptList">' + (idx.length
+      ? idx.slice().reverse().map(q => ptRow(q, false)).join("")
+      : '<div class="empty">No patients have signed in yet. New patients sign in from the landing page.</div>') + '</div>';
+  }
+
   const dupes = duplicateGroups(provs);
   const dupeHTML = dupes.map(g => {
     const names = g.map(x => x.name);
     return '<div class="warnbox" style="margin-top:8px">These look like the same provider: <b>' + names.map(esc).join("</b>, <b>") + '</b>' +
       '<button class="btn sub" style="margin-top:8px" onclick=\'mergeProviders(' + esc(JSON.stringify(JSON.stringify(names))) + ')\'>Merge into one</button></div>';
   }).join("");
-  document.getElementById("provList").innerHTML = (provs.length
-    ? provs.map(p => '<span class="provtag">' + esc(p.name) + (p.addedBy === "patient" ? ' <em>&middot; added by a patient, not linked</em>' : '') + '</span>').join(" ")
-    : 'No providers registered yet. Add your name below.') + dupeHTML;
-  document.getElementById("provList").className = provs.length ? "" : "empty";
+  const provTag = (q) => {
+    const bits = [];
+    if (q.role && q.role !== "Physician") bits.push(q.role + (q.lead ? " &middot; team of " + esc(q.lead) : "") + (q.approved ? "" : " &middot; pending"));
+    if (q.addedBy === "patient") bits.push("added by a patient, not linked");
+    return '<span class="provtag">' + esc(q.name) + (bits.length ? ' <em>&middot; ' + bits.join(" &middot; ") + '</em>' : '') + '</span>';
+  };
+  const dirCard =
+    '<div class="card"><h2 class="sec">Provider directory</h2>' +
+    '<div id="provList" class="' + (provs.length ? '' : 'empty') + '">' +
+    (provs.length ? provs.map(provTag).join(" ") : 'No providers registered yet. Sign on above.') + dupeHTML + '</div></div>';
+
+  app().innerHTML = topbar + whoCard + reqCard + listCard +
+    '<div class="card"><h2 class="sec">Open by patient code</h2>' +
+    '<div class="typebox"><input id="ptCode" placeholder="6-character code (e.g. from QR link)"><button onclick="openByCode()">Open</button></div></div>' +
+    dirCard + settingsHTML();
+  wireSettings();
+}
+async function joinCareTeam(){
+  const name = (document.getElementById("tmName").value || "").trim();
+  const role = document.getElementById("tmRole").value;
+  const leadSel = document.getElementById("tmLead").value;
+  const m = document.getElementById("tmMsg");
+  if (!name) { m.innerHTML = '<span class="err">Enter your name.</span>'; return; }
+  const self = role === "Physician";
+  if (!self && leadSel === "__self") { m.innerHTML = '<span class="err">Pick the physician whose care team you are joining. If none is listed, the physician signs on first.</span>'; return; }
+  try {
+    const doc = (await loadDoc()) || EMPTY_DOC();
+    const hit = findProvider(doc.providers, name);
+    let rec = null;
+    if (hit && (hit.how === "exact" || hit.how === "strong")) {
+      const keep = hit.how === "exact" || confirm('The directory already lists "' + hit.p.name + '".\n\nAre you that person?');
+      if (keep) { rec = hit.p; rec.aka = [...new Set((rec.aka || []).concat([name]))]; }
+    }
+    if (!rec) { rec = { name: name, created: Date.now() }; doc.providers.push(rec); }
+    rec.role = role; rec.linked = true;
+    if (self) { rec.lead = null; rec.approved = true; }
+    else {
+      rec.lead = leadSel;
+      if (rec.approved !== true) { rec.approved = false; rec.requestedAt = Date.now(); }
+    }
+    await saveDoc(doc);
+    setProvIdent({ name: rec.name });
+    renderDrHome();
+  } catch (e) { m.innerHTML = '<span class="err">' + esc(e.message) + '</span>'; }
+}
+async function approveTeam(nJSON, ok){
+  try {
+    const n = JSON.parse(nJSON);
+    const doc = (await loadDoc()) || EMPTY_DOC();
+    const hit = findProvider(doc.providers, n);
+    if (!hit) return;
+    if (ok) { hit.p.approved = true; hit.p.approvedAt = Date.now(); }
+    else { doc.providers = doc.providers.filter(q => q !== hit.p); }
+    await saveDoc(doc);
+    renderDrHome();
+  } catch (e) { alert("Could not save: " + e.message); }
+}
+async function removeMyPatient(id){
+  const ident = provIdent(); if (!ident) return;
+  if (!confirm("Remove this patient from your list?\n\nThis only hides them from your view. Their page and questions are untouched, and Show all patients still finds them.")) return;
+  try {
+    const doc = (await loadDoc()) || EMPTY_DOC();
+    const rec = provRecOf(doc.providers, ident.name); if (!rec) return;
+    rec.hidden = [...new Set((rec.hidden || []).concat([id]))];
+    await saveDoc(doc);
+    renderDrHome();
+  } catch (e) { alert("Could not save: " + e.message); }
 }
 async function addProvider(){
   const inp = document.getElementById("provName");
@@ -1325,7 +1472,8 @@ function itemState(item){
   return {
     matched: m.length,
     addressed: m.length ? m.some(e => e.addressed) : !!item.addressed,
-    heard: m.length ? m.every(e => e.heard) : false
+    heard: m.length ? m.every(e => e.heard) : false,
+    bounced: m.some(e => (e.bouncedAt || 0) > (e.addressedAt || 0))
   };
 }
 function renderSummaryHTML(failNote){
@@ -1402,8 +1550,11 @@ function bucketHTML(title, cls, key, items){
   const lis = openItems.length
     ? openItems.map(([i, idx]) => {
         const q = cleanQuote(i.quote);
+        const bounced = itemState(i).bounced
+          ? '<span class="bnc" title="The team marked this addressed, and the patient tapped Not heard, so it is back on the list">&#10006; Patient: not heard yet</span>'
+          : "";
         return "<li><label class=\"itemchk\" title=\"Mark addressed. The item stays, and moves to the Addressed list below\"><input type=\"checkbox\" onchange=\"completeItem('" + key + "'," + idx + ")\"> Addressed</label>" +
-          esc(i.text) + itemAuthorTag(i) + (q && q !== i.text ? "<q>“" + esc(q) + "”</q>" : "") + "</li>";
+          esc(i.text) + itemAuthorTag(i) + bounced + (q && q !== i.text ? "<q>“" + esc(q) + "”</q>" : "") + "</li>";
       }).join("")
     : '<li class="empty">' + (items.length ? "All addressed" : "None") + '</li>';
   return '<div class="bucket ' + cls + '"><h3>' + title + '</h3><ul>' + lis + '</ul></div>';
