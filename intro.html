@@ -76,6 +76,8 @@
   .entry.addressed { border-left-color:#9a6700; background:#fff8e1; }
   .entry.closed { border-left-color:var(--green); background:var(--green-lt); }
   .foot .r.ok { color:var(--green); font-weight:700; }
+  .nhx { border:1px solid #e6b0ac; background:#fdecea; color:var(--red); font-weight:700;
+    border-radius:7px; padding:2px 7px; font-size:10.5px; }
   .foot { display:flex; justify-content:space-between; align-items:center; margin-top:6px;
     font-size:10.5px; gap:7px; }
   .foot .l { color:var(--green); font-weight:700; }
@@ -190,7 +192,7 @@ const DUR = {"01":2.74,"02":3.26,"03":3.41,"04":2.02,"05":9.07,"06":1.9,"07":7.2
   "08":7.22,"09":5.18,"10":2.16,"11":4.78,"12":2.35,"13":6.26,"14":8.35,"15":4.08,
   "16":1.39,"17":13.9,"18":1.39,"19":5.62,"20":5.04};
 /* 13 and 14 re-voiced 2026-09-01 with Steve's reworded lines; 21 is the HIPAA box. */
-DUR["13"] = 6.31; DUR["14"] = 7.66; DUR["21"] = 9.72; DUR["22"] = 11.59; DUR["23"] = 6.7;
+DUR["13"] = 6.31; DUR["14"] = 7.66; DUR["21"] = 9.72; DUR["22"] = 11.59; DUR["23"] = 12.29;
 const player = new Audio(); player.preload = "auto";
 let audioOn = false, needVoice = false;
 player.onended = () => { needVoice = false; };
@@ -199,7 +201,7 @@ function voice(id){
   if (!audioOn || !id) return;
   needVoice = true;
   try {
-    player.src = "vo-" + id + ".mp3?v=4";
+    player.src = "vo-" + id + ".mp3?v=5";
     const p = player.play();
     /* One scene once went entirely silent while its files served fine, so a
        rejected play gets one immediate reload-and-retry before the healer takes over. */
@@ -404,7 +406,7 @@ async function(my){
   sc.insertAdjacentHTML("beforeend", phoneWrap(
     '<div class="c"><div class="sec">Captured so far (2)</div>' +
     '<div class="entry" id="e1"><span class="t">Today, 9:12 AM</span>Is it normal for my calf to feel tight?' +
-    '<div class="foot"><span class="l" id="iwh">&#9744; I was heard</span><span class="r" id="badge">Waiting for your care team</span></div></div>' +
+    '<div class="foot"><span class="l" id="iwh">&#9744; I was heard</span><span class="nhx" id="nhx" style="display:none">&#10006; Not heard</span><span class="r" id="badge">Waiting for your care team</span></div></div>' +
     '<div class="entry"><span class="t">Today, 4:40 PM</span>When can I shower with the dressing on?' +
     '<div class="foot"><span class="l">&#9744; I was heard</span><span class="r">Waiting for your care team</span></div></div></div>'));
   fitPhone(sc);
@@ -412,10 +414,17 @@ async function(my){
   const e1 = sc.querySelector("#e1"), badge = sc.querySelector("#badge"), iwh = sc.querySelector("#iwh");
   e1.classList.add("addressed");
   badge.innerHTML = "&#10003; Heard by your care team"; badge.classList.add("ok");
+  sc.querySelector("#nhx").style.display = "";
   ringTo(sc, "#badge", 8);
   await sayLine(sc, "During one of your care team's touch points, a phone call, a visit in the hospital, or in clinic, they will be able to acknowledge your concern. You will see it appear at the bottom right of your question.", my, "22");
   ringTo(sc, "#iwh", 8);
-  await sayLine(sc, "You will then have the ability to close the loop. Tap I was heard, ensuring your concerns have been heard and addressed.", my, "23");
+  say(sc, "You will then have the ability to close the loop. Tap I was heard. Or, if your concern was not truly addressed, tap the red Not heard button, and the question goes right back on your list.");
+  voice("23");
+  await sleep(5200, my);
+  ringTo(sc, "#nhx", 8);
+  await sleep(holdFor("x", "23") - 5200, my);
+  ringTo(sc, "#iwh", 8);
+  await sleep(600, my);
   iwh.innerHTML = "&#9745; I was heard";
   e1.classList.remove("addressed"); e1.classList.add("closed");
   await sleep(1800, my);

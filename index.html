@@ -136,6 +136,9 @@
   /* loop states: open -> addressed by the care team -> closed once the patient confirms */
   .entryfoot { display: flex; align-items: center; justify-content: space-between; gap: 6px 10px; margin-top: 6px; flex-wrap: wrap; }
   .entryfoot .heardchk { margin-top: 0; }
+  .nhx { border: 1px solid #e6b0ac; background: #fdecea; color: var(--red); font-weight: 700;
+    border-radius: 8px; padding: 3px 9px; font-size: 12px; cursor: pointer; font-family: inherit;
+    margin-right: auto; }
   .ctbadge { font-size: 11px; font-weight: 600; white-space: nowrap; color: var(--amber); }
   .entry.closed .ctbadge { color: var(--green); }
   .entry.addressed { border-left-color: var(--amber); background: var(--amber-lt); }
@@ -329,8 +332,18 @@ function mergeEntries(a, b, deleted){
     const k = entryKey(e);
     if (del.has(k)) continue;
     if (!seen[k]) { seen[k] = e; out.push(e); }
-    else { if (e.heard) seen[k].heard = true; if (e.addressed) seen[k].addressed = true; }
+    else {
+      const t = seen[k];
+      if (e.heard) t.heard = true;
+      if (e.addressed) t.addressed = true;
+      if ((e.addressedAt || 0) > (t.addressedAt || 0)) t.addressedAt = e.addressedAt;
+      if ((e.bouncedAt || 0) > (t.bouncedAt || 0)) t.bouncedAt = e.bouncedAt;
+    }
   }
+  /* "Not heard" is the one thing that has to turn a flag back OFF, which a pure
+     OR-merge would resurrect. Timestamps arbitrate: whichever of addressed or
+     bounced happened last wins, and a provider can always re-address later. */
+  out.forEach(x => { if ((x.bouncedAt || 0) > (x.addressedAt || 0)) { x.addressed = false; x.heard = false; } });
   out.sort((x, y) => x.ts - y.ts);
   return out;
 }
@@ -815,9 +828,12 @@ function entryHTML(e, i, closed, readOnly){
     ? '<span class="heardchk" style="font-weight:400;color:var(--mut)">' + (e.heard ? '&#9745; Patient marked heard' : '&#9744; Patient has not marked this yet') + '</span>'
     : '<label class="heardchk" title="Check this when you feel this concern was heard and addressed">' +
       '<input type="checkbox" ' + (e.heard ? 'checked' : '') + ' onchange="markHeard(' + i + ', this.checked)"> I was heard</label>';
+  const bounce = (!readOnly && !closed && e.addressed)
+    ? '<button class="nhx" title="Not heard yet: this sends the question back to your open list for the next touch point" onclick="bounceHeard(' + i + ')">&#10006; Not heard</button>'
+    : '';
   return '<div class="entry' + (closed ? ' closed' : (e.addressed ? ' addressed' : '')) + '">' +
     '<time>' + new Date(e.ts).toLocaleString() + (who ? ' &middot; <b>' + esc(who) + '</b>' : '') + '</time>' + esc(e.text) +
-    '<div class="entryfoot">' + control + badge + '</div></div>';
+    '<div class="entryfoot">' + control + bounce + badge + '</div></div>';
 }
 /* Groups a list into the patient's own items, then one group per caregiver. */
 function groupByAuthor(pairs){
@@ -867,6 +883,15 @@ function renderEntries(){
 }
 function markHeard(i, v){
   if (ptRec.entries[i]) { ptRec.entries[i].heard = !!v; renderEntries(); saveRecord(); }
+}
+/* The red X: the patient disagrees that this was addressed. The question goes
+   back to the open list on both sides, until the team addresses it again. */
+function bounceHeard(i){
+  const e = ptRec.entries[i]; if (!e) return;
+  e.bouncedAt = Date.now();
+  e.addressed = false;
+  e.heard = false;
+  renderEntries(); saveRecord();
 }
 async function saveRecord(){
   // Always write the FULL local list merged with the server's (minus tombstoned
@@ -1324,7 +1349,7 @@ async function completeItem(bucket, idx){
   if (!item) return;
   item.addressed = true;
   const matches = entriesForItem(item);
-  matches.forEach(e => { e.addressed = true; if (!e.addressedAt) e.addressedAt = Date.now(); });
+  matches.forEach(e => { e.addressed = true; e.addressedAt = Date.now(); });
   renderSummaryHTML();
   if (!matches.length) return;
   try {
