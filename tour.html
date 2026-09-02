@@ -123,6 +123,14 @@
   .typebox .a { width:52px; height:38px; border-radius:10px; background:var(--accent); color:#fff;
     font-size:12.5px; font-weight:700; display:flex; align-items:center; justify-content:center; }
 
+  .trow { display:flex; gap:6px; margin-bottom:9px; }
+  .tb { flex:1 1 33%; min-width:0; background:#fff; border:1px solid #cfe0df; border-radius:12px;
+    padding:6px 3px; text-align:center; display:flex; flex-direction:column; align-items:center;
+    justify-content:center; min-height:48px; }
+  .tb b { font-size:9px; color:var(--teal-deep); line-height:1.15; }
+  .tb small { font-size:7.5px; color:var(--mut); margin-top:2px; }
+  .tb.bmk { border:5px solid var(--green); }
+  .tb.bmk b { color:var(--green); }
   .authhdr { font-size:10px; text-transform:uppercase; letter-spacing:.6px; color:var(--mut); margin:10px 0 1px; }
   .authhdr.cg { color:var(--accent); }
   .entry { border-left:3px solid var(--accent); background:#fafcfe; padding:8px 10px;
@@ -241,7 +249,7 @@ const CAP_GAP = 12, CAP_EDGE = 8, CAP_HOLD = 2200;
 /* ---- narration: the same voice as the intro film, one clip per caption ---- */
 const DUR_T = {"01":4.06,"02":5.47,"03":3.74,"04":3.22,"05":5.5,"06":3.89,"07":5.4,"08":4.49,
   "09":5.93,"10":4.15,"11":4.46,"12":4.99,"13":4.99,"14":5.35,"15":5.04,"16":5.52,
-  "17":3.17,"18":10.03,"19":10.61,"20":10.78};
+  "17":3.17,"18":10.03,"19":10.61,"20":10.78,"21":12.53};
 const player = new Audio(); player.preload = "auto";
 let audioOn = false, voiceUntil = 0, needVoice = false;
 player.onended = () => { needVoice = false; };
@@ -404,6 +412,11 @@ const entry = (id, text, cls, left, right) =>
   '<div class="foot"><span class="l">' + left + '</span>' +
   (cls === "addressed" ? '<span class="nhx">&#10006; Not heard</span>' : '') +
   '<span class="r">' + right + '</span></div></div>';
+const toprowMini = () =>
+  '<div class="trow" id="trow">' +
+  '<div class="tb bmk"><b>&#128278; Bookmark my site</b><small>so you can come back</small></div>' +
+  '<div class="tb"><b>&#9654; Intro</b><small>what is Heard</small></div>' +
+  '<div class="tb"><b>&#9654; See how it works</b><small>step by step</small></div></div>';
 const shareCard = (withCode) =>
   '<div class="c"><div class="sec">Include your caregiver</div>' +
   (withCode
@@ -445,11 +458,14 @@ const STEPS = [
 
 { cap:["This is your page","One button. Nothing else to learn.","04"],
   async run(my){
-    view(patientHead() + '<div class="c"><div class="sec">Captured so far (0)</div>' +
+    view(patientHead() + toprowMini() + '<div class="c"><div class="sec">Captured so far (0)</div>' +
       '<div class="note">Nothing captured yet.</div></div>');
     parkCursor(160, 520); await capWait(2400); guard(my);
-    await highlight("#mic", 4000); guard(my);
-    await sleep(3200);
+    await highlight("#mic", 3600); guard(my);
+    await sleep(600); guard(my);
+    await caption("Need more information?", "These three buttons sit right on your page: bookmark it, watch the intro, or replay these instructions.", "21");
+    await highlight("#trow", 3600); guard(my);
+    await sleep(900);
   }},
 
 { cap:["Tap, and say what is on your mind","Any hour of the night. It does not have to wait for rounds.","05"],
@@ -605,7 +621,7 @@ const STEPS = [
 
 /* Rough seconds per screen, for the continuous time bar and the 30 second backup.
    The bar is a guide, not a stopwatch. */
-const EST = [24, 10, 13, 9, 22, 17, 14, 9, 30, 15, 11];
+const EST = [24, 25, 13, 9, 22, 17, 14, 9, 30, 15, 11];
 const CUM = EST.reduce((a, v) => (a.push((a[a.length-1] || 0) + v), a), []);
 const TOTAL = CUM[CUM.length - 1];
 let inScreen = 0, timer = null;
