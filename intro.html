@@ -209,6 +209,8 @@ const DUR = {"01":2.74,"02":3.26,"03":3.41,"04":2.02,"05":9.07,"06":1.9,"07":7.2
   "16":1.39,"17":13.9,"18":1.39,"19":5.62,"20":5.04};
 /* 13 and 14 re-voiced 2026-09-01 with Steve's reworded lines; 21 is the HIPAA box. */
 DUR["13"] = 6.31; DUR["14"] = 7.66; DUR["21"] = 9.72; DUR["22"] = 11.59; DUR["23"] = 12.29;
+/* 24 to 26: the safety message scene, voiced 21 November 2026 (Kokoro af_heart, speed 0.95). */
+DUR["24"] = 2.78; DUR["25"] = 7.49; DUR["26"] = 6.62;
 const player = new Audio(); player.preload = "auto";
 let audioOn = false, needVoice = false;
 player.onended = () => { needVoice = false; };
