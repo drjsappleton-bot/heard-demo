@@ -52,10 +52,16 @@ const MUST_FLAG = [
   ["heavy breathing", "breathing", R],
   ["labored breathing", "breathing", R],
   // His example of a possible clot in the lung: swelling, a new cough and heavy breathing.
-  // It is red through the breathing words. Swelling with a new cough and no breathing
-  // words shows nothing today; that case is open with the physician.
+  // It is red through the breathing words.
   ["I have swelling and a new cough and I am breathing heavily", "breathing", R],
   ["I was breathing heavily after therapy", "breathing", R],     // false alarm, same kind as "winded"
+  // ---- swelling with a cough (amber) ----
+  // Physician, 21 Nov 2026: swelling alone shows nothing and a cough alone shows nothing.
+  // The two in one entry are amber.
+  ["I have swelling in my leg and a new cough", "swelling_cough", A],
+  ["I started coughing and my leg is swollen", "swelling_cough", A],
+  ["my ankle is puffy and I have been coughing all night", "swelling_cough", A],
+  ["my knee is swollen and the cough medicine is not working", "swelling_cough", A], // false alarm, accepted as amber
 
   // ---- bleeding (red): heavy or internal ----
   ["it won't stop bleeding", "bleeding", R],
@@ -268,6 +274,9 @@ const MUST_FLAG = [
 ];
 
 const MUST_NOT_FLAG = [
+  "I have some swelling in my leg",
+  "I have a new cough",
+  "does the incentive spirometer make you cough",
   "the heavy blanket makes breathing easier",
   "I can do the hard breathing exercises",
   "when can I drive",

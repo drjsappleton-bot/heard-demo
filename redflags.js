@@ -47,7 +47,7 @@
 (function (root) {
   "use strict";
 
-  var VERSION = "2026-11-21.9";
+  var VERSION = "2026-11-21.10";
 
   /* Review status at this version (21 November 2026 review): every group has been
      revised. Open points are listed in the project's START-HERE. */
@@ -201,6 +201,16 @@
       /\b(have|having|got|feels like|might be|think it's|think its)\b.{0,15}\b(blood )?clot\b/,
       /\bis (this|that|it|there|my)\b.{0,25}\b(blood )?clot\b/,
       /\b(this|that|it|there) is\b.{0,15}\b(blood )?clot\b/
+    ]) },
+
+    /* ---- swelling with a cough (amber). Physician, 21 Nov 2026: leg swelling alone
+       is very common and shows nothing, and a cough alone shows nothing. The two in
+       one entry are amber, following the CDC signs of a clot in the leg and in the
+       lung. With trouble breathing or breathing heavily the entry is red through
+       the breathing rule. ---- */
+    { id: "swelling_cough", tier: "amber", lists: ["clot"], rx: any([
+      /\b(swelling|swollen|swelled|swells|swell up|puffy)\b.{0,80}\bcough\w*/,
+      /\bcough\w*\b.{0,80}\b(swelling|swollen|swelled|swells|swell up|puffy)\b/
     ]) },
 
     /* ---- heart (amber): racing, pounding, palpitations. Reviewed 21 Nov 2026 ---- */
