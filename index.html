@@ -1263,8 +1263,50 @@ let endTimer = null, hideTimer = null, lastHeardAt = 0;
 const MAX_RESTARTS = 60;          // roughly five minutes of silence
 const SILENCE_LIMIT_MS = 90000;   // stop on our own after this much true silence
 
+/* ---- iPhone: the gap between spoken questions ----
+   Steve, 22 November 2026. iPhone Safari has a known fault (WebKit bug 321436): for a
+   minute or two after one spoken question, the big button cannot hear the next one. So
+   on an iPhone, a tap on the button inside that gap does not start listening. A pop-up
+   says why and sends the patient to the microphone key on the keyboard, which works. */
+const MIC_GAP_MS = 120000;
+const MIC_NOTICE = {
+  title: "Use the microphone on your keyboard",
+  why: "iPhone Safari has a known fault. For a minute or two after one spoken question, the big button cannot hear the next one.",
+  what: "Heard recommends: tap the box below, then tap the microphone key on your keyboard and speak.",
+  after: "The big button will work again in about two minutes.",
+  button: "OK, take me to the box"
+};
+function markListened(){ if (IS_IOS && !IS_IOS_NON_SAFARI) { try { localStorage.setItem("heard_last_listen", String(Date.now())); } catch (e) {} } }
+function micGated(){
+  if (!IS_IOS || IS_IOS_NON_SAFARI) return false;
+  let t = 0; try { t = parseInt(localStorage.getItem("heard_last_listen") || "0", 10) || 0; } catch (e) {}
+  return Date.now() - t < MIC_GAP_MS;
+}
+function showMicNotice(){
+  let o = document.getElementById("micNotice");
+  if (!o) {
+    o = document.createElement("div"); o.id = "micNotice";
+    o.setAttribute("role", "dialog"); o.setAttribute("aria-modal", "true"); o.setAttribute("aria-labelledby", "micNoticeTitle");
+    o.style.cssText = "position:fixed;inset:0;background:rgba(15,23,32,.55);display:flex;align-items:center;justify-content:center;padding:18px;z-index:60";
+    document.body.appendChild(o);
+  }
+  const P = 'style="font-size:17px;line-height:1.45;margin-bottom:10px"';
+  o.innerHTML = '<div style="background:#fff;border-radius:16px;padding:20px;max-width:420px;width:100%;box-shadow:0 12px 34px rgba(0,0,0,.3)">' +
+    '<h3 id="micNoticeTitle" style="font-size:20px;margin-bottom:10px;color:var(--blue)">' + esc(MIC_NOTICE.title) + '</h3>' +
+    '<p ' + P + '>' + esc(MIC_NOTICE.why) + '</p><p ' + P + '><b>' + esc(MIC_NOTICE.what) + '</b></p>' +
+    '<p style="font-size:15px;color:var(--mut);margin-bottom:16px">' + esc(MIC_NOTICE.after) + '</p>' +
+    '<button class="btn teal" id="micNoticeOk">' + esc(MIC_NOTICE.button) + '</button></div>';
+  o.style.display = "flex";
+  document.getElementById("micNoticeOk").onclick = () => {
+    o.style.display = "none";
+    const inp = document.getElementById("typeInput"); if (inp) { try { inp.focus(); } catch (e) {} }
+    showLive(keyboardHint(), true);
+  };
+}
+
 function toggleRec(){
   if (!SR) { useKeyboardDictation("This browser cannot listen directly."); return; }
+  if (!wantRec && micGated()) { showMicNotice(); return; }
   if (speechBlocked || IS_IOS_NON_SAFARI) {
     useKeyboardDictation(IS_IOS_NON_SAFARI
       ? "On iPhone, only Safari can let a web page listen."
@@ -1393,6 +1435,7 @@ function finishCapture(){
   clearTimeout(endTimer);
   if (wantRec) return;
   recSeq++; dropRec();            /* this session is over; anything it still sends is ignored */
+  markListened();                 /* on an iPhone, starts the two-minute gap before the button listens again */
   recording = false;
   recUI(false);
   /* Interim text counts. Tapping stop mid-phrase used to discard it. */
