@@ -378,6 +378,62 @@ test("condition lists follow the rule that matched, and every list names its sou
   assert.ok(RF.LIST_TEXT.sourceEnd.includes("does not imply endorsement"));
 });
 
+// The condition lists, item by item, as each source page read in a browser on
+// 21 November 2026. A change to a list in redflags.js must be made here too, after
+// the live page has been read again. Do not take the text from a tool that
+// summarizes pages: one returned "Sudden trouble seeing in one or both eyes",
+// which is not on the CDC stroke page.
+const CLOT_LUNG_ITEMS = [
+  "Difficulty breathing",
+  "Faster than normal or irregular heartbeat",
+  "Chest pain or discomfort, which usually worsens with a deep breath or coughing",
+  "Cough or coughing up blood",
+  "Very low blood pressure, lightheadedness, or fainting",
+];
+const LIST_ITEMS = {
+  // https://www.cdc.gov/stroke/signs-symptoms/ (page dated 19 May 2026), in page order
+  stroke: [[
+    "Sudden trouble walking, dizziness, loss of balance, or lack of coordination.",
+    "Sudden trouble seeing.",
+    "Sudden numbness or weakness in the face, arm, or leg, especially on one side of the body.",
+    "Sudden confusion, trouble speaking, or difficulty understanding speech.",
+    "Sudden severe headache with no known cause.",
+  ]],
+  // https://www.cdc.gov/heart-disease/about/heart-attack.html (page dated 24 October 2024).
+  // The opening sentence of each bullet. The page's bullets go on: the first describes
+  // the discomfort, the second adds a cold sweat, the fifth adds timing. The page also
+  // names other symptoms (tiredness, nausea or vomiting) that this list leaves out.
+  heart_attack: [[
+    "Chest pain or discomfort.",
+    "Feeling weak, light-headed, or faint.",
+    "Pain or discomfort in the jaw, neck, or back.",
+    "Pain or discomfort in one or both arms or shoulders.",
+    "Shortness of breath.",
+  ]],
+  // https://www.cdc.gov/blood-clots/about/ (page dated 5 March 2025)
+  pe: [CLOT_LUNG_ITEMS],
+  clot: [
+    ["Swelling", "Pain or tenderness", "Warmth", "Redness or discoloration"],
+    CLOT_LUNG_ITEMS,
+  ],
+  // https://www.niddk.nih.gov/health-information/digestive-diseases/gastrointestinal-bleeding/symptoms-causes
+  // (last reviewed July 2024)
+  gi_bleed: [
+    ["black or tarry stool", "dark or bright red blood mixed with stool", "bright red blood in vomit", "vomit that looks like coffee grounds"],
+    ["having cramps or pain in your abdomen", "fainting or feeling lightheaded or dizzy", "feeling tired", "having shortness of breath"],
+    ["confusion or unconsciousness", "fast heart rate", "pale skin", "cold hands and feet", "sweating"],
+  ],
+};
+
+test("every condition list item matches its source page word for word, in page order", () => {
+  assert.deepEqual(Object.keys(RF.LISTS).sort(), Object.keys(LIST_ITEMS).sort(), "a list was added or removed without its source text here");
+  for (const [key, groups] of Object.entries(LIST_ITEMS)) {
+    assert.deepEqual(RF.LISTS[key].groups.map(g => g.items), groups, "list " + key + " differs from its source page");
+    assert.match(RF.LISTS[key].reviewed, /checked word for word/, "list " + key + " needs the date it was last checked");
+  }
+  assert.ok(!JSON.stringify(RF.LISTS.stroke).includes("one or both eyes"));
+});
+
 test("check never throws on odd input and always reports a version", () => {
   for (const v of [null, undefined, 42, {}, [], "’’’"]) {
     const r = RF.check(v);
