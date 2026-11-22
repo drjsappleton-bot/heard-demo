@@ -188,6 +188,21 @@
     .ripple.go { animation:none; } .to .cursorbar { animation:none; }
     .capnote.pop { animation:none; } .nav button.pri.ready { animation:none; }
   }
+
+  /* standing safety line and the safety message, matched to the live app. The words
+     come from redflags.js, so the film always shows the message the app shows. */
+  .safeline { margin-top:9px; border:1px solid #e6b0ac; background:#fdecea; color:#1a1d21; border-radius:9px;
+    padding:7px 9px; font-size:10.5px; line-height:1.35; text-align:center; font-weight:600; }
+  .rfc { background:#fff; border:2px solid #d9b13b; border-radius:16px; padding:13px 13px 12px; }
+  .rfc h3 { margin:0 0 7px; font-size:15px; line-height:1.25; color:#7a5200; }
+  .rfc .nm { font-size:11.5px; font-weight:700; margin-bottom:8px; color:#1a1d21; }
+  .rfc .where { border-radius:10px; padding:8px 10px; margin-bottom:7px; background:#fff8e1; }
+  .rfc .where .lbl { font-size:9.5px; text-transform:uppercase; letter-spacing:.6px; color:#5f6b76; }
+  .rfc .where .act { font-size:15px; font-weight:800; line-height:1.25; color:#1a1d21; }
+  .rfc .where .sm { font-size:10.5px; color:#5f6b76; margin-top:2px; }
+  .rfc .esc { font-size:11px; font-weight:600; line-height:1.35; margin:6px 0; color:#1a1d21; }
+  .rfc .saved { font-size:10.5px; color:#5f6b76; margin-bottom:9px; }
+  .rfc .ok { background:#1f4e79; color:#fff; font-weight:700; font-size:13px; text-align:center; border-radius:10px; padding:10px; }
 </style>
 </head>
 <body>
@@ -226,12 +241,13 @@
     <button id="prev">&#8592; Back</button>
     <button id="pause">Pause</button>
     <button id="back30">&#8630; 30s</button>
-    <span class="count" id="count">1 / 11</span>
+    <span class="count" id="count">1 / 12</span>
     <button class="pri" id="next">Next &#8594;</button>
   </div>
   <p class="hint">Plays straight through. Back up thirty seconds any time, or use Back and Next to jump between screens.</p>
 </div>
 
+<script src="redflags.js"></script>
 <script>
 const screenEl = document.getElementById("screen");
 const vp     = document.getElementById("viewport");
@@ -255,7 +271,7 @@ let audioOn = false, voiceUntil = 0, needVoice = false;
 player.onended = () => { needVoice = false; };
 player.onerror = () => { if (player.error) needVoice = false; };
 function voice(id){
-  if (!audioOn || !id){ voiceUntil = 0; return; }
+  if (!audioOn || !id || !DUR_T[id]){ voiceUntil = 0; return; }   /* a caption with no clip yet plays silently */
   needVoice = true;
   voiceUntil = performance.now() + (DUR_T[id] || 0) * 1000;
   try {
@@ -400,13 +416,37 @@ async function typeInto(el, text, my, sp){
 }
 
 /* ---- fragments matched to the live app ---- */
+/* ---- the safety message, read from the live list (redflags.js) ----
+   Q_PLAIN are ordinary questions: they must show no message in the app. Q_SAFETY must
+   show the amber message. test/site-copy.test.mjs checks both against the list, so
+   the films cannot drift from what the app does. */
+const Q_PLAIN_1 = "When can I drive again?";
+const Q_PLAIN_2 = "When can I shower with the dressing on?";
+const Q_PLAIN_3 = "Does she keep taking the blood thinner at home?";
+const Q_SAFETY = "My calf feels tight and sore";
+const RFX = window.HeardRedFlags || null;
+const RF_AMBER = (RFX && RFX.MESSAGES && RFX.MESSAGES.amber) || {
+  title: "Tell your care team about this", notMonitored: "Heard is not monitored. No one is reading this right now.",
+  hospitalLabel: "In the hospital", hospitalAction: "Tell your nurse now.", homeLabel: "At home",
+  homeAction: "Call your surgeon's office now.", homeNote: "Do not wait for a reply here.",
+  escalate: "If it is severe or getting worse: in the hospital, press your call button. At home, call 911.",
+  saved: "Your words were saved for your care team to see at their next visit.", button: "I understand" };
+const RF_STANDING = (RFX && RFX.MESSAGE && RFX.MESSAGE.standing) || "Heard is not monitored. Need help now? In the hospital, press your call button. At home, call 911.";
+const escT = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const safeLine = () => '<div class="safeline">' + escT(RF_STANDING) + '</div>';
+const safetyCard = () => { const M = RF_AMBER; return '<div class="rfc" id="rfc">' +
+  '<h3>&#9888; ' + escT(M.title) + '</h3><div class="nm">' + escT(M.notMonitored) + '</div>' +
+  '<div class="where" id="rfhosp"><div class="lbl">' + escT(M.hospitalLabel) + '</div><div class="act">' + escT(M.hospitalAction) + '</div></div>' +
+  '<div class="where" id="rfhome"><div class="lbl">' + escT(M.homeLabel) + '</div><div class="act">' + escT(M.homeAction) + '</div><div class="sm">' + escT(M.homeNote) + '</div></div>' +
+  '<div class="esc">' + escT(M.escalate) + '</div><div class="saved">' + escT(M.saved) + '</div>' +
+  '<div class="ok" id="rfok">' + escT(M.button) + '</div></div>'; };
 const patientHead = () =>
   '<div class="c"><div class="sec">Hello, Margaret</div>' +
   '<div class="privacy"><span class="dot" id="dot"></span><span id="plabel">Microphone off &mdash; nothing is being recorded</span></div>' +
   '<div class="mic" id="mic"><em>&#127908;</em><span id="miclabel">Tap to speak</span></div>' +
   '<div class="note" style="text-align:center;margin-top:7px">Tap, say your question or concern, tap again to stop. Your care team will see it at their next visit.</div>' +
   '<div class="livebox" id="live">&nbsp;</div>' +
-  '<div class="typebox"><div class="f">Or type a question / concern&hellip;</div><div class="a">Add</div></div></div>';
+  '<div class="typebox"><div class="f">Or type a question / concern&hellip;</div><div class="a">Add</div></div>' + safeLine() + '</div>';
 const entry = (id, text, cls, left, right) =>
   '<div class="entry ' + (cls||"") + '" id="' + id + '"><span class="t">Today, 9:12 AM</span>' + text +
   '<div class="foot"><span class="l">' + left + '</span>' +
@@ -479,7 +519,7 @@ const STEPS = [
     vp.querySelector("#dot").classList.add("live");
     vp.querySelector("#plabel").textContent = "Recording — you are in control";
     await sleep(800); guard(my);
-    await typeInto(vp.querySelector("#live"), "Is it normal for my calf to feel tight?", my, 48);
+    await typeInto(vp.querySelector("#live"), Q_PLAIN_1, my, 48);
     await sleep(1300); guard(my);
     await caption("Tap again to stop", "The microphone is only on while you say so.", "06");
     await moveTo("#mic"); await tap(); guard(my);
@@ -493,10 +533,27 @@ const STEPS = [
 { cap:["It joins your list","Nothing is lost between visits. It waits for the team, not for you.","07"],
   async run(my){
     view(patientHead() + '<div class="c"><div class="sec">Captured so far (1)</div>' +
-      entry("e1","Is it normal for my calf to feel tight?","","&#9744; I was heard","Waiting for your care team") + '</div>');
+      entry("e1",Q_PLAIN_1,"","&#9744; I was heard","Waiting for your care team") + '</div>');
     parkCursor(160, 520); await capWait(2400); guard(my);
     await highlight("#e1", 4600); guard(my);
     await sleep(3400);
+  }},
+
+{ cap:["Some words bring up a safety message","If what you say sounds like it should not wait, Heard saves it, then shows who to contact right now.","22"],
+  async run(my){
+    view(patientHead() + '<div class="c"><div class="sec">Captured so far (1)</div>' +
+      entry("e1", Q_PLAIN_1, "", "&#9744; I was heard", "Waiting for your care team") + '</div>');
+    parkCursor(160, 500); await capWait(2400); guard(my);
+    await typeInto(vp.querySelector("#live"), Q_SAFETY, my, 48);
+    await sleep(1100); guard(my);
+    /* the app saves the words first, then shows the message */
+    view(safetyCard());
+    await sleep(1400); guard(my);
+    await highlight("#rfhosp", 2600); guard(my);
+    await highlight("#rfhome", 2600); guard(my);
+    await caption("Heard does not alert anyone", "Your nurse, your surgeon's office, or 911 is how you get help now. Then tap I understand.", "23");
+    await highlight("#rfok"); await moveTo("#rfok"); guard(my); await tap(); clearHighlight();
+    await sleep(1600);
   }},
 
 { cap:["Bring in a family member","Right below the capture button: Share with a caregiver.","08"],
@@ -548,9 +605,9 @@ const STEPS = [
   async run(my){
     view('<div class="c"><div class="sec">Captured so far (2)</div>' +
       '<div class="authhdr">From Margaret</div>' +
-      entry("e1","Is it normal for my calf to feel tight?","","&#9744; I was heard","Waiting for your care team") +
+      entry("e1",Q_PLAIN_1,"","&#9744; I was heard","Waiting for your care team") +
       '<div class="authhdr cg" id="cgh">Caregiver &mdash; Sarah (daughter)</div>' +
-      entry("e2","Does she keep taking the blood thinner at home?","","&#9744; I was heard","Waiting for your care team") +
+      entry("e2",Q_PLAIN_3,"","&#9744; I was heard","Waiting for your care team") +
       '</div>');
     parkCursor(160, 500); await capWait(2400); guard(my);
     await highlight("#cgh", 4600); guard(my);
@@ -561,9 +618,9 @@ const STEPS = [
   async run(my){
     view('<div class="c"><div class="sec">Captured so far (2)</div>' +
       '<div class="authhdr">From Margaret</div>' +
-      entry("e1","Is it normal for my calf to feel tight?","","&#9744; I was heard","Waiting for your care team") +
+      entry("e1",Q_PLAIN_1,"","&#9744; I was heard","Waiting for your care team") +
       '<div class="authhdr cg">Caregiver &mdash; Sarah (daughter)</div>' +
-      entry("e2","Does she keep taking the blood thinner at home?","","&#9744; I was heard","Waiting for your care team") +
+      entry("e2",Q_PLAIN_3,"","&#9744; I was heard","Waiting for your care team") +
       '</div>');
     parkCursor(160, 300); await sleep(3200); guard(my);
     const e1 = vp.querySelector("#e1");
@@ -581,11 +638,11 @@ const STEPS = [
     clearHighlight(); await sleep(1000); guard(my);
     view('<div class="c"><div class="sec">Captured so far (1)</div>' +
       '<div class="authhdr cg">Caregiver &mdash; Sarah (daughter)</div>' +
-      entry("e2","Does she keep taking the blood thinner at home?","","&#9744; I was heard","Waiting for your care team") +
+      entry("e2",Q_PLAIN_3,"","&#9744; I was heard","Waiting for your care team") +
       '</div>' +
       '<div class="c"><div class="sec">Heard by your care team (1)</div>' +
       '<div class="note" style="margin-bottom:6px">Your care team answered these, and you confirmed you were heard.</div>' +
-      entry("e3","Is it normal for my calf to feel tight?","closed","&#9745; I was heard","&#10003; Heard by your care team") + '</div>');
+      entry("e3",Q_PLAIN_1,"closed","&#9745; I was heard","&#10003; Heard by your care team") + '</div>');
     await sleep(2800); guard(my);
   }},
 
@@ -593,7 +650,7 @@ const STEPS = [
   async run(my){
     view('<div class="c"><div class="sec">Captured so far (1)</div>' +
       '<div class="authhdr cg" id="cgh">Caregiver &mdash; Sarah (daughter)</div>' +
-      entry("e2","Does she keep taking the blood thinner at home?","addressed","&#9744; I was heard","&#10003; Heard by your care team") +
+      entry("e2",Q_PLAIN_3,"addressed","&#9744; I was heard","&#10003; Heard by your care team") +
       '</div>');
     parkCursor(160, 300); await sleep(2600); guard(my);
     await highlight("#cgh", 2600); guard(my);
@@ -605,8 +662,8 @@ const STEPS = [
       '<div class="note">Everything so far has been answered and closed.</div></div>' +
       '<div class="c"><div class="sec">Heard by your care team (2)</div>' +
       '<div class="note" style="margin-bottom:6px">Your care team answered these, and you confirmed you were heard.</div>' +
-      entry("e3","Is it normal for my calf to feel tight?","closed","&#9745; I was heard","&#10003; Heard by your care team") +
-      entry("e4","Does she keep taking the blood thinner at home?","closed","&#9745; I was heard","&#10003; Heard by your care team") + '</div>');
+      entry("e3",Q_PLAIN_1,"closed","&#9745; I was heard","&#10003; Heard by your care team") +
+      entry("e4",Q_PLAIN_3,"closed","&#9745; I was heard","&#10003; Heard by your care team") + '</div>');
     await sleep(2600); guard(my);
   }},
 
@@ -621,7 +678,7 @@ const STEPS = [
 
 /* Rough seconds per screen, for the continuous time bar and the 30 second backup.
    The bar is a guide, not a stopwatch. */
-const EST = [24, 25, 13, 9, 22, 17, 14, 9, 30, 15, 11];
+const EST = [24, 25, 13, 9, 24, 22, 17, 14, 9, 30, 15, 11];
 const CUM = EST.reduce((a, v) => (a.push((a[a.length-1] || 0) + v), a), []);
 const TOTAL = CUM[CUM.length - 1];
 let inScreen = 0, timer = null;

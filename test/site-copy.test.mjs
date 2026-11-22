@@ -21,3 +21,36 @@ test("no page promises that anyone is listening between visits", () => {
     assert.ok(!/even between visits/i.test(html), name + " still carries the old tagline");
   }
 });
+
+// The two films (intro.html and tour.html) show the app. They must show what the
+// app does today. Each film names its example questions as constants; these tests
+// run them through the live list.
+await import("../redflags.js");
+const RF = globalThis.HeardRedFlags;
+function constantsOf(html, prefix) {
+  const out = [];
+  const re = new RegExp("const (" + prefix + "\\w*) = \"([^\"]+)\";", "g");
+  let m; while ((m = re.exec(html))) out.push([m[1], m[2]]);
+  return out;
+}
+
+test("the films' ordinary example questions show no safety message in the app", () => {
+  for (const name of ["intro.html", "tour.html"]) {
+    const plain = constantsOf(page(name), "Q_PLAIN");
+    assert.ok(plain.length >= 2, name + " should name its ordinary questions");
+    for (const [k, q] of plain) assert.equal(RF.check(q).hit, false, name + " " + k + " now shows a safety message: " + q);
+  }
+});
+
+test("the films' safety example shows the amber message, and the films read the message from the list", () => {
+  for (const name of ["intro.html", "tour.html"]) {
+    const html = page(name);
+    const safety = constantsOf(html, "Q_SAFETY");
+    assert.equal(safety.length, 1, name + " should name one safety example");
+    assert.equal(RF.check(safety[0][1]).tier, "amber", name + " safety example is no longer amber: " + safety[0][1]);
+    assert.ok(html.includes('<script src="redflags.js"></script>'), name + " must load the live list");
+    assert.ok(html.includes("RFX.MESSAGES.amber") && html.includes("RFX.MESSAGE.standing"), name + " must take its wording from the list");
+    // No example question is written straight into the markup any more.
+    assert.ok(!/calf to feel tight/i.test(html), name + " still shows the calf question as an ordinary capture");
+  }
+});

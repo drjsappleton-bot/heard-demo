@@ -161,6 +161,21 @@
     .scene, .big, .med, .say, .ring, .btnrow, .endmark, #prog { transition-duration:.01ms !important; }
     .ring.on, .dot.live, .say.pop { animation:none !important; }
   }
+
+  /* standing safety line and the safety message, matched to the live app. The words
+     come from redflags.js, so the film always shows the message the app shows. */
+  .safeline { margin-top:9px; border:1px solid #e6b0ac; background:#fdecea; color:#1a1d21; border-radius:9px;
+    padding:7px 9px; font-size:10.5px; line-height:1.35; text-align:center; font-weight:600; }
+  .rfc { background:#fff; border:2px solid #d9b13b; border-radius:16px; padding:13px 13px 12px; }
+  .rfc h3 { margin:0 0 7px; font-size:15px; line-height:1.25; color:#7a5200; }
+  .rfc .nm { font-size:11.5px; font-weight:700; margin-bottom:8px; color:#1a1d21; }
+  .rfc .where { border-radius:10px; padding:8px 10px; margin-bottom:7px; background:#fff8e1; }
+  .rfc .where .lbl { font-size:9.5px; text-transform:uppercase; letter-spacing:.6px; color:#5f6b76; }
+  .rfc .where .act { font-size:15px; font-weight:800; line-height:1.25; color:#1a1d21; }
+  .rfc .where .sm { font-size:10.5px; color:#5f6b76; margin-top:2px; }
+  .rfc .esc { font-size:11px; font-weight:600; line-height:1.35; margin:6px 0; color:#1a1d21; }
+  .rfc .saved { font-size:10.5px; color:#5f6b76; margin-bottom:9px; }
+  .rfc .ok { background:#1f4e79; color:#fff; font-weight:700; font-size:13px; text-align:center; border-radius:10px; padding:10px; }
 </style>
 </head>
 <body>
@@ -168,7 +183,7 @@
 <div id="gate">
   <img src="heard-icon.png" alt="">
   <div class="gtitle">Heard, and why it exists</div>
-  <div class="gsub">A short story with narration, under two minutes.</div>
+  <div class="gsub">A short story with narration, about two and a half minutes.</div>
   <button id="gplay">&#9654;&#xFE0E;&nbsp; Play</button>
   <button id="gmute">Play without sound</button>
 </div>
@@ -180,6 +195,7 @@
   <button id="restart">&#8635; Restart</button>
 </div>
 
+<script src="redflags.js"></script>
 <script>
 const film = document.getElementById("film");
 const RM = matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -198,7 +214,7 @@ let audioOn = false, needVoice = false;
 player.onended = () => { needVoice = false; };
 player.onerror = () => { if (player.error) needVoice = false; };
 function voice(id){
-  if (!audioOn || !id) return;
+  if (!audioOn || !id || !DUR[id]) return;   /* a line with no clip yet plays silently at reading pace */
   needVoice = true;
   try {
     player.src = "vo-" + id + ".mp3?v=5";
@@ -259,13 +275,37 @@ async function line(parent, cls, text, my, id){
 }
 
 /* ---- app fragments, matched to the live app ---- */
+/* ---- the safety message, read from the live list (redflags.js) ----
+   Q_PLAIN are ordinary questions: they must show no message in the app. Q_SAFETY must
+   show the amber message. test/site-copy.test.mjs checks both against the list, so
+   the films cannot drift from what the app does. */
+const Q_PLAIN_1 = "When can I drive again?";
+const Q_PLAIN_2 = "When can I shower with the dressing on?";
+const Q_PLAIN_3 = "Does she keep taking the blood thinner at home?";
+const Q_SAFETY = "My calf feels tight and sore";
+const RFX = window.HeardRedFlags || null;
+const RF_AMBER = (RFX && RFX.MESSAGES && RFX.MESSAGES.amber) || {
+  title: "Tell your care team about this", notMonitored: "Heard is not monitored. No one is reading this right now.",
+  hospitalLabel: "In the hospital", hospitalAction: "Tell your nurse now.", homeLabel: "At home",
+  homeAction: "Call your surgeon's office now.", homeNote: "Do not wait for a reply here.",
+  escalate: "If it is severe or getting worse: in the hospital, press your call button. At home, call 911.",
+  saved: "Your words were saved for your care team to see at their next visit.", button: "I understand" };
+const RF_STANDING = (RFX && RFX.MESSAGE && RFX.MESSAGE.standing) || "Heard is not monitored. Need help now? In the hospital, press your call button. At home, call 911.";
+const escT = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const safeLine = () => '<div class="safeline">' + escT(RF_STANDING) + '</div>';
+const safetyCard = () => { const M = RF_AMBER; return '<div class="rfc" id="rfc">' +
+  '<h3>&#9888; ' + escT(M.title) + '</h3><div class="nm">' + escT(M.notMonitored) + '</div>' +
+  '<div class="where" id="rfhosp"><div class="lbl">' + escT(M.hospitalLabel) + '</div><div class="act">' + escT(M.hospitalAction) + '</div></div>' +
+  '<div class="where" id="rfhome"><div class="lbl">' + escT(M.homeLabel) + '</div><div class="act">' + escT(M.homeAction) + '</div><div class="sm">' + escT(M.homeNote) + '</div></div>' +
+  '<div class="esc">' + escT(M.escalate) + '</div><div class="saved">' + escT(M.saved) + '</div>' +
+  '<div class="ok" id="rfok">' + escT(M.button) + '</div></div>'; };
 const patientHead = () =>
   '<div class="c"><div class="sec">Hello, Margaret</div>' +
   '<div class="privacy"><span class="dot" id="dot"></span><span id="plabel">Microphone off &mdash; nothing is being recorded</span></div>' +
   '<div class="mic" id="mic"><em>&#127908;</em><span id="miclabel">Tap to speak</span></div>' +
   '<div class="note" style="text-align:center;margin-top:7px">Tap, say your question or concern, tap again to stop. Your care team will see it at their next visit.</div>' +
   '<div class="livebox" id="live">&nbsp;</div>' +
-  '<div class="typebox"><div class="f">Or type a question / concern&hellip;</div><div class="a">Add</div></div></div>';
+  '<div class="typebox"><div class="f">Or type a question / concern&hellip;</div><div class="a">Add</div></div>' + safeLine() + '</div>';
 const entry = (text, when) =>
   '<div class="entry"><span class="t">' + when + '</span>' + text +
   '<div class="foot"><span class="l">&#9744; I was heard</span><span class="r">Waiting for your care team</span></div></div>';
@@ -345,7 +385,7 @@ async function(my){
 async function(my){
   const sc = newScene("cream");
   const bd = document.createElement("div"); bd.className = "backdrop";
-  bd.innerHTML = phoneWrap(patientHead() + listCard(1, entry("Is it normal for my calf to feel tight?", "Today, 9:12 AM")));
+  bd.innerHTML = phoneWrap(patientHead() + listCard(1, entry(Q_PLAIN_1, "Today, 9:12 AM")));
   sc.appendChild(bd);
   const bw = bd.querySelector(".phonewrap"); bw.style.left = "50%"; bw.style.transform = "translateX(-50%) scale(" + Math.min(1, (innerHeight - 40) / 724) + ")";
   const veil = document.createElement("div"); veil.className = "veil"; sc.appendChild(veil);
@@ -373,7 +413,7 @@ async function(my){
   sc.querySelector("#miclabel").textContent = "Listening…";
   sc.querySelector("#dot").classList.add("live");
   sc.querySelector("#plabel").textContent = "Recording — you are in control";
-  const typing = typeInto(sc.querySelector("#live"), "Is it normal for my calf to feel tight?", my);
+  const typing = typeInto(sc.querySelector("#live"), Q_PLAIN_1, my);
   await sayLine(sc, "Tap the button, and the microphone turns on and hears your question or concern.", my, "11");
   await typing;
 
@@ -390,8 +430,8 @@ async function(my){
   /* the list accrues, and the team sees it */
   const lc = sc.querySelector("#listcard");
   lc.outerHTML = listCard(2,
-    entry("Is it normal for my calf to feel tight?", "Today, 9:12 AM") +
-    entry("When can I shower with the dressing on?", "Today, 4:40 PM"));
+    entry(Q_PLAIN_1, "Today, 9:12 AM") +
+    entry(Q_PLAIN_2, "Today, 4:40 PM"));
   sc.querySelector("#live").innerHTML = "&nbsp;";
   ringTo(sc, "#listcard", 6);
   await sayLine(sc, "Your list of questions are visible to your care team during your touch points: phone calls, visits in the hospital, or in clinic.", my, "14");
@@ -405,9 +445,9 @@ async function(my){
   const sc = newScene("cream");
   sc.insertAdjacentHTML("beforeend", phoneWrap(
     '<div class="c"><div class="sec">Captured so far (2)</div>' +
-    '<div class="entry" id="e1"><span class="t">Today, 9:12 AM</span>Is it normal for my calf to feel tight?' +
+    '<div class="entry" id="e1"><span class="t">Today, 9:12 AM</span>' + Q_PLAIN_1 +
     '<div class="foot"><span class="l" id="iwh">&#9744; I was heard</span><span class="nhx" id="nhx" style="display:none">&#10006; Not heard</span><span class="r" id="badge">Waiting for your care team</span></div></div>' +
-    '<div class="entry"><span class="t">Today, 4:40 PM</span>When can I shower with the dressing on?' +
+    '<div class="entry"><span class="t">Today, 4:40 PM</span>' + Q_PLAIN_2 +
     '<div class="foot"><span class="l">&#9744; I was heard</span><span class="r">Waiting for your care team</span></div></div></div>'));
   fitPhone(sc);
   await sleep(700, my);
@@ -428,6 +468,26 @@ async function(my){
   iwh.innerHTML = "&#9745; I was heard";
   e1.classList.remove("addressed"); e1.classList.add("closed");
   await sleep(1800, my);
+  ringOff(sc);
+},
+
+/* 5b · some words bring up a safety message (added 21 November 2026 for the two-tier build) */
+async function(my){
+  const sc = newScene("cream");
+  sc.insertAdjacentHTML("beforeend", phoneWrap(patientHead() + listCard(1, entry(Q_PLAIN_1, "Today, 9:12 AM"))));
+  fitPhone(sc);
+  await sleep(500, my);
+  const typing = typeInto(sc.querySelector("#live"), Q_SAFETY, my);
+  typing.catch(() => {});                       /* skipping the scene must not leave a stray error */
+  await sayLine(sc, "Some concerns should not wait for your next visit.", my, "24");
+  await typing;
+  /* the app saves the words first, then shows the message */
+  sc.querySelector(".screen").innerHTML = '<div style="padding-top:26px">' + safetyCard() + '</div>';
+  await sleep(500, my);
+  ringTo(sc, "#rfhosp", 5);
+  await sayLine(sc, "When your words sound like one of those, Heard saves them, then shows a safety message. It tells you who to contact right now.", my, "25");
+  ringTo(sc, "#rfhome", 5);
+  await sayLine(sc, "Heard does not alert anyone. Your nurse, your surgeon's office, or 911 is how you get help now.", my, "26");
   ringOff(sc);
 },
 
