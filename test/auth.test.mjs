@@ -130,7 +130,9 @@ test("the patient and caregiver sides need no sign-in and never ask who is signe
 });
 
 test("who addressed a question is recorded for the provider side and not shown to the patient", () => {
-  assert.match(fnBody("completeItem"), /e\.addressedBy = who/);
+  // Since 22 November 2026 both provider paths go through loop.js, which writes the name.
+  assert.match(fnBody("completeItem"), /LOOP\.address\(e, Date\.now\(\), who\)/);
+  assert.match(readFileSync(new URL("../loop.js", import.meta.url), "utf8"), /if \(who\) e\.addressedBy = who;/);
   assert.ok(!/addressedBy/.test(fnBody("renderEntries")), "the patient's list must not show who addressed an entry");
   assert.ok(!/addressedBy/.test(fnBody("renderPatient")));
 });

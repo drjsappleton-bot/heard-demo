@@ -80,7 +80,9 @@
     border-radius:7px; padding:2px 7px; font-size:10.5px; }
   .foot { display:flex; justify-content:space-between; align-items:center; margin-top:6px;
     font-size:10.5px; gap:7px; }
-  .foot .l { color:var(--green); font-weight:700; }
+  /* "I was heard" is locked, and grey, until the care team marks the question addressed. */
+  .foot .l { color:var(--mut); }
+  .entry.addressed .foot .l, .entry.closed .foot .l { color:var(--green); font-weight:700; }
   .foot .r { color:var(--mut); }
 
   /* the green ring that lands on what is being talked about */
