@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Heard: narration recording</title>
+<link rel="icon" href="heard-icon.png">
+<style>
+  :root { --teal:#12807c; --teal-deep:#0b5f5c; --coral:#c9543b; --cream:#fdf8f3; --ink:#1a1d21; --mut:#5f6b76;
+          --line:#dde3e9; --red:#b3261e; --red-lt:#fdecea; --green:#1e7d46; --green-lt:#e8f5ee; --amber:#9a6700; --amber-lt:#fff8e1; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; background:var(--cream); color:var(--ink); }
+  header { background:linear-gradient(150deg,var(--teal),var(--teal-deep)); color:#fff; padding:14px 20px; }
+  header h1 { margin:0; font-size:20px; }
+  header p { margin:4px 0 0; font-size:14px; opacity:.95; }
+  header a { color:#fff; }
+  main { display:grid; grid-template-columns:minmax(0,1fr) 380px; gap:16px; padding:16px 20px 60px; max-width:1300px; margin:0 auto; }
+  @media (max-width:900px){ main { grid-template-columns:1fr; } }
+  .card { background:#fff; border:1px solid var(--line); border-radius:14px; padding:16px 18px; margin-bottom:14px; }
+  h2 { font-size:15px; margin:0 0 10px; color:var(--teal-deep); }
+  button { font:inherit; font-size:16px; font-weight:600; border-radius:10px; border:1px solid var(--line); background:#fff; color:var(--ink); padding:11px 16px; cursor:pointer; min-height:46px; }
+  button:disabled { opacity:.45; cursor:default; }
+  button.pri { background:var(--teal); border-color:var(--teal); color:#fff; }
+  button.rec { background:var(--red); border-color:var(--red); color:#fff; min-width:190px; }
+  button.rec.live { background:#fff; color:var(--red); }
+  button.keep { background:var(--green); border-color:var(--green); color:#fff; }
+  kbd { font:inherit; font-size:12px; font-weight:600; border:1px solid currentColor; border-radius:5px; padding:0 5px; margin-left:6px; opacity:.8; }
+  select { font:inherit; font-size:15px; padding:9px; border-radius:9px; border:1px solid var(--line); max-width:100%; background:#fff; }
+  .row { display:flex; flex-wrap:wrap; gap:10px; align-items:center; }
+  .mut { color:var(--mut); font-size:14px; line-height:1.45; }
+  .warn { background:var(--amber-lt); color:#5c3d00; border-radius:9px; padding:9px 12px; font-size:14px; margin-top:10px; }
+  .bad { background:var(--red-lt); color:var(--red); border-radius:9px; padding:9px 12px; font-size:14px; margin-top:10px; }
+  .good { background:var(--green-lt); color:var(--green); border-radius:9px; padding:9px 12px; font-size:14px; margin-top:10px; }
+  #meter { height:16px; background:#eef1f4; border-radius:8px; overflow:hidden; position:relative; margin-top:10px; }
+  #meterFill { height:100%; width:0; background:var(--green); }
+  #meterPeak { position:absolute; top:0; bottom:0; width:3px; background:var(--ink); left:0; }
+  #meter .zone { position:absolute; top:0; bottom:0; left:89%; right:0; background:rgba(179,38,30,.18); }
+  .where { font-size:13px; font-weight:700; letter-spacing:.4px; text-transform:uppercase; color:var(--teal-deep); }
+  #lineMain { font-size:22px; font-weight:700; margin-top:10px; color:var(--teal-deep); }
+  #lineText { font-size:30px; line-height:1.38; margin:8px 0 6px; font-weight:500; }
+  @media (max-width:600px){ #lineText { font-size:24px; } }
+  #nextUp { font-size:16px; color:#8a949d; margin-top:14px; border-top:1px dashed var(--line); padding-top:10px; }
+  #pace { height:10px; background:#eef1f4; border-radius:5px; overflow:hidden; margin-top:14px; }
+  #paceFill { height:100%; width:0; background:var(--teal); }
+  #clock { font-variant-numeric:tabular-nums; font-size:15px; margin-top:6px; color:var(--mut); }
+  #takeBox { margin-top:12px; }
+  .list { max-height:74vh; overflow:auto; padding:0; margin:0; list-style:none; }
+  .list li.h { font-size:12px; font-weight:700; letter-spacing:.4px; text-transform:uppercase; color:var(--teal-deep); padding:12px 4px 4px; position:sticky; top:0; background:#fff; }
+  .list li.l { display:grid; grid-template-columns:22px 1fr auto; gap:8px; align-items:start; padding:8px 6px; border-radius:8px; cursor:pointer; font-size:14px; line-height:1.35; }
+  .list li.l:hover { background:#f3f7f7; }
+  .list li.l.cur { background:#e3f1f0; outline:2px solid var(--teal); }
+  .list li.l .st { font-weight:700; color:#b7bfc6; }
+  .list li.l.done .st { color:var(--green); }
+  .list li.l .d { color:var(--mut); font-variant-numeric:tabular-nums; white-space:nowrap; font-size:13px; }
+  #count { font-size:15px; font-weight:700; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Heard: narration recording</h1>
+  <p>Temporary page for recording the films' narration. Your recordings stay in this browser until you download them. Nothing is sent to Heard's servers. <a href="./">Back to Heard</a></p>
+</header>
+<main>
+<div>
+  <div class="card" id="setup">
+    <h2>1. Microphone</h2>
+    <div class="row">
+      <button class="pri" id="micBtn">Turn on the microphone</button>
+      <select id="micSel" style="display:none" aria-label="Microphone"></select>
+    </div>
+    <div id="meter" aria-hidden="true"><div class="zone"></div><div id="meterFill"></div><div id="meterPeak"></div></div>
+    <div class="mut" id="micNote" style="margin-top:8px">Speak at your reading volume. The bar should move through the middle and stay out of the red end.</div>
+    <div id="micMsg"></div>
+  </div>
+
+  <div class="card" id="stage">
+    <h2>2. Read the line</h2>
+    <div class="where" id="where"></div>
+    <div id="lineMain"></div>
+    <div id="lineText"></div>
+    <div class="mut" id="lineNote"></div>
+    <div id="pace" aria-hidden="true"><div id="paceFill"></div></div>
+    <div id="clock"></div>
+    <div class="row" style="margin-top:14px">
+      <button class="rec" id="recBtn" disabled>Record<kbd>Space</kbd></button>
+      <button id="refBtn">Hear the current clip<kbd>L</kbd></button>
+    </div>
+    <div id="takeBox"></div>
+    <div id="nextUp"></div>
+    <div class="row" style="margin-top:14px">
+      <button id="prevBtn">Previous<kbd>&uarr;</kbd></button>
+      <button id="nextBtn">Next<kbd>&darr;</kbd></button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>How to read</h2>
+    <div class="mut">
+      Press Record, wait a beat, read the line, wait a beat, press Stop. The quiet at each end is trimmed later, so key clicks do no harm.<br>
+      The bar under the line fills over the length of the current clip. It is a guide, not a target: the films are re-timed to your voice.<br>
+      Read 911 as "nine one one". Keep the microphone in one place for the whole sitting, and finish all the lines in one sitting so the voice matches.<br>
+      Record the room tone line last or first: ten seconds of sitting still, so the background noise can be measured.
+    </div>
+  </div>
+</div>
+
+<div>
+  <div class="card">
+    <h2>3. Download</h2>
+    <div id="count"></div>
+    <div class="row" style="margin-top:10px">
+      <button class="pri" id="zipBtn" disabled>Download all recordings</button>
+    </div>
+    <div class="mut" style="margin-top:8px">One zip file. Save it in <b>OneDrive &rsaquo; Desktop &rsaquo; MBA &rsaquo; Heard</b>.</div>
+    <div id="zipMsg"></div>
+    <div class="row" style="margin-top:12px"><button id="wipeBtn" style="font-size:13px;min-height:34px;padding:6px 10px;color:var(--red)">Erase every recording in this browser</button></div>
+  </div>
+  <div class="card">
+    <h2>The script</h2>
+    <ul class="list" id="list"></ul>
+  </div>
+</div>
+</main>
+
+<script>
+/* The script, in film order. Each line is one clip. `ref` is the length of the clip the
+   films use today, in seconds. test/record.test.mjs checks this table against intro.html
+   and tour.html, so the script cannot drift from the films. */
+const LINES = [
+  {"key": "vo-01", "film": "intro", "id": "01", "scene": "The problem", "main": "", "text": "Every patient has questions after surgery.", "ref": 2.74, "clip": "vo-01.mp3"},
+  {"key": "vo-02", "film": "intro", "id": "02", "scene": "The problem", "main": "", "text": "Not all of them are heard. Not enough of them are answered.", "ref": 3.26, "clip": "vo-02.mp3"},
+  {"key": "vo-03", "film": "intro", "id": "03", "scene": "Why questions get lost", "main": "", "text": "Your questions come up spontaneously, not on a schedule.", "ref": 3.41, "clip": "vo-03.mp3"},
+  {"key": "vo-04", "film": "intro", "id": "04", "scene": "Why questions get lost", "main": "", "text": "They get forgotten. They get lost.", "ref": 2.02, "clip": "vo-04.mp3"},
+  {"key": "vo-05", "film": "intro", "id": "05", "scene": "Why questions get lost", "main": "", "text": "Some come from family and caregivers who are not there for the touch points with your care team, by phone, or face to face in the hospital or clinic.", "ref": 9.07, "clip": "vo-05.mp3"},
+  {"key": "vo-06", "film": "intro", "id": "06", "scene": "Why Heard exists", "main": "", "text": "This is why Heard was developed.", "ref": 1.9, "clip": "vo-06.mp3"},
+  {"key": "vo-07", "film": "intro", "id": "07", "scene": "Why Heard exists", "main": "", "text": "A simple way to collect your questions as they arise, using something as simple as your words, transcribed into text.", "ref": 7.2, "clip": "vo-07.mp3"},
+  {"key": "vo-08", "film": "intro", "id": "08", "scene": "Why Heard exists", "main": "", "text": "Heard keeps your list for your provider team, stored in the cloud. Not a lost scrap of paper. Not a forgotten question.", "ref": 7.22, "clip": "vo-08.mp3"},
+  {"key": "vo-09", "film": "intro", "id": "09", "scene": "Why Heard exists", "main": "", "text": "Stored, and ready for your care team, so that at those touch points your concerns are addressed.", "ref": 5.18, "clip": "vo-09.mp3"},
+  {"key": "vo-10", "film": "intro", "id": "10", "scene": "The app", "main": "", "text": "Capturing a concern takes one tap.", "ref": 2.16, "clip": "vo-10.mp3"},
+  {"key": "vo-11", "film": "intro", "id": "11", "scene": "The app", "main": "", "text": "Tap the button, and the microphone turns on and hears your question or concern.", "ref": 4.78, "clip": "vo-11.mp3"},
+  {"key": "vo-12", "film": "intro", "id": "12", "scene": "The app", "main": "", "text": "Tap again, and the microphone shuts off.", "ref": 2.35, "clip": "vo-12.mp3"},
+  {"key": "vo-13", "film": "intro", "id": "13", "scene": "The app", "main": "", "text": "Only what you choose to capture is recorded. That is completely within your control, and at your discretion.", "ref": 6.31, "clip": "vo-13.mp3"},
+  {"key": "vo-14", "film": "intro", "id": "14", "scene": "The app", "main": "", "text": "Your list of questions are visible to your care team during your touch points: phone calls, visits in the hospital, or in clinic.", "ref": 7.66, "clip": "vo-14.mp3"},
+  {"key": "vo-15", "film": "intro", "id": "15", "scene": "The app", "main": "", "text": "So every question you have had along the way can be acknowledged and addressed.", "ref": 4.08, "clip": "vo-15.mp3"},
+  {"key": "vo-22", "film": "intro", "id": "22", "scene": "The team acknowledges", "main": "", "text": "During one of your care team's touch points, a phone call, a visit in the hospital, or in clinic, they will be able to acknowledge your concern. You will see it appear at the bottom right of your question.", "ref": 11.59, "clip": "vo-22.mp3"},
+  {"key": "vo-23", "film": "intro", "id": "23", "scene": "The team acknowledges", "main": "", "text": "You will then have the ability to close the loop. Tap I was heard. Or, if your concern was not truly addressed, tap the red Not heard button, and the question goes right back on your list.", "ref": 12.29, "clip": "vo-23.mp3"},
+  {"key": "vo-24", "film": "intro", "id": "24", "scene": "The safety message", "main": "", "text": "Some concerns should not wait for your next visit.", "ref": 2.78, "clip": "vo-24.mp3"},
+  {"key": "vo-25", "film": "intro", "id": "25", "scene": "The safety message", "main": "", "text": "When your words sound like one of those, Heard saves them, then shows a safety message. It tells you who to contact right now.", "ref": 7.49, "clip": "vo-25.mp3"},
+  {"key": "vo-26", "film": "intro", "id": "26", "scene": "The safety message", "main": "", "text": "Heard does not alert anyone. Your nurse, your surgeon's office, or 911 is how you get help now.", "ref": 6.62, "clip": "vo-26.mp3"},
+  {"key": "vo-16", "film": "intro", "id": "16", "scene": "One important note", "main": "", "text": "One important note.", "ref": 1.39, "clip": "vo-16.mp3"},
+  {"key": "vo-17", "film": "intro", "id": "17", "scene": "One important note", "main": "", "text": "This tool is for recording your questions. It is not real time communication with your care team. For anything urgent or emergent: use your call light in the hospital, call your doctor's office, or call 911.", "ref": 13.9, "clip": "vo-17.mp3"},
+  {"key": "vo-21", "film": "intro", "id": "21", "scene": "One important note", "main": "", "text": "Please note: currently, this website and service is not HIPAA compliant. Therefore, no medical or other information provided is protected by HIPAA.", "ref": 9.72, "clip": "vo-21.mp3"},
+  {"key": "vo-18", "film": "intro", "id": "18", "scene": "The partnership", "main": "", "text": "We want you to be heard.", "ref": 1.39, "clip": "vo-18.mp3", "note": "The current clip runs 1.4 s, which does not fit these words. Listen to it: the old clip may say something else."},
+  {"key": "vo-19", "film": "intro", "id": "19", "scene": "The partnership", "main": "", "text": "For all your questions and concerns, we strive to make this as simple and complete as possible.", "ref": 5.62, "clip": "vo-19.mp3"},
+  {"key": "vo-20", "film": "intro", "id": "20", "scene": "The partnership", "main": "", "text": "You and your care team are a partnership. This tool helps strengthen that collaboration.", "ref": 5.04, "clip": "vo-20.mp3"},
+  {"key": "tvo-01", "film": "tour", "id": "01", "scene": "", "main": "Sign in once", "text": "Your name, then your doctor. Nothing to install.", "ref": 4.06, "clip": "tvo-01.mp3"},
+  {"key": "tvo-02", "film": "tour", "id": "02", "scene": "", "main": "Choose your doctor", "text": "The list fills in as the practice uses it. Not there? Type the name.", "ref": 5.47, "clip": "tvo-02.mp3"},
+  {"key": "tvo-03", "film": "tour", "id": "03", "scene": "", "main": "Then sign in", "text": "You get your own page, and a link you can bookmark.", "ref": 3.74, "clip": "tvo-03.mp3"},
+  {"key": "tvo-04", "film": "tour", "id": "04", "scene": "", "main": "This is your page", "text": "One button. Nothing else to learn.", "ref": 3.22, "clip": "tvo-04.mp3"},
+  {"key": "tvo-21", "film": "tour", "id": "21", "scene": "", "main": "Need more information?", "text": "These three buttons sit right on your page: bookmark it, watch the intro, or replay these instructions.", "ref": 12.53, "clip": "tvo-21.mp3", "note": "The current clip runs 12.5 s, which does not fit these words. Listen to it: the old clip may say something else."},
+  {"key": "tvo-05", "film": "tour", "id": "05", "scene": "", "main": "Tap, and say what is on your mind", "text": "Any hour of the night. It does not have to wait for rounds.", "ref": 5.5, "clip": "tvo-05.mp3"},
+  {"key": "tvo-06", "film": "tour", "id": "06", "scene": "", "main": "Tap again to stop", "text": "The microphone is only on while you say so.", "ref": 3.89, "clip": "tvo-06.mp3"},
+  {"key": "tvo-07", "film": "tour", "id": "07", "scene": "", "main": "It joins your list", "text": "Nothing is lost between visits. It waits for the team, not for you.", "ref": 5.4, "clip": "tvo-07.mp3"},
+  {"key": "tvo-22", "film": "tour", "id": "22", "scene": "", "main": "Some words bring up a safety message", "text": "If what you say sounds like it should not wait, Heard saves it, then shows who to contact right now.", "ref": 8.14, "clip": "tvo-22.mp3"},
+  {"key": "tvo-23", "film": "tour", "id": "23", "scene": "", "main": "Heard does not alert anyone", "text": "Your nurse, your surgeon's office, or 911 is how you get help now. Then tap I understand.", "ref": 8.45, "clip": "tvo-23.mp3"},
+  {"key": "tvo-08", "film": "tour", "id": "08", "scene": "", "main": "Bring in a family member", "text": "Right below the capture button: Share with a caregiver.", "ref": 4.49, "clip": "tvo-08.mp3"},
+  {"key": "tvo-17", "film": "tour", "id": "17", "scene": "", "main": "Click on this button", "text": "It adds a caregiver to your team.", "ref": 3.17, "clip": "tvo-17.mp3"},
+  {"key": "tvo-09", "film": "tour", "id": "09", "scene": "", "main": "You get a six character code", "text": "Read it out, or send it. Anyone who uses it sees your whole page.", "ref": 5.93, "clip": "tvo-09.mp3"},
+  {"key": "tvo-10", "film": "tour", "id": "10", "scene": "", "main": "Send it as a text", "text": "Tap the button and your own messaging app opens.", "ref": 4.15, "clip": "tvo-10.mp3"},
+  {"key": "tvo-11", "film": "tour", "id": "11", "scene": "", "main": "You only choose who it goes to", "text": "The invite and the code are already written for you.", "ref": 4.46, "clip": "tvo-11.mp3"},
+  {"key": "tvo-12", "film": "tour", "id": "12", "scene": "", "main": "Sarah joins with the code", "text": "She puts in her name, so the team knows who is asking.", "ref": 4.99, "clip": "tvo-12.mp3"},
+  {"key": "tvo-13", "film": "tour", "id": "13", "scene": "", "main": "Her questions sit beside yours", "text": "Labelled with her name, never mixed up with yours.", "ref": 4.99, "clip": "tvo-13.mp3"},
+  {"key": "tvo-18", "film": "tour", "id": "18", "scene": "", "main": "Your team sees your list", "text": "At their next point of contact. When a concern has been addressed with you, they mark it: Heard by your care team.", "ref": 10.03, "clip": "tvo-18.mp3"},
+  {"key": "tvo-19", "film": "tour", "id": "19", "scene": "", "main": "If you feel it has been, close the loop", "text": "Tap I was heard. If it has not been, the red Not heard sends it back to your open list.", "ref": 10.61, "clip": "tvo-19.mp3"},
+  {"key": "tvo-20", "film": "tour", "id": "20", "scene": "", "main": "Your caregiver's questions land on your page", "text": "And the loop is ultimately yours: only you can tick I was heard, on your questions and on theirs.", "ref": 10.78, "clip": "tvo-20.mp3"},
+  {"key": "tvo-16", "film": "tour", "id": "16", "scene": "", "main": "That's the whole loop", "text": "Ask when it occurs to you. Your team will hear you. You both know you've been heard.", "ref": 5.52, "clip": "tvo-16.mp3"},
+  {"key": "vo-27", "film": "close", "id": "27", "scene": "", "main": "", "text": "Be heard.", "ref": null, "clip": null, "note": "The new closing line. There is no clip for it yet."},
+  {"key": "room-tone", "film": "extra", "id": null, "scene": "", "main": "", "text": "Say nothing. Sit still for ten seconds.", "ref": 10, "clip": null, "note": "Ten seconds of quiet in the same seat, so the background noise can be measured."}
+];
+
+const $ = id => document.getElementById(id);
+const fmt = s => (s == null ? "" : s.toFixed(1) + " s");
+const spoken = l => (l.main ? l.main + (/[.?!:]$/.test(l.main) ? " " : ". ") : "") + l.text;
+const GROUP = { intro: "Intro film", tour: "Walkthrough", close: "Closing line", extra: "Room tone" };
+
+let cur = 0;
+const takes = {};          /* key -> { blob, dur, peak, sr, at }  kept takes */
+let pending = null;        /* a take just recorded, not yet kept */
+
+/* ---------- storage: kept takes survive a reload (this browser only) ---------- */
+let db = null;
+function openDB(){
+  return new Promise(res => {
+    try {
+      const rq = indexedDB.open("heard_narration", 1);
+      rq.onupgradeneeded = () => rq.result.createObjectStore("takes");
+      rq.onsuccess = () => res(rq.result);
+      rq.onerror = () => res(null);
+    } catch (e) { res(null); }
+  });
+}
+function dbAll(){
+  return new Promise(res => {
+    if (!db) return res([]);
+    try {
+      const out = [], tx = db.transaction("takes"), st = tx.objectStore("takes"), rq = st.openCursor();
+      rq.onsuccess = () => { const c = rq.result; if (c) { out.push([c.key, c.value]); c.continue(); } else res(out); };
+      rq.onerror = () => res(out);
+    } catch (e) { res([]); }
+  });
+}
+function dbPut(key, val){ return new Promise(res => { if (!db) return res(false); try { const tx = db.transaction("takes", "readwrite"); tx.objectStore("takes").put(val, key); tx.oncomplete = () => res(true); tx.onerror = tx.onabort = () => res(false); } catch (e) { res(false); } }); }
+function dbClear(){ return new Promise(res => { if (!db) return res(); try { const tx = db.transaction("takes", "readwrite"); tx.objectStore("takes").clear(); tx.oncomplete = tx.onerror = () => res(); } catch (e) { res(); } }); }
+
+/* ---------- microphone: raw samples, browser voice processing switched off ---------- */
+let ctx = null, stream = null, srcNode = null, tap = null, sink = null, workletLoaded = false;
+let recording = false, chunks = [], recSamples = 0, recPeak = 0, recStart = 0;
+let mLevel = 0, mPeak = 0, mPeakAt = 0, micLabel = "", micSettings = {};
+
+function onSamples(f){
+  let pk = 0, sum = 0;
+  for (let i = 0; i < f.length; i++){ const a = Math.abs(f[i]); if (a > pk) pk = a; sum += f[i] * f[i]; }
+  mLevel = Math.max(pk, mLevel * 0.9);
+  if (pk >= mPeak || performance.now() - mPeakAt > 1500){ mPeak = pk; mPeakAt = performance.now(); }
+  if (recording){ chunks.push(f); recSamples += f.length; if (pk > recPeak) recPeak = pk; }
+}
+const WORKLET = "class HeardTap extends AudioWorkletProcessor{process(i){const c=i[0]&&i[0][0];if(c)this.port.postMessage(c.slice(0));return true;}}registerProcessor('heard-tap',HeardTap);";
+
+async function micOn(deviceId){
+  const msg = $("micMsg");
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+    msg.innerHTML = '<div class="bad">This browser will not give a web page the microphone here. Open this page in Chrome or Edge, over https.</div>'; return;
+  }
+  try {
+    if (stream) stream.getTracks().forEach(t => t.stop());
+    const audio = { echoCancellation:false, noiseSuppression:false, autoGainControl:false, channelCount:1 };
+    if (deviceId) audio.deviceId = { exact: deviceId };
+    stream = await navigator.mediaDevices.getUserMedia({ audio });
+    if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
+    await ctx.resume();
+    if (srcNode) try { srcNode.disconnect(); } catch (e) {}
+    if (tap) try { tap.disconnect(); } catch (e) {}
+    srcNode = ctx.createMediaStreamSource(stream);
+    if (!sink){ sink = ctx.createGain(); sink.gain.value = 0; sink.connect(ctx.destination); }   /* keeps the graph running; never audible */
+    /* The sample tap runs off the main thread where the browser allows it. A page opened
+       straight from disk cannot load it either way, and falls back to the older tap. */
+    if (ctx.audioWorklet && workletLoaded === false){
+      workletLoaded = null;
+      for (const url of [URL.createObjectURL(new Blob([WORKLET], { type:"application/javascript" })), "data:application/javascript;base64," + btoa(WORKLET)]){
+        try { await ctx.audioWorklet.addModule(url); workletLoaded = true; break; } catch (e) {}
+      }
+    }
+    if (workletLoaded === true){
+      tap = new AudioWorkletNode(ctx, "heard-tap", { numberOfInputs:1, numberOfOutputs:1, channelCount:1, channelCountMode:"explicit" });
+      tap.port.onmessage = e => onSamples(e.data);
+    } else {
+      tap = ctx.createScriptProcessor(4096, 1, 1);
+      tap.onaudioprocess = e => onSamples(new Float32Array(e.inputBuffer.getChannelData(0)));
+    }
+    srcNode.connect(tap); tap.connect(sink);
+    const track = stream.getAudioTracks()[0];
+    micLabel = track.label || "microphone"; micSettings = track.getSettings ? track.getSettings() : {};
+    try { localStorage.setItem("heard_narr_mic", micSettings.deviceId || deviceId || ""); } catch (e) {}
+    await fillMics(micSettings.deviceId || deviceId);
+    const on = ["echoCancellation","noiseSuppression","autoGainControl"].filter(k => micSettings[k] === true);
+    msg.innerHTML = '<div class="good">Using: <b>' + esc(micLabel) + '</b>, ' + ctx.sampleRate + ' Hz.</div>' +
+      (on.length ? '<div class="warn">The browser left some voice processing on (' + on.join(", ") + '). The recording still works, but tell Claude.</div>' : '');
+    $("micBtn").style.display = "none";
+    $("recBtn").disabled = false;
+  } catch (e) {
+    msg.innerHTML = '<div class="bad">The microphone did not start: ' + esc(e && e.message || String(e)) + '. Allow the microphone for this site in the address bar, then press the button again.</div>';
+  }
+}
+async function fillMics(active){
+  try {
+    const devs = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === "audioinput");
+    const sel = $("micSel"); sel.innerHTML = "";
+    devs.forEach((d, i) => { const o = document.createElement("option"); o.value = d.deviceId; o.textContent = d.label || ("Microphone " + (i + 1)); if (d.deviceId === active) o.selected = true; sel.appendChild(o); });
+    sel.style.display = devs.length ? "" : "none";
+  } catch (e) {}
+}
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c]));
+
+/* ---------- wav ---------- */
+function wavBlob(parts, total, sr){
+  const buf = new ArrayBuffer(44 + total * 2), v = new DataView(buf);
+  const w = (o, s) => { for (let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); };
+  w(0, "RIFF"); v.setUint32(4, 36 + total * 2, true); w(8, "WAVE"); w(12, "fmt "); v.setUint32(16, 16, true);
+  v.setUint16(20, 1, true); v.setUint16(22, 1, true); v.setUint32(24, sr, true); v.setUint32(28, sr * 2, true);
+  v.setUint16(32, 2, true); v.setUint16(34, 16, true); w(36, "data"); v.setUint32(40, total * 2, true);
+  let o = 44;
+  for (const p of parts) for (let i = 0; i < p.length; i++, o += 2){
+    const s = Math.max(-1, Math.min(1, p[i])); v.setInt16(o, Math.round(s < 0 ? s * 32768 : s * 32767), true);
+  }
+  return new Blob([buf], { type:"audio/wav" });
+}
+
+/* ---------- record ---------- */
+function startRec(){
+  if (!stream || recording) return;
+  stopPlayers();
+  pending = null; chunks = []; recSamples = 0; recPeak = 0; recStart = performance.now(); recording = true;
+  $("recBtn").classList.add("live"); $("recBtn").innerHTML = "Stop<kbd>Space</kbd>";
+  renderTake();
+}
+function stopRec(){
+  if (!recording) return;
+  recording = false;
+  $("recBtn").classList.remove("live"); $("recBtn").innerHTML = "Record<kbd>Space</kbd>";
+  const sr = ctx.sampleRate, dur = recSamples / sr;
+  if (dur < 0.3){ pending = null; renderTake("That was too short to be a take."); return; }
+  pending = { blob: wavBlob(chunks, recSamples, sr), dur, peak: recPeak, sr, at: new Date().toISOString(), mic: micLabel };
+  chunks = [];
+  renderTake();
+}
+async function keep(){
+  if (!pending) return;
+  const l = LINES[cur];
+  takes[l.key] = pending; pending = null;
+  const ok = await dbPut(l.key, takes[l.key]);
+  if (!ok) $("zipMsg").innerHTML = '<div class="warn">This browser would not store the recording for later. It is held only while this page stays open: download before closing it.</div>';
+  renderList(); renderCount();
+  if (cur < LINES.length - 1) go(cur + 1); else renderStage();
+}
+function discard(){ pending = null; renderTake(); }
+
+/* ---------- playback ---------- */
+const refPlayer = new Audio(), myPlayer = new Audio();
+function stopPlayers(){ try { refPlayer.pause(); myPlayer.pause(); } catch (e) {} }
+function playRef(){ const l = LINES[cur]; if (!l.clip || recording) return; stopPlayers(); refPlayer.src = l.clip; refPlayer.play().catch(() => {}); }
+let myURL = null;
+function playMine(){
+  const t = pending || takes[LINES[cur].key]; if (!t || recording) return;
+  stopPlayers(); if (myURL) URL.revokeObjectURL(myURL);
+  myURL = URL.createObjectURL(t.blob); myPlayer.src = myURL; myPlayer.play().catch(() => {});
+}
+
+/* ---------- screen ---------- */
+function levelNote(t){
+  if (t.peak >= 0.985) return '<div class="bad">This take clipped: the loudest moment hit the ceiling. Move the microphone a little further from your mouth, or lower its level, and read it again.</div>';
+  if (t.peak < 0.06) return '<div class="warn">This take is very quiet. Check that the right microphone is chosen above, then read it again.</div>';
+  return "";
+}
+function renderTake(note){
+  const l = LINES[cur], box = $("takeBox"), k = takes[l.key];
+  if (recording){ box.innerHTML = '<div class="bad">Recording. Press Space or Stop when you have finished the line.</div>'; return; }
+  let h = note ? '<div class="warn">' + esc(note) + '</div>' : "";
+  if (pending){
+    h += '<div class="good">New take: <b>' + fmt(pending.dur) + '</b>' + (l.ref ? ' (current clip ' + fmt(l.ref) + ')' : '') + '</div>' + levelNote(pending) +
+      '<div class="row" style="margin-top:10px"><button id="pm">Play my take<kbd>P</kbd></button>' +
+      '<button class="keep" id="kp">Keep, and go to the next line<kbd>Enter</kbd></button><button id="dc">Discard<kbd>X</kbd></button></div>';
+  } else if (k){
+    h += '<div class="good">Kept take: <b>' + fmt(k.dur) + '</b>' + (l.ref ? ' (current clip ' + fmt(l.ref) + ')' : '') + '. Record again to replace it.</div>' + levelNote(k) +
+      '<div class="row" style="margin-top:10px"><button id="pm">Play my take<kbd>P</kbd></button></div>';
+  }
+  box.innerHTML = h;
+  if ($("pm")) $("pm").onclick = playMine;
+  if ($("kp")) $("kp").onclick = keep;
+  if ($("dc")) $("dc").onclick = discard;
+}
+function renderStage(){
+  const l = LINES[cur], n = LINES[cur + 1];
+  $("where").textContent = GROUP[l.film] + (l.scene ? ": " + l.scene : "") + "  ·  line " + (cur + 1) + " of " + LINES.length + "  ·  " + l.key;
+  $("lineMain").textContent = l.main || ""; $("lineMain").style.display = l.main ? "" : "none";
+  $("lineText").textContent = l.text;
+  $("lineNote").textContent = l.note || (l.ref ? "The current clip runs " + fmt(l.ref) + "." : "");
+  $("refBtn").disabled = !l.clip;
+  $("nextUp").textContent = n ? "Next: " + spoken(n) : "This is the last line.";
+  $("prevBtn").disabled = cur === 0; $("nextBtn").disabled = cur === LINES.length - 1;
+  $("paceFill").style.width = "0"; $("clock").textContent = "";
+  renderTake();
+  document.querySelectorAll("#list li.l").forEach(li => li.classList.toggle("cur", +li.dataset.i === cur));
+  const c = document.querySelector("#list li.cur"); if (c && c.scrollIntoView) c.scrollIntoView({ block:"nearest" });
+}
+function renderList(){
+  const ul = $("list"); ul.innerHTML = ""; let g = null;
+  LINES.forEach((l, i) => {
+    if (l.film !== g){ g = l.film; const h = document.createElement("li"); h.className = "h"; h.textContent = GROUP[g]; ul.appendChild(h); }
+    const li = document.createElement("li"), t = takes[l.key];
+    li.className = "l" + (t ? " done" : "") + (i === cur ? " cur" : ""); li.dataset.i = i;
+    li.innerHTML = '<span class="st">' + (t ? "&#10003;" : "&#9675;") + '</span><span>' + esc(spoken(l)) + '</span><span class="d">' + (t ? fmt(t.dur) : (l.ref ? fmt(l.ref) : "")) + '</span>';
+    li.onclick = () => go(i);
+    ul.appendChild(li);
+  });
+}
+function renderCount(){
+  const n = LINES.filter(l => takes[l.key]).length;
+  $("count").textContent = n + " of " + LINES.length + " lines recorded";
+  $("zipBtn").disabled = n === 0;
+}
+function go(i){ if (recording) return; stopPlayers(); pending = null; cur = Math.max(0, Math.min(LINES.length - 1, i)); try { localStorage.setItem("heard_narr_cur", String(cur)); } catch (e) {} renderStage(); }
+
+function tick(){
+  $("meterFill").style.width = Math.min(100, Math.sqrt(mLevel) * 100) + "%";
+  $("meterFill").style.background = mLevel >= 0.8 ? "var(--red)" : "var(--green)";
+  $("meterPeak").style.left = Math.min(99, Math.sqrt(mPeak) * 100) + "%";
+  if (recording){
+    const el = (performance.now() - recStart) / 1000, ref = LINES[cur].ref;
+    $("paceFill").style.width = ref ? Math.min(100, el / ref * 100) + "%" : "0";
+    $("clock").textContent = fmt(el) + (ref ? "  /  current clip " + fmt(ref) : "");
+  }
+  requestAnimationFrame(tick);
+}
+
+/* ---------- zip (stored, no compression) ---------- */
+const CRC = (() => { const t = new Uint32Array(256); for (let n = 0; n < 256; n++){ let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
+function crc32(u8){ let c = 0xFFFFFFFF; for (let i = 0; i < u8.length; i++) c = CRC[(c ^ u8[i]) & 255] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; }
+function zipOf(files){
+  const enc = new TextEncoder(), parts = [], central = [], d = new Date();
+  const time = (d.getHours() << 11) | (d.getMinutes() << 5) | (d.getSeconds() >> 1), date = ((d.getFullYear() - 1980) << 9) | ((d.getMonth() + 1) << 5) | d.getDate();
+  let off = 0;
+  for (const f of files){
+    const name = enc.encode(f.name), crc = crc32(f.data), h = new DataView(new ArrayBuffer(30));
+    h.setUint32(0, 0x04034b50, true); h.setUint16(4, 20, true); h.setUint16(6, 0x0800, true); h.setUint16(8, 0, true);
+    h.setUint16(10, time, true); h.setUint16(12, date, true); h.setUint32(14, crc, true); h.setUint32(18, f.data.length, true); h.setUint32(22, f.data.length, true);
+    h.setUint16(26, name.length, true); h.setUint16(28, 0, true);
+    parts.push(h.buffer, name, f.data);
+    const c = new DataView(new ArrayBuffer(46));
+    c.setUint32(0, 0x02014b50, true); c.setUint16(4, 20, true); c.setUint16(6, 20, true); c.setUint16(8, 0x0800, true); c.setUint16(10, 0, true);
+    c.setUint16(12, time, true); c.setUint16(14, date, true); c.setUint32(16, crc, true); c.setUint32(20, f.data.length, true); c.setUint32(24, f.data.length, true);
+    c.setUint16(28, name.length, true); c.setUint32(42, off, true);
+    central.push(c.buffer, name);
+    off += 30 + name.length + f.data.length;
+  }
+  let csize = 0; for (const c of central) csize += c.byteLength;
+  const e = new DataView(new ArrayBuffer(22));
+  e.setUint32(0, 0x06054b50, true); e.setUint16(8, files.length, true); e.setUint16(10, files.length, true); e.setUint32(12, csize, true); e.setUint32(16, off, true);
+  return new Blob([...parts, ...central, e.buffer], { type:"application/zip" });
+}
+async function downloadAll(){
+  const btn = $("zipBtn"); btn.disabled = true; $("zipMsg").innerHTML = '<div class="mut">Building the file.</div>';
+  try {
+    const files = [], rows = [];
+    for (const l of LINES){
+      const t = takes[l.key]; if (!t) continue;
+      const name = "steve-" + l.key + ".wav";
+      files.push({ name, data: new Uint8Array(await t.blob.arrayBuffer()) });
+      rows.push({ file: name, key: l.key, film: l.film, id: l.id || null, text: spoken(l), refSeconds: l.ref || null, seconds: +t.dur.toFixed(3), peak: +t.peak.toFixed(4), sampleRate: t.sr, recordedAt: t.at, microphone: t.mic || null });
+    }
+    const missing = LINES.filter(l => !takes[l.key]).map(l => l.key);
+    const manifest = { made: new Date().toISOString(), page: location.href, browser: navigator.userAgent, microphone: micLabel, trackSettings: micSettings, missing, takes: rows };
+    files.push({ name: "manifest.json", data: new TextEncoder().encode(JSON.stringify(manifest, null, 2)) });
+    const d = new Date(), p = n => String(n).padStart(2, "0");
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(zipOf(files));
+    a.download = "heard-narration-" + d.getFullYear() + p(d.getMonth() + 1) + p(d.getDate()) + "-" + p(d.getHours()) + p(d.getMinutes()) + ".zip";
+    document.body.appendChild(a); a.click(); a.remove();
+    $("zipMsg").innerHTML = '<div class="good">Downloaded ' + rows.length + ' recordings' + (missing.length ? ". Still to record: " + missing.length + " lines." : ", the whole script.") + '</div>';
+  } catch (e) {
+    $("zipMsg").innerHTML = '<div class="bad">The download failed: ' + esc(e && e.message || String(e)) + '</div>';
+  }
+  btn.disabled = false;
+}
+
+/* ---------- wiring ---------- */
+$("micBtn").onclick = () => { let saved = ""; try { saved = localStorage.getItem("heard_narr_mic") || ""; } catch (e) {} micOn(saved).then(() => { if (!stream && saved) micOn(""); }); };
+$("micSel").onchange = e => micOn(e.target.value);
+$("recBtn").onclick = () => recording ? stopRec() : startRec();
+$("refBtn").onclick = playRef;
+$("prevBtn").onclick = () => go(cur - 1);
+$("nextBtn").onclick = () => go(cur + 1);
+$("zipBtn").onclick = downloadAll;
+$("wipeBtn").onclick = async () => {
+  const b = $("wipeBtn");
+  if (b.dataset.armed !== "1"){ b.dataset.armed = "1"; b.textContent = "Press again to erase every recording. This cannot be undone."; setTimeout(() => { b.dataset.armed = ""; b.textContent = "Erase every recording in this browser"; }, 5000); return; }
+  for (const k in takes) delete takes[k]; pending = null; await dbClear();
+  b.dataset.armed = ""; b.textContent = "Erase every recording in this browser";
+  renderList(); renderCount(); renderStage();
+};
+document.addEventListener("keydown", e => {
+  if (e.target && /^(SELECT|INPUT|TEXTAREA)$/.test(e.target.tagName)) return;
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  const k = e.key;
+  if (k === " " || e.code === "Space"){ e.preventDefault(); if (e.repeat) return; if (!$("recBtn").disabled) recording ? stopRec() : startRec(); }
+  else if (recording) return;
+  else if (k === "Enter"){ if (pending){ e.preventDefault(); keep(); } }
+  else if (k === "p" || k === "P") playMine();
+  else if (k === "l" || k === "L") playRef();
+  else if (k === "x" || k === "X") discard();
+  else if (k === "ArrowDown"){ e.preventDefault(); go(cur + 1); }
+  else if (k === "ArrowUp"){ e.preventDefault(); go(cur - 1); }
+});
+/* Space on a focused button would press it a second time on key-up; stop that, and
+   take focus off any button once it has been pressed. */
+document.addEventListener("keyup", e => { if ((e.key === " " || e.code === "Space") && e.target && e.target.tagName === "BUTTON") e.preventDefault(); });
+document.addEventListener("click", () => { const a = document.activeElement; if (a && a.tagName === "BUTTON") a.blur(); });
+window.addEventListener("beforeunload", e => { if (recording || pending){ e.preventDefault(); e.returnValue = ""; } });
+
+(async function init(){
+  renderList(); renderCount();
+  try { const c = parseInt(localStorage.getItem("heard_narr_cur") || "0", 10); if (c >= 0 && c < LINES.length) cur = c; } catch (e) {}
+  renderStage();
+  requestAnimationFrame(tick);
+  db = await openDB();
+  for (const [k, v] of await dbAll()) if (v && v.blob && LINES.some(l => l.key === k)) takes[k] = v;
+  renderList(); renderCount(); renderStage();
+})();
+</script>
+</body>
+</html>

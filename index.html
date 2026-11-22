@@ -1363,7 +1363,13 @@ async function renderDrHome(){
   app().innerHTML = topbar + whoCard + reqCard + listCard +
     '<div class="card"><h2 class="sec">Open by patient code</h2>' +
     '<div class="typebox"><input id="ptCode" placeholder="6-character code (e.g. from QR link)"><button onclick="openByCode()">Open</button></div></div>' +
-    dirCard + settingsHTML();
+    dirCard +
+    /* TEMPORARY (22 November 2026): a way in to the narration recording page while Steve
+       records the films' voice. Provider side only. Remove this card, record.html and
+       test/record.test.mjs once the new clips are in the films. */
+    '<div class="card"><h2 class="sec">Narration recording (temporary)</h2>' +
+    '<a class="btn sub" style="text-decoration:none" href="record.html">Record the films\' narration</a></div>' +
+    settingsHTML();
   wireSettings();
 }
 async function joinCareTeam(){
