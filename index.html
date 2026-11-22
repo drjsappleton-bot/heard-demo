@@ -7,6 +7,7 @@
 <link rel="icon" href="heard-icon.png">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script src="redflags.js"></script>
+<script src="lastread.js"></script>
 <style>
   :root {
     --blue: #1f4e79; --blue-lt: #eaf1f8; --accent: #2e75b6;
@@ -361,7 +362,7 @@ function teamLeadName(p){ return !p ? null : (isPhysician(p) ? p.name : (p.lead 
 
 const EMPTY_DOC = () => ({ idx: [], pts: {}, providers: [] });
 function normDoc(d){ if (!d || typeof d !== "object") return null; if (!Array.isArray(d.idx)) d.idx = []; if (!d.pts || typeof d.pts !== "object") d.pts = {}; if (!Array.isArray(d.providers)) d.providers = []; return d; }
-function normRec(r){ if (r) { if (!Array.isArray(r.entries)) r.entries = []; if (!Array.isArray(r.deleted)) r.deleted = []; if (!Array.isArray(r.caregivers)) r.caregivers = []; } return r; }
+function normRec(r){ if (r) { if (!Array.isArray(r.entries)) r.entries = []; if (!Array.isArray(r.deleted)) r.deleted = []; if (!Array.isArray(r.caregivers)) r.caregivers = []; if (!Array.isArray(r.reads)) r.reads = []; } return r; }
 /* Invite codes are read aloud and typed by hand, so the alphabet drops
    characters that get confused: O/0, I/1/L, and lower case entirely. */
 function rndCode(n){ let s = ""; const c = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"; for (let i=0;i<n;i++) s += c[Math.floor(Math.random()*c.length)]; return s; }
@@ -939,6 +940,13 @@ function renderEntries(){
     cbox.innerHTML = groupedHTML(closed, true, RENDER_READONLY);
   }
 }
+/* ---------- provider-side record of opens ----------
+   Heard records questions. It is not two-way communication (physician's rule,
+   21 November 2026). Nothing on the patient or caregiver side changes because a
+   provider looked at the list. The only provider action the patient sees is a
+   question marked addressed. lastread.js keeps a record of when a provider
+   device opened a list and shows it on the provider side only. */
+const LR = window.HeardLastRead || null;
 function markHeard(i, v){
   if (ptRec.entries[i]) { ptRec.entries[i].heard = !!v; renderEntries(); saveRecord(); }
 }
@@ -961,6 +969,8 @@ async function saveRecord(){
     const srv = normRec(doc.pts[route.id]) || ptRec;
     ptRec.deleted = [...new Set((srv.deleted || []).concat(ptRec.deleted || []))];
     ptRec.entries = mergeEntries(srv.entries, ptRec.entries, ptRec.deleted);
+    /* never shown here; merged so a save from this device cannot erase the provider-side record */
+    if (LR) ptRec.reads = LR.mergeReads(srv.reads, ptRec.reads);
     doc.pts[route.id] = ptRec;
     await saveDoc(doc);
     localStorage.setItem("heard_cache_" + route.id, JSON.stringify(ptRec));
@@ -1483,6 +1493,7 @@ async function renderDrPatient(){
     '<div class="topbar"><a href="#/b/' + bucket + '/dr">&#8249; All patients</a><button onclick="lockProvider()">&#128274; Lock</button></div>' +
     '<div class="card"><h2 class="sec">Patient</h2><div class="nm" style="font-size:17px;font-weight:700">' + esc(drRec.last) + ', ' + esc(drRec.first) + '</div>' +
     '<div class="dt" style="font-size:12px;color:var(--mut)">' + drRec.entries.length + ' captured item(s) &middot; signed in ' + new Date(drRec.created).toLocaleString() + (drRec.doctor ? ' &middot; Doctor: ' + esc(drRec.doctor) : '') + '</div>' +
+    (LR ? '<div class="dt" id="drLastRead" style="font-size:12px;color:var(--mut);margin-top:4px">' + esc(LR.providerLine(drRec.reads, Date.now())) + ' The patient is not shown this.</div>' : '') +
     '<button id="genBtn" class="btn" style="margin-top:12px" onclick="generate()">Generate rounding summary</button>' +
     '<button class="btn sub" style="margin-top:10px;color:var(--red)" onclick="clearPatientItems()">Clear ALL items for this patient</button>' +
     '<div class="note" id="modeNote"></div></div>' +
@@ -1577,8 +1588,27 @@ async function aiSummarize(entries, key){
   const j = JSON.parse(txt);
   return { urgent: j.urgent || [], md: j.md || [], rn: j.rn || [], other: j.other || [] };
 }
+/* Records that a provider device showed this patient's list, with the role the
+   provider declared. Written with the same load, merge, save pattern as the
+   rest of the demo. A failure here never blocks the list from showing. */
+async function recordOpen(){
+  if (!LR || !drRec) return;
+  try {
+    const ident = provIdent();
+    const doc = (await loadDoc()) || EMPTY_DOC();
+    const rec = normRec(doc.pts[route.id]);
+    if (!rec) return;
+    const me = ident ? provRecOf(doc.providers, ident.name) : null;
+    const role = me ? (me.role || "Physician") : "";
+    rec.reads = LR.recordRead(LR.mergeReads(rec.reads, drRec.reads), role, Date.now());
+    drRec.reads = rec.reads;
+    doc.pts[route.id] = rec;
+    await saveDoc(doc);
+  } catch (e) { try { console.warn("Heard: could not record that the list was opened.", e); } catch (x) {} }
+}
 async function generate(){
   const res = document.getElementById("results");
+  recordOpen();
   if (!drRec.entries.length) { res.innerHTML = '<div class="card"><div class="empty">This patient has not captured any items yet.</div></div>'; return; }
   const btn = document.getElementById("genBtn");
   btn.disabled = true; btn.innerHTML = '<span class="spin"></span>Summarizing…';
