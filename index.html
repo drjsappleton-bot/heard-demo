@@ -5,8 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Heard — Patient Concern Capture (Demo)</title>
 <link rel="icon" href="heard-icon.png">
-<!-- qrcodejs 1.0.0 (MIT, see qrcode.LICENSE.txt), served from this site, not from a third party. -->
-<script src="qrcode.min.js"></script>
 <script src="codes.js"></script>
 <script src="redflags.js"></script>
 <script src="lastread.js"></script>
@@ -62,8 +60,6 @@
   .typebox button { padding: 0 16px; min-height: 44px; border: 0; border-radius: 10px; background: var(--accent); color: #fff; font-weight: 600; font-size: 16px; font-family: inherit; cursor: pointer; }
   .entry { border-left: 3px solid var(--accent); background: #fafcfe; padding: 9px 12px; border-radius: 0 10px 10px 0; margin-top: 8px; font-size: 16px; line-height: 1.4; }
   .entry time { display: block; font-size: 14px; color: var(--mut); margin-bottom: 2px; }
-  .qrbox { text-align: center; }
-  .qrbox .qr { display: inline-block; padding: 10px; background: #fff; border: 1px solid var(--line); border-radius: 12px; }
   .linkline { font-size: 14px; color: var(--accent); word-break: break-all; margin-top: 8px; }
 
   /* provider */
@@ -277,6 +273,9 @@ const LS = {
    22 November 2026). A link that carries a site code still opens that site, and
    #/b/local is single-device mode. #/setup makes a separate demo site. */
 const DEFAULT_SITE = "606cf5a50a874fb1";
+/* The API key box is gone (demo recommendation 7, 22 November 2026). A key saved on
+   this device by an earlier version is removed. */
+try { localStorage.removeItem(LS.key); } catch (e) {}
 let bucket = null;       // current site id ("local" = single-device mode)
 let route = {};          // parsed hash
 
@@ -777,7 +776,7 @@ async function renderLanding(){
     '<div class="choice"><h2>I\'m a provider</h2>' +
     '<p>See every patient\'s questions and concerns, sorted by role, ready for rounds.</p>' +
     '<button class="btn teal" onclick="location.hash=\'#/b/\'+bucket+\'/dr\'">Provider sign in</button>' +
-    '<div class="note">Requires your provider PIN.</div></div>' +
+    '<div class="note">For care team members with an approved account.</div></div>' +
     (bucket === "local" ? '<div class="note">Single-device mode: everything stays on this phone.</div>' : '<div class="note">Demo site ID: ' + esc(bucket) + '</div>');
 }
 async function openMyPage(){
@@ -859,8 +858,6 @@ async function renderPatient(){
   localStorage.setItem(LS.myPatient, route.id);
   AUTHOR = { by: "patient", name: "" };
   RENDER_READONLY = false;
-  const drLink = link("/dr/" + route.id);
-  const myLink = link("/p/" + route.id);
   app().innerHTML =
     '<div class="card"><h2 class="sec">Hello, ' + esc(ptRec.first) + '</h2>' +
     '<div class="privacy"><span id="privDot" class="dot"></span><span id="privLabel">Microphone off &mdash; nothing is being recorded</span></div>' +
@@ -882,18 +879,12 @@ async function renderPatient(){
     '<div class="card"><h2 class="sec">Captured so far (<span id="count">' + ptRec.entries.length + '</span>)</h2><div id="entries"></div></div>' +
     '<div class="card" id="closedCard" style="display:none"><h2 class="sec">Heard by your care team (<span id="closedCount">0</span>)</h2>' +
     '<div class="note" style="margin-bottom:6px">' + esc(LOOP.TEXT.closedNote) + '</div>' +
-    '<div id="closedEntries"></div></div>' +
-    '<div class="card qrbox"><h2 class="sec">For your care team</h2><div class="qr" id="qrDr"></div>' +
-    '<div class="note">A provider entering the room can scan this to open your provider view (their PIN required).</div></div>' +
-    '<div class="card"><h2 class="sec">Demo links (clickable)</h2>' +
-    '<a class="btn sub" href="' + esc(myLink) + '">&#128100; My patient page &mdash; bookmark this</a>' +
-    '<a class="btn sub" style="margin-top:10px" href="' + esc(drLink) + '" target="_blank" rel="noopener">&#129658; Provider view for this patient &mdash; opens new tab, PIN required</a>' +
-    '<button class="btn sub" style="margin-top:10px" data-l="' + esc(JSON.stringify(myLink)) + '" onclick="copyText(this.dataset.l)">Copy patient link</button>' +
-    '<button class="btn sub" style="margin-top:10px" data-l="' + esc(JSON.stringify(drLink)) + '" onclick="copyText(this.dataset.l)">Copy provider link</button>' +
-    '<div class="linkline">' + esc(myLink) + '</div></div>';
+    '<div id="closedEntries"></div></div>';
+  /* The patient's page carries nothing for providers and no demo links (demo
+     recommendation 7, 22 November 2026). A provider reaches a patient from the
+     provider home after signing in. The patient's own link is under "Bookmark my site". */
   renderEntries();
   renderShare();
-  makeQR("qrDr", drLink);
 }
 function careLink(code){ return link("/c/" + code); }
 function renderShare(){
@@ -998,11 +989,6 @@ function drawCaregiver(name){
     '<div id="closedEntries"></div></div>' +
     '<div class="card"><div class="warnbox">Only ' + esc(ptRec.first) + ' can tick "I was heard". You can see it, and you cannot set it.</div></div>';
   renderEntries();
-}
-function makeQR(elId, text){
-  const el = document.getElementById(elId);
-  if (typeof QRCode !== "undefined") new QRCode(el, { text: text, width: 150, height: 150, correctLevel: QRCode.CorrectLevel.M });
-  else el.innerHTML = '<div class="linkline">' + esc(text) + '</div>';
 }
 /* ---- "Bookmark my site" ----
    A web page cannot add a bookmark by itself. This shows the steps for the browser
@@ -1696,9 +1682,8 @@ async function renderDrHome(){
   const waiting = /Access requests \(|Care team requests/.test(reqCard);
   app().innerHTML = topbar + (waiting ? reqCard : "") + listCard + whoCard + (waiting ? "" : reqCard) +
     '<div class="card"><h2 class="sec">Open by patient code</h2>' +
-    '<div class="typebox"><input id="ptCode" aria-label="Patient page code" placeholder="6-character code (e.g. from QR link)"><button onclick="openByCode()">Open</button></div></div>' +
-    dirCard + settingsHTML();
-  wireSettings();
+    '<div class="typebox"><input id="ptCode" aria-label="Patient page code" placeholder="6-character code"><button onclick="openByCode()">Open</button></div></div>' +
+    dirCard;
   /* Steve, 22 November 2026: when a patient's questions are shown on this screen, that is
      recorded as an open of that patient's list, the same as opening the patient. A patient
      with nothing open is not recorded. The patient is never shown this. */
@@ -1886,11 +1871,8 @@ async function renderDrPatient(again){
     '<div class="card"><h2 class="sec">Patient</h2><div class="nm" style="font-size:17px;font-weight:700">' + esc(drRec.last) + ', ' + esc(drRec.first) + '</div>' +
     '<div class="dt" style="font-size:14px;color:var(--mut)">' + drRec.entries.length + ' captured item(s) &middot; signed in ' + new Date(drRec.created).toLocaleString() + (drRec.doctor ? ' &middot; Doctor: ' + esc(drRec.doctor) : '') + '</div>' +
     (LR ? '<div class="dt" id="drLastRead" style="font-size:14px;color:var(--mut);margin-top:4px">' + esc(LR.providerLine(drRec.reads, Date.now())) + ' The patient is not shown this.</div>' : '') +
-    '<button id="genBtn" class="btn sub hidden" style="margin-top:12px" onclick="generate()">Sort with AI</button>' +
-    '<div class="note" id="modeNote"></div></div>' +
+    '<div class="note">Sorted by keyword on this device (no AI).</div></div>' +
     '<div id="results"></div>' + settingsHTML(true);
-  wireSettings();
-  updateModeNote();
   showList();
   /* Recorded after the line above was drawn, so the line names the open before this one. */
   if (!again) recordOpen();
@@ -1898,40 +1880,11 @@ async function renderDrPatient(again){
 /* forPatient adds the one destructive control, kept out of the way of the list.
    It used to sit directly under the main button at the same size. */
 function settingsHTML(forPatient){
-  return '<div class="card"><details class="settings"><summary>Settings: AI mode' + (forPatient ? ', clear this patient&rsquo;s items' : '') + '</summary>' +
-    '<input id="apiKey" type="password" aria-label="Anthropic API key" placeholder="Anthropic API key (sk-ant-...) — blank = offline keyword mode">' +
-    '<div class="row"><button onclick="saveKey()">Save key</button><button onclick="clearKey()">Remove key</button></div><div id="keyStatus"></div>' +
-    (forPatient
-      ? '<div class="note" style="text-align:left;margin-top:12px">Clearing removes every captured item for this patient, including the record of which safety messages were shown. It cannot be undone.</div>' +
-        '<div class="row"><button class="danger" onclick="clearPatientItems()">Clear ALL items for this patient</button></div>'
-      : '') +
+  if (!forPatient) return '';
+  return '<div class="card"><details class="settings"><summary>Settings: clear this patient&rsquo;s items</summary>' +
+    '<div class="note" style="text-align:left;margin-top:12px">Clearing removes every captured item for this patient, including the record of which safety messages were shown. It cannot be undone.</div>' +
+    '<div class="row"><button class="danger" onclick="clearPatientItems()">Clear ALL items for this patient</button></div>' +
     '</details></div>';
-}
-function wireSettings(){
-  const k = localStorage.getItem(LS.key);
-  if (k && document.getElementById("apiKey")) document.getElementById("apiKey").value = k;
-}
-function saveKey(){
-  const k = document.getElementById("apiKey").value.trim();
-  if (!k) { document.getElementById("keyStatus").innerHTML = '<span class="err">No key entered.</span>'; return; }
-  localStorage.setItem(LS.key, k);
-  document.getElementById("keyStatus").innerHTML = '<span class="ok">Key saved on this device. AI mode active.</span>';
-  updateModeNote();
-}
-function clearKey(){
-  localStorage.removeItem(LS.key);
-  if (document.getElementById("apiKey")) document.getElementById("apiKey").value = "";
-  document.getElementById("keyStatus").innerHTML = '<span class="ok">Key removed. Offline keyword mode.</span>';
-  updateModeNote();
-}
-function updateModeNote(){
-  const n = document.getElementById("modeNote"); if (!n) return;
-  const key = localStorage.getItem(LS.key);
-  n.textContent = key
-    ? "Sorted by keyword on this device. Sort with AI sends this patient's entries to Claude through your API key."
-    : "Sorted by keyword on this device (no AI).";
-  const b = document.getElementById("genBtn");
-  if (b) b.classList.toggle("hidden", !key);
 }
 
 /* ---------- summarization ---------- */
@@ -1967,21 +1920,16 @@ function pinRedFlags(s, entries){
   });
   return s;
 }
-async function aiSummarize(entries, key){
+/* AI sorting is not part of the demo. The key box and the call from the browser to an
+   AI service were removed on 22 November 2026 (demo recommendation 7). If sorting by AI
+   is added later it runs on the server, through the AWS agreement, and it sorts only.
+   It never judges how serious anything is: the fixed phrase list does that, and a
+   person does the rest. This is the wording such a sorter would be given. */
+function aiSortPrompt(entries){
   const transcript = entries.map(e => "[" + new Date(e.ts).toLocaleTimeString() + "] " + e.text).join("\n");
-  const prompt = "You are a clinical triage assistant inside a hospital patient-experience app. A hospitalized patient recorded the following questions and concerns between staff visits. Rewrite each distinct question/concern concisely and sort into JSON with keys: urgent (anything suggesting a potentially dangerous symptom, e.g. chest pressure, breathing trouble, new neuro symptoms, bleeding), md (questions for the physician/APP: diagnosis, results, treatment plan, discharge), rn (nursing needs: pain, meds timing, comfort, bathroom, wound care), other (anything else). Each item: {\"text\": concise restatement, \"quote\": the patient's original words}. Return ONLY valid JSON, no markdown fences.\n\nPatient recordings:\n" + transcript;
-  const resp = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: { "content-type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" },
-    body: JSON.stringify({ model: "claude-haiku-4-5", max_tokens: 1500, messages: [{ role: "user", content: prompt }] })
-  });
-  if (!resp.ok) { const t = await resp.text(); throw new Error("API error " + resp.status + ": " + t.slice(0, 200)); }
-  const data = await resp.json();
-  let txt = (data.content && data.content[0] && data.content[0].text || "").trim();
-  txt = txt.replace(/^```(json)?/i, "").replace(/```$/, "").trim();
-  const j = JSON.parse(txt);
-  return { urgent: j.urgent || [], md: j.md || [], rn: j.rn || [], other: j.other || [] };
+  return "You sort a patient's recorded questions for their care team, inside a hospital patient-experience app. A hospitalized patient recorded the following questions and concerns between staff visits. Rewrite each distinct question or concern concisely and sort into JSON with keys: md (questions for the physician or APP: diagnosis, results, treatment plan, discharge), rn (nursing: pain, medicine timing, comfort, bathroom, wound care), other (anything else). Do not judge how serious anything is, do not rank the items, and do not leave any out. Each item: {\"text\": concise restatement, \"quote\": the patient's original words}. Return ONLY valid JSON, no markdown fences.\n\nPatient recordings:\n" + transcript;
 }
+
 /* Records that a provider device showed this patient's list, with the role the
    provider declared. Written with the same load, merge, save pattern as the
    rest of the demo. A failure here never blocks the list from showing. */
@@ -2028,24 +1976,8 @@ function showList(){
   const res = document.getElementById("results"); if (!res || !drRec) return;
   if (!drRec.entries.length) { lastSummary = null; res.innerHTML = '<div class="card"><div class="empty">This patient has not captured any items yet.</div></div>'; return; }
   lastSummary = orderReview(pinRedFlags(mockSummarize(drRec.entries), drRec.entries));
-  lastUsedAI = false;
   renderSummaryHTML();
 }
-/* Sorting with AI: only on a press, and only when a key is saved on this device. */
-async function generate(){
-  const key = localStorage.getItem(LS.key);
-  if (!key || !drRec || !drRec.entries.length) { showList(); return; }
-  const btn = document.getElementById("genBtn");
-  btn.disabled = true; btn.innerHTML = '<span class="spin"></span>Sorting…';
-  let s, usedAI = false, failNote = "";
-  try { s = await aiSummarize(drRec.entries, key); usedAI = true; }
-  catch (err) { s = mockSummarize(drRec.entries); failNote = '<div class="err" style="margin-bottom:8px">AI call failed (' + esc(err.message) + '); fell back to keyword mode.</div>'; }
-  lastSummary = orderReview(pinRedFlags(s, drRec.entries));
-  lastUsedAI = usedAI;
-  renderSummaryHTML(failNote);
-  btn.disabled = false; btn.textContent = "Sort with AI";
-}
-let lastUsedAI = false;
 /* Ties a summary line back to the captured entries it came from, so the
    provider view can show whether the patient has since confirmed. */
 function entriesForItem(item){
@@ -2085,7 +2017,7 @@ function renderSummaryHTML(failNote){
   html += bucketHTML("Other / comfort", "b-other", "other", s.other);
   html += addressedHTML();
   html += '<div class="exportrow"><button onclick="exportMD(false)">Download .md</button><button onclick="exportMD(true)">Share summary</button></div>';
-  html += '<div class="note">' + (lastUsedAI ? "Sorted by Claude (AI mode)." : "Sorted by keyword, not AI.") + ' Marking an item addressed moves it to the Addressed list below. Nothing is deleted.</div></div>';
+  html += '<div class="note">Sorted by keyword, not AI. Marking an item addressed moves it to the Addressed list below. Nothing is deleted.</div></div>';
   res.innerHTML = html;
 }
 /* Marks an item addressed. It is NOT deleted: it moves to the Addressed list

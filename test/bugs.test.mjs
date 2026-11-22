@@ -4,7 +4,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { createHash } from "node:crypto";
 await import("../codes.js");
 const C = globalThis.HeardCodes;
 const root = new URL("../", import.meta.url);
@@ -60,17 +59,15 @@ test("replacing the caregiver code says what it does", () => {
   assert.ok(html.includes("caregivers who already joined lose access until you give them the new code"));
 });
 
-test("the QR script is served from this site, unchanged from qrcodejs 1.0.0", () => {
-  assert.ok(html.includes('<script src="qrcode.min.js"></script>'));
+test("no page loads a script, stylesheet or font from another site", () => {
+  // The QR script was moved onto this site, then removed with the provider QR code on
+  // the patient page (demo recommendation 7). Nothing on the site draws a QR code now.
   for (const name of ["index.html", "tour.html", "intro.html"]) {
     const src = readFileSync(new URL(name, root), "utf8");
     assert.ok(!/<script[^>]+src="https?:/i.test(src), name + " loads a script from another site");
     assert.ok(!/<link[^>]+href="https?:/i.test(src), name + " loads a stylesheet or font from another site");
   }
-  // The file published as qrcodejs 1.0.0 on the npm registry, byte for byte.
-  const sha = createHash("sha512").update(readFileSync(new URL("qrcode.min.js", root))).digest("base64");
-  assert.equal(sha, "CNgIRecGo7nphbeZ04Sc13ka07paqdeTu0WR1IM4kNcpmBAUSHSQX0FslNhTDadL4O5SAGapGt4FodqL8My0mA==");
-  assert.match(readFileSync(new URL("qrcode.LICENSE.txt", root), "utf8"), /MIT/);
+  assert.ok(!/QRCode|qrcode\.min\.js/.test(html), "the QR script is back");
 });
 
 test("every page is sent with a content security policy that names no outside script host", () => {
