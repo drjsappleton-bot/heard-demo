@@ -5,7 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Heard — Patient Concern Capture (Demo)</title>
 <link rel="icon" href="heard-icon.png">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<!-- qrcodejs 1.0.0 (MIT, see qrcode.LICENSE.txt), served from this site, not from a third party. -->
+<script src="qrcode.min.js"></script>
+<script src="codes.js"></script>
 <script src="redflags.js"></script>
 <script src="lastread.js"></script>
 <script src="rows.js"></script>
@@ -360,7 +362,8 @@ function betterName(a, b){
   if (fa !== fb) return fa ? a : b;
   return b.length > a.length ? b : a;
 }
-function esc(s){ return String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+/* Escapes & < > " and the apostrophe (codes.js). */
+function esc(s){ return window.HeardCodes.esc(s); }
 
 /* ================= data layer (Netlify Blobs via /api/store, or local) ================= */
 /* ---- provider identity and care teams (demo grade; the shared PIN stays) ----
@@ -777,15 +780,18 @@ async function renderLanding(){
     '<div class="note">Requires your provider PIN.</div></div>' +
     (bucket === "local" ? '<div class="note">Single-device mode: everything stays on this phone.</div>' : '<div class="note">Demo site ID: ' + esc(bucket) + '</div>');
 }
-function openMyPage(){
+async function openMyPage(){
   const el = document.getElementById("reCode");
   const m = document.getElementById("reMsg");
   const c = (el.value || "").trim();
   if (!c) { m.innerHTML = '<span class="err">Enter the code from your link.</span>'; return; }
-  /* Patient page codes are six lower-case characters. Caregiver invite codes are
-     upper case with digits. Send each to the route that understands it. */
-  if (c === c.toUpperCase() && /^[A-Z2-9]{6}$/.test(c)) { location.hash = "#/b/" + bucket + "/c/" + c; return; }
-  location.hash = "#/b/" + bucket + "/p/" + c.toLowerCase();
+  /* A page code and an invite code use the same letters, and a phone keyboard
+     often capitalises, so the code is looked up, not guessed from its case
+     (codes.js). A patient who types their own code in capitals reaches their page. */
+  let doc = null;
+  try { doc = await loadDoc(); } catch (e) {}
+  const to = window.HeardCodes.resolve(c, doc);
+  location.hash = "#/b/" + bucket + (to.v === "care" ? "/c/" + to.code : "/p/" + to.id);
 }
 async function newPatient(){
   const f = document.getElementById("npFirst").value.trim();
@@ -913,7 +919,10 @@ function renderShare(){
     '<button class="btn sub" style="margin-top:8px" onclick="makeShareCode(true)">Replace the code</button>';
 }
 async function makeShareCode(replace){
-  if (replace && !confirm("Replace the code? The old one stops working. Caregivers who already joined stay joined.")) return;
+  /* The words now match what happens: access follows the current code, so replacing
+     it is how the patient removes everyone who joined. A caregiver who is given the
+     new code comes back under the name they used before. */
+  if (replace && !confirm("Replace the code? The old one stops working, and caregivers who already joined lose access until you give them the new code.")) return;
   ptRec.share = { code: rndCode(6), created: Date.now() };
   renderShare();
   await saveRecord();
@@ -1595,9 +1604,9 @@ async function renderDrHome(){
   };
   const legend = ROWS ? '<div class="rowlegend">' + esc(ROWS.TEXT.legend) + '</div>' : '';
   const ptRow = (q, removable) =>
-    '<div class="ptrow" onclick="location.hash=\'#/b/\'+bucket+\'/dr/' + q.id + '\'">' +
+    '<div class="ptrow" data-p="' + esc(q.id) + '" onclick="location.hash=\'#/b/\'+bucket+\'/dr/\'+this.dataset.p">' +
     '<div><div class="nm">' + esc(q.last) + ', ' + esc(q.first) + '</div>' + chipsHTML(q) + '<div class="dt">Signed in ' + new Date(q.created).toLocaleString() + ' &middot; code ' + q.id + (q.doctor ? ' &middot; ' + esc(q.doctor) : '') + (q.team ? ' &middot; ' + esc(q.team) : '') + '</div></div>' +
-    (removable ? '<button class="rmx" title="Remove from my list (hides it from your view only)" data-id="' + q.id + '" onclick="event.stopPropagation(); removeMyPatient(this.dataset.id)">&#10006;</button>' : '<span class="arrow">&#8250;</span>') +
+    (removable ? '<button class="rmx" title="Remove from my list (hides it from your view only)" data-id="' + esc(q.id) + '" onclick="event.stopPropagation(); removeMyPatient(this.dataset.id)">&#10006;</button>' : '<span class="arrow">&#8250;</span>') +
     '</div>';
 
   let topbar, listCard;
@@ -1644,7 +1653,7 @@ async function renderDrHome(){
           (e.by === "caregiver" ? ' <span class="cgtag">Caregiver' + (e.byName ? " &mdash; " + esc(e.byName) : "") + '</span>' : '') +
           '<div class="cap">' + esc(ROWS ? ROWS.capturedText(e.ts, now) : new Date(e.ts).toLocaleString()) + (bounced ? ' &middot; Not heard: the patient sent this back' : '') + '</div></li>';
       };
-      return '<div class="rnd"><div class="rndhead" onclick="location.hash=\'#/b/\'+bucket+\'/dr/' + q.id + '\'">' +
+      return '<div class="rnd"><div class="rndhead" data-p="' + esc(q.id) + '" onclick="location.hash=\'#/b/\'+bucket+\'/dr/\'+this.dataset.p">' +
         '<div><div class="nm">' + esc(q.last) + ', ' + esc(q.first) + '</div>' + chipsHTML(q) + '</div><span class="arrow">&#8250;</span></div>' +
         (open.length ? '<ul class="rndlist">' + open.map(li).join("") + '</ul>' : '') +
         (viewing === "__none" ? '<div class="dt" style="margin-top:6px">Doctor as typed: ' + (q.doctor ? esc(q.doctor) : 'none') + '</div>' : '') +
