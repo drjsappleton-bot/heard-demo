@@ -6,6 +6,7 @@
 <title>Heard — Patient Concern Capture (Demo)</title>
 <link rel="icon" href="heard-icon.png">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="redflags.js"></script>
 <style>
   :root {
     --blue: #1f4e79; --blue-lt: #eaf1f8; --accent: #2e75b6;
@@ -181,6 +182,26 @@
   .cgtag { display: inline-block; margin-left: 8px; font-size: 11px; font-weight: 600; color: var(--accent); background: var(--blue-lt); border-radius: 6px; padding: 1px 6px; vertical-align: 1px; }
   .sharecode { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 28px; letter-spacing: 4px; font-weight: 700; color: var(--blue); text-align: center; background: var(--blue-lt); border-radius: 10px; padding: 12px; margin: 8px 0; }
   .warnbox { background: var(--amber-lt); border: 1px solid #e6d9a8; color: var(--amber); border-radius: 10px; padding: 10px 12px; font-size: 12px; margin-top: 8px; }
+  /* ===== red-flag safety message =====
+     Large type and one button: the reader may be elderly, in pain and without glasses. */
+  .rf-overlay { position: fixed; inset: 0; background: rgba(20,28,36,.8); display: flex; align-items: flex-start; justify-content: center; z-index: 60; padding: 14px; overflow-y: auto; }
+  .rf-card { background: #fff; border-radius: 18px; border: 4px solid var(--red); padding: 20px 18px 18px; width: 100%; max-width: 460px; margin: auto 0; box-shadow: 0 12px 34px rgba(0,0,0,.4); }
+  .rf-card h3 { color: var(--red); font-size: 25px; line-height: 1.2; margin-bottom: 8px; }
+  .rf-card .rf-nm { font-size: 16px; font-weight: 600; margin-bottom: 14px; line-height: 1.35; }
+  .rf-where { border-radius: 12px; padding: 12px 14px; margin-bottom: 10px; }
+  .rf-where.hosp { background: var(--red-lt); border: 1px solid #e6b0ac; }
+  .rf-where.home { background: var(--amber-lt); border: 1px solid #e6d9a8; }
+  .rf-where .lbl { font-size: 13px; text-transform: uppercase; letter-spacing: .8px; font-weight: 700; color: var(--mut); }
+  .rf-where .act { font-size: 22px; font-weight: 800; line-height: 1.25; margin-top: 3px; color: var(--ink); }
+  .rf-where .act a { color: var(--red); }
+  .rf-where .sm { font-size: 15px; margin-top: 6px; line-height: 1.35; color: var(--ink); }
+  .rf-card .rf-crisis { font-size: 17px; font-weight: 700; margin: 2px 0 10px; line-height: 1.3; }
+  .rf-card .rf-saved { font-size: 13px; color: var(--mut); margin: 4px 0 14px; }
+  .rf-card .btn { background: var(--red); font-size: 18px; min-height: 58px; }
+  .rftag { display: block; margin-top: 6px; border: 1px solid #e6b0ac; background: var(--red-lt); color: var(--red); font-weight: 700;
+    border-radius: 8px; padding: 6px 9px; font-size: 12.5px; cursor: pointer; font-family: inherit; text-align: left; width: 100%; }
+  .rfnote { display: block; margin-top: 4px; font-size: 12px; font-weight: 700; color: var(--red); }
+  .safeline { margin-top: 12px; border: 1px solid #e6b0ac; background: var(--red-lt); color: var(--ink); border-radius: 10px; padding: 9px 12px; font-size: 13.5px; line-height: 1.35; text-align: center; font-weight: 600; }
   .provtag { display: inline-block; background: var(--blue-lt); color: var(--blue); border-radius: 8px; padding: 4px 10px; font-size: 13px; font-weight: 600; margin: 2px 4px 2px 0; }
 </style>
 </head>
@@ -209,6 +230,9 @@
       <div class="pin-err" id="pinErr"></div>
     </div>
   </div>
+
+  <!-- Red-flag safety message. Filled in by showSafetyMessage(). -->
+  <div id="rfOverlay" class="rf-overlay hidden" role="alertdialog" aria-modal="true" aria-labelledby="rfTitle" aria-describedby="rfBody"></div>
 
   <footer>Prototype for concept demonstration only. Demo data is stored in a demo database on this site and is not automatically deleted. Not for clinical use.</footer>
 </div>
@@ -354,6 +378,9 @@ function mergeEntries(a, b, deleted){
       if (e.addressed) t.addressed = true;
       if ((e.addressedAt || 0) > (t.addressedAt || 0)) t.addressedAt = e.addressedAt;
       if ((e.bouncedAt || 0) > (t.bouncedAt || 0)) t.bouncedAt = e.bouncedAt;
+      /* the safety-message trail must survive a merge in either direction */
+      if (e.rf && !t.rf) { t.rf = e.rf; t.rfVer = e.rfVer; t.rfShownAt = e.rfShownAt; }
+      if ((e.rfAckAt || 0) > (t.rfAckAt || 0)) t.rfAckAt = e.rfAckAt;
     }
   }
   /* "Not heard" is the one thing that has to turn a flag back OFF, which a pure
@@ -662,7 +689,7 @@ async function renderPatient(){
       ) + (IS_IOS_NON_SAFARI ? ' Opening this page in Safari lets you speak with one tap instead.' : '') + '</div>' +
     '<div id="liveText"></div>' +
     '<div class="typebox"><input id="typeInput" type="text" placeholder="Or type a question / concern&hellip;" onkeydown="if(event.key===\'Enter\')addTyped()"><button onclick="addTyped()">Add</button></div>' +
-    '<div id="capMsg" class="note"></div></div>' +
+    '<div id="capMsg" class="note"></div>' + safeLineHTML() + '</div>' +
     '<div class="card" id="shareCard"><h2 class="sec">Include your caregiver</h2><div id="shareBox"></div></div>' +
     '<div class="toprow" style="margin:0 0 12px">' +
     '<button class="bm" onclick="toggleBookmarkHelp()"><b>&#128278; Bookmark my site</b><small>so you can come back</small></button>' +
@@ -779,7 +806,7 @@ function drawCaregiver(name){
       ) + (IS_IOS_NON_SAFARI ? ' Opening this page in Safari lets you speak with one tap instead.' : '') + '</div>' +
     '<div id="liveText"></div>' +
     '<div class="typebox"><input id="typeInput" type="text" placeholder="Or type a question / concern&hellip;" onkeydown="if(event.key===\'Enter\')addTyped()"><button onclick="addTyped()">Add</button></div>' +
-    '<div id="capMsg" class="note"></div></div>' +
+    '<div id="capMsg" class="note"></div>' + safeLineHTML() + '</div>' +
     '<div class="card"><h2 class="sec">Captured so far (<span id="count">0</span>)</h2><div id="entries"></div></div>' +
     '<div class="card" id="closedCard" style="display:none"><h2 class="sec">Heard by your care team (<span id="closedCount">0</span>)</h2>' +
     '<div class="note" style="margin-bottom:6px">The care team answered these, and ' + esc(ptRec.first) + ' confirmed.</div>' +
@@ -849,6 +876,7 @@ function entryHTML(e, i, closed, readOnly){
     : '';
   return '<div class="entry' + (closed ? ' closed' : (e.addressed ? ' addressed' : '')) + '">' +
     '<time>' + new Date(e.ts).toLocaleString() + (who ? ' &middot; <b>' + esc(who) + '</b>' : '') + '</time>' + esc(e.text) +
+    (e.rf && e.rf.length ? '<button class="rftag" onclick="reshowSafetyMessage(' + i + ')">&#9888; Need help now? Do not wait for a reply here. Tap to read the safety message again.</button>' : '') +
     '<div class="entryfoot">' + control + bounce + badge + '</div></div>';
 }
 /* Groups a list into the patient's own items, then one group per caregiver. */
@@ -927,12 +955,66 @@ async function saveRecord(){
   }
   catch (e) { if (m) m.innerHTML = '<span class="err">Could not sync to server; kept on this device for now.</span>'; }
 }
+/* ---------- red-flag safety message ----------
+   The list and the wording live in redflags.js. This shows one fixed message when
+   something captured matches the list. It never blocks or delays the save, it
+   names no condition, and it notifies no one. */
+const RF = window.HeardRedFlags || null;
+if (!RF) { try { console.warn("Heard: redflags.js did not load; the safety message is off, the standing safety line still shows."); } catch (e) {} }
+/* A tap-to-dial 911 link. Off in the demo so nobody trying it out dials by accident. */
+const RF_DIAL_LINK = false;
+const SAFE_LINE_FALLBACK = "Heard is not monitored. Need help now? In the hospital, press your call button. At home, call 911.";
+function safeLineHTML(){ return '<div class="safeline">' + esc(RF ? RF.MESSAGE.standing : SAFE_LINE_FALLBACK) + '</div>'; }
+function rfCheck(text){
+  try { return RF ? RF.check(text) : { hit: false, ids: [] }; } catch (e) { return { hit: false, ids: [] }; }
+}
+function isRedFlag(e){ return !!e && ((Array.isArray(e.rf) && e.rf.length > 0) || rfCheck(e.text).hit); }
+let rfPendingKey = null;
+function showSafetyMessage(entry){
+  const o = document.getElementById("rfOverlay");
+  if (!o || !RF || !entry) return;
+  const M = RF.MESSAGE;
+  rfPendingKey = entryKey(entry);
+  const selfHarm = (entry.rf || []).indexOf("self_harm") > -1;
+  const homeAct = RF_DIAL_LINK ? '<a href="tel:911">' + esc(M.homeAction) + '</a>' : esc(M.homeAction);
+  o.innerHTML =
+    '<div class="rf-card">' +
+    '<h3 id="rfTitle">&#9888; ' + esc(M.title) + '</h3>' +
+    '<div id="rfBody">' +
+    '<div class="rf-nm">' + esc(M.notMonitored) + '</div>' +
+    '<div class="rf-where hosp"><div class="lbl">' + esc(M.hospitalLabel) + '</div><div class="act">' + esc(M.hospitalAction) + '</div></div>' +
+    '<div class="rf-where home"><div class="lbl">' + esc(M.homeLabel) + '</div><div class="act">' + homeAct + '</div>' +
+    '<div class="sm">' + esc(M.homeNote) + '</div></div>' +
+    (selfHarm ? '<div class="rf-crisis">' + esc(M.crisis) + '</div>' : '') +
+    '<div class="rf-saved">' + esc(M.saved) + '</div>' +
+    '</div>' +
+    '<button class="btn" id="rfOk" onclick="ackSafetyMessage()">' + esc(M.button) + '</button>' +
+    '</div>';
+  o.classList.remove("hidden");
+  o.scrollTop = 0;
+  const b = document.getElementById("rfOk");
+  if (b) { try { b.focus(); } catch (e) {} }
+}
+function reshowSafetyMessage(i){ const e = ptRec && ptRec.entries[i]; if (e) showSafetyMessage(e); }
+/* Records that the reader dismissed the message. This is the audit trail, not a
+   claim that they acted on it. */
+function ackSafetyMessage(){
+  const o = document.getElementById("rfOverlay");
+  if (o) { o.classList.add("hidden"); o.innerHTML = ""; }
+  const k = rfPendingKey; rfPendingKey = null;
+  if (!k || !ptRec) return;
+  const cur = ptRec.entries.find(x => entryKey(x) === k);
+  if (cur && !cur.rfAckAt) { cur.rfAckAt = Date.now(); renderEntries(); saveRecord(); }
+}
 function persistEntry(text){
   const e = { text: text, ts: Date.now(), by: AUTHOR.by };
   if (AUTHOR.by === "caregiver" && AUTHOR.name) e.byName = AUTHOR.name;
+  const rf = rfCheck(text);
+  if (rf.hit) { e.rf = rf.ids; e.rfVer = rf.version; e.rfShownAt = e.ts; }
   ptRec.entries.push(e);
   renderEntries();
-  saveRecord();
+  saveRecord();                       /* saved first, always */
+  if (rf.hit) showSafetyMessage(e);
 }
 function addTyped(){
   const inp = document.getElementById("typeInput");
@@ -1402,19 +1484,37 @@ function updateModeNote(){
 }
 
 /* ---------- summarization ---------- */
-const URGENT_RX = /(chest (pain|pressure|heav|tight)|can'?t breathe|trouble breathing|short(ness)? of breath|bleeding|passed out|faint|numb|slurred|worst headache|suicid|crushing)/i;
+/* The safety list is shared with the patient side (redflags.js), so what the
+   patient was warned about and what tops the rounding list are the same thing. */
 const MD_RX = /(diagnos|prognos|surgery|operation|procedure|results?|scan|mri|ct\b|x-?ray|biopsy|discharge|go home|going home|treatment|plan|specialist|medication change|new medication|why am i)/i;
 const RN_RX = /(pain|medic|pill|dose|iv\b|bathroom|toilet|nausea|vomit|sleep|itch|dizz|water|food|eat|blanket|cold|hot|wound|dressing|bandage|shower|walk)/i;
 function mockSummarize(entries){
   const out = { urgent: [], md: [], rn: [], other: [] };
   for (const e of entries) {
     const item = { text: e.text, quote: e.text };
-    if (URGENT_RX.test(e.text)) out.urgent.push(item);
+    if (isRedFlag(e)) { item.rf = true; out.urgent.push(item); }
     else if (MD_RX.test(e.text)) out.md.push(item);
     else if (RN_RX.test(e.text)) out.rn.push(item);
     else out.other.push(item);
   }
   return out;
+}
+/* Whatever the AI returns, every entry that matched the safety list ends up in
+   the top section. The AI cannot drop or re-sort one. */
+function pinRedFlags(s, entries){
+  const low = x => String(x || "").toLowerCase();
+  const linked = (item, e) => {
+    const q = low(cleanQuote(item.quote) || item.text), t = low(e.text);
+    return !!q && !!t && (t === q || t.includes(q) || q.includes(t));
+  };
+  (entries || []).filter(isRedFlag).forEach(e => {
+    let found = false;
+    (s.urgent || []).forEach(it => { if (linked(it, e)) { it.rf = true; found = true; } });
+    if (found) return;
+    ["md", "rn", "other"].forEach(k => { s[k] = (s[k] || []).filter(it => low(cleanQuote(it.quote) || it.text) !== low(e.text)); });
+    s.urgent.push({ text: e.text, quote: e.text, rf: true });
+  });
+  return s;
 }
 async function aiSummarize(entries, key){
   const transcript = entries.map(e => "[" + new Date(e.ts).toLocaleTimeString() + "] " + e.text).join("\n");
@@ -1442,6 +1542,7 @@ async function generate(){
     if (key) { s = await aiSummarize(drRec.entries, key); usedAI = true; }
     else s = mockSummarize(drRec.entries);
   } catch (err) { s = mockSummarize(drRec.entries); failNote = '<div class="err" style="margin-bottom:8px">AI call failed (' + esc(err.message) + '); fell back to keyword mode.</div>'; }
+  s = pinRedFlags(s, drRec.entries);
   lastSummary = s;
   lastUsedAI = usedAI;
   renderSummaryHTML(failNote);
@@ -1480,8 +1581,8 @@ function renderSummaryHTML(failNote){
   const res = document.getElementById("results"); if (!res) return;
   const s = lastSummary; if (!s) { res.innerHTML = ""; return; }
   let html = '<div class="card">' + (failNote || "");
-  if (s.urgent.length) html += '<div class="alertbar">&#9888; ' + s.urgent.length + ' potentially urgent item(s) — in the full system this would notify the RN in real time.</div>';
-  html += bucketHTML("&#9888; Flagged as potentially urgent", "b-urgent", "urgent", s.urgent);
+  if (s.urgent.length) html += '<div class="alertbar">&#9888; ' + s.urgent.length + ' item(s) for review first. Heard notifies no one. Each item below says whether the patient was shown the safety message.</div>';
+  html += bucketHTML("&#9888; Review first", "b-urgent", "urgent", s.urgent);
   html += bucketHTML("Physician / APP list", "b-md", "md", s.md);
   html += bucketHTML("Nursing list", "b-rn", "rn", s.rn);
   html += bucketHTML("Other / comfort", "b-other", "other", s.other);
@@ -1554,16 +1655,25 @@ function bucketHTML(title, cls, key, items){
           ? '<span class="bnc" title="The team marked this addressed, and the patient tapped Not heard, so it is back on the list">&#10006; Patient: not heard yet</span>'
           : "";
         return "<li><label class=\"itemchk\" title=\"Mark addressed. The item stays, and moves to the Addressed list below\"><input type=\"checkbox\" onchange=\"completeItem('" + key + "'," + idx + ")\"> Addressed</label>" +
-          esc(i.text) + itemAuthorTag(i) + bounced + (q && q !== i.text ? "<q>“" + esc(q) + "”</q>" : "") + "</li>";
+          esc(i.text) + itemAuthorTag(i) + bounced + (q && q !== i.text ? "<q>“" + esc(q) + "”</q>" : "") + safetyNote(i, key) + "</li>";
       }).join("")
     : '<li class="empty">' + (items.length ? "All addressed" : "None") + '</li>';
   return '<div class="bucket ' + cls + '"><h3>' + title + '</h3><ul>' + lis + '</ul></div>';
+}
+/* For the top section: was the patient shown the safety message, and when. */
+function safetyNote(item, key){
+  if (key !== "urgent") return "";
+  const m = entriesForItem(item).filter(e => e.rfShownAt);
+  if (!m.length) return '<span class="rfnote" style="color:var(--mut)">Safety message not shown for this item (captured before it existed, or flagged by AI only).</span>';
+  const e = m[0];
+  return '<span class="rfnote">Safety message shown to the ' + (e.by === "caregiver" ? "caregiver" : "patient") + " " + new Date(e.rfShownAt).toLocaleString() +
+    (e.rfAckAt ? ", dismissed " + new Date(e.rfAckAt).toLocaleTimeString() : ", not yet dismissed") + '</span>';
 }
 function summaryMD(){
   const s = lastSummary; if (!s) return "";
   const sec = (t, items) => "## " + t + "\n" + (items.length ? items.map(i => { const q = cleanQuote(i.quote); return "- " + i.text + (q && q !== i.text ? "\n  - patient's words: \"" + q + "\"" : ""); }).join("\n") : "- none") + "\n\n";
   return "# Patient Concern Summary — " + drRec.last + ", " + drRec.first + " (Heard demo)\nGenerated: " + new Date().toLocaleString() + "\n\n" +
-    sec("Potentially urgent (review first)", s.urgent) + sec("Physician / APP", s.md) + sec("Nursing", s.rn) + sec("Other / comfort", s.other) +
+    sec("Review first", s.urgent) + sec("Physician / APP", s.md) + sec("Nursing", s.rn) + sec("Other / comfort", s.other) +
     "---\nPrototype demo. Not a medical record. Not for clinical use.\n";
 }
 async function exportMD(share){
