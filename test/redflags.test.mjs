@@ -40,7 +40,60 @@ const MUST_FLAG = [
   ["I want to kill myself", "self_harm"],
   ["I don't want to live anymore", "self_harm"],
   ["CHEST PAIN", "chest"],
-  ["no chest pain today", "chest"] // negation is deliberately not understood
+  ["no chest pain today", "chest"], // negation is deliberately not understood
+
+  // ---- 21 Nov 2026 review, version 2026-11-21.2 ----
+  // chest: more symptom words, either word order
+  ["tightness around my chest", "chest"],
+  ["my chest is sore", "chest"],
+  ["chest discomfort", "chest"],
+  ["it hurts in my chest", "chest"],
+  ["a burning in my chest", "chest"],
+  // chest: pain with breathing or coughing
+  ["it hurts when I breathe", "chest"],
+  ["it hurts to breathe", "chest"],
+  ["sharp pain when I take a deep breath", "chest"],
+  ["pain when I cough", "chest"],
+  // chest: accepted false alarm
+  ["my dad had a heart attack last year", "chest"],
+  // breathing: wider gap, reverse order, new words, colour
+  ["I can't take a deep breath", "breathing"],
+  ["my breathing is hard", "breathing"],
+  ["breathing is difficult", "breathing"],
+  ["her breathing is getting worse", "breathing"],
+  ["I am wheezing", "breathing"],
+  ["I am winded", "breathing"],
+  ["I feel like I am suffocating", "breathing"],
+  ["his lips are blue", "breathing"],
+  ["her face is gray", "breathing"],
+  ["he is turning blue", "breathing"],
+  // breathing: accepted false alarms
+  ["I can't breathe through my nose", "breathing"],
+  ["having trouble with the breathing machine", "breathing"],
+  // bleeding: blood on the dressing, "bloody", reverse order
+  ["there is blood on my bandage", "bleeding"],
+  ["blood is coming through the dressing", "bleeding"],
+  ["blood everywhere", "bleeding"],
+  ["blood all over the sheets", "bleeding"],
+  ["bloody stool", "bleeding"],
+  ["my urine has blood in it", "bleeding"],
+  ["it soaked through the bandage", "bleeding"],
+  // clot: calf in either word order, tight
+  ["I have a swollen calf", "clot"],
+  ["sore calf", "clot"],
+  ["my calf is tight", "clot"],
+  // clot: back of the leg, lower leg
+  ["the back of my lower leg hurts", "clot"],
+  ["pain in the back of my leg", "clot"],
+  // clot: leg, ankle or foot swelling with a qualifier
+  ["my whole leg is swollen and red", "clot"],
+  ["my leg is more swollen today", "clot"],
+  ["both legs are swollen", "clot"],
+  ["the swelling in my foot is getting worse", "clot"],
+  ["my ankle and foot are swelling and getting worse", "clot"],
+  // clot: a stated clot still fires
+  ["do I have a clot", "clot"],
+  ["is this a clot", "clot"]
 ];
 
 const MUST_NOT_FLAG = [
@@ -57,6 +110,17 @@ const MUST_NOT_FLAG = [
   "how long do I take the blood thinner",
   "is it normal for my knee to be stiff",
   "I need help getting to the bathroom",
+  // ---- 21 Nov 2026 review, version 2026-11-21.2 ----
+  "my leg is swollen",                       // swelling alone, no qualifier
+  "my ankle and foot are swelling",          // swelling alone, no qualifier
+  "can I soak in a bath with the bandage on",
+  "what is a blood clot",
+  "worried about blood clots",               // a worry, not a stated symptom
+  "how do I prevent a blood clot",
+  "do I need a urine test and a blood test",
+  "my leg is swollen, can I have more ice",  // "more" is not about the swelling
+  "my leg is swollen and it is hard to sleep",
+  "when can I take the pain pill with my cough medicine",
   "",
   "   "
 ];
