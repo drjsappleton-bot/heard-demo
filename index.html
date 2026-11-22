@@ -1248,6 +1248,17 @@ const SPEECH_LIKELY = !!SR && !IS_IOS_NON_SAFARI;
 let speechBlocked = false;
 let rec = null, recording = false, wantRec = false;
 let finalBuf = "", interimBuf = "", lastSaved = "", restarts = 0;
+/* 22 November 2026: on an iPhone the first capture saved and later ones did not. Each
+   listening session now has a number, and an event from an older session is ignored.
+   Before, a session that finished late (iPhone Safari is slow to close one, and sometimes
+   never reports that it has) could reach into the next capture and restart or end it. */
+let recSeq = 0, lastRecError = "";
+function dropRec(){
+  const old = rec; rec = null;
+  if (!old) return;
+  try { old.onresult = old.onerror = old.onend = null; } catch (e) {}
+  try { old.abort(); } catch (e) {}
+}
 let endTimer = null, hideTimer = null, lastHeardAt = 0;
 const MAX_RESTARTS = 60;          // roughly five minutes of silence
 const SILENCE_LIMIT_MS = 90000;   // stop on our own after this much true silence
@@ -1287,7 +1298,12 @@ function useKeyboardDictation(reason){
   if (inp) { try { inp.focus(); } catch (e) {} }
 }
 function startRec(){
-  finalBuf = ""; interimBuf = ""; lastSaved = ""; restarts = 0;
+  /* A capture that was stopped a moment ago and has not been saved yet is saved now, so a
+     quick second tap cannot throw it away. */
+  clearTimeout(endTimer);
+  const pending = (finalBuf + " " + interimBuf).replace(/\s+/g, " ").trim();
+  if (pending && pending !== lastSaved) persistEntry(pending);
+  finalBuf = ""; interimBuf = ""; lastSaved = ""; restarts = 0; lastRecError = "";
   wantRec = true; lastHeardAt = Date.now();
   recUI(true);
   openRec();
@@ -1296,12 +1312,15 @@ function startRec(){
 /* Opens a session, and is called again from onend when silence closed one
    while the patient still has the button open. */
 function openRec(){
+  dropRec();                      /* never two sessions at once */
+  const mine = ++recSeq;
   rec = new SR();
   rec.continuous = true;
   rec.interimResults = true;
   rec.lang = "en-US";
 
   rec.onresult = (e) => {
+    if (mine !== recSeq) return;
     let interim = "";
     for (let i = e.resultIndex; i < e.results.length; i++) {
       if (e.results[i].isFinal) finalBuf += e.results[i][0].transcript + " ";
@@ -1313,6 +1332,8 @@ function openRec(){
   };
 
   rec.onerror = (e) => {
+    if (mine !== recSeq) return;
+    lastRecError = e && e.error ? String(e.error) : "";
     if (e.error === "service-not-allowed") {
       useKeyboardDictation(IS_IOS
         ? "On iPhone, only Safari can let a web page listen."
@@ -1334,21 +1355,27 @@ function openRec(){
   };
 
   rec.onend = () => {
+    if (mine !== recSeq) return;
     recording = false;
     const silent = Date.now() - lastHeardAt > SILENCE_LIMIT_MS;
-    if (wantRec && !silent && restarts < MAX_RESTARTS) {
+    /* A session that closed by itself is reopened while the button is still open. Not on
+       an iPhone: Safari there starts the microphone only from a tap, so what was heard is
+       saved and the button goes back to "Tap to speak". */
+    if (wantRec && !silent && restarts < MAX_RESTARTS && !IS_IOS) {
       restarts++;
-      setTimeout(() => { if (wantRec) openRec(); }, 150);
+      setTimeout(() => { if (wantRec && mine === recSeq) openRec(); }, 150);
       return;
     }
-    if (wantRec && silent) wantRec = false;   /* we closed it, not the patient */
+    wantRec = false;                          /* we closed it, not the patient */
     finishCapture();
   };
 
   try { rec.start(); recording = true; }
   catch (e) {
-    /* start() throws if a session is already live; that is harmless */
-    if (!recording && !restarts) { wantRec = false; recUI(false); showLive("Could not start the microphone: " + e.message, true); }
+    /* start() throws when the last session has not finished closing */
+    recSeq++; dropRec();
+    wantRec = false; recording = false; recUI(false);
+    showLive("The microphone is still closing. Tap again in a moment.", true);
   }
 }
 
@@ -1365,12 +1392,16 @@ function stopRec(){
 function finishCapture(){
   clearTimeout(endTimer);
   if (wantRec) return;
+  recSeq++; dropRec();            /* this session is over; anything it still sends is ignored */
   recording = false;
   recUI(false);
   /* Interim text counts. Tapping stop mid-phrase used to discard it. */
   const t = (finalBuf + " " + interimBuf).replace(/\s+/g, " ").trim();
   finalBuf = ""; interimBuf = "";
-  if (!t) { showLive("Nothing was heard. Tap again, or type it below.", true); return; }
+  if (!t) {
+    const why = lastRecError && !/^(no-speech|aborted)$/.test(lastRecError) ? "The microphone stopped (" + lastRecError + "). " : "Nothing was heard. ";
+    showLive(why + "Tap again, or type it below.", true); return;
+  }
   if (t === lastSaved) return;
   lastSaved = t;
   showLive("Captured: " + t);
@@ -1394,7 +1425,7 @@ function stopUI(silent){
   wantRec = false; recording = false;
   clearTimeout(endTimer); clearTimeout(hideTimer);
   finalBuf = ""; interimBuf = "";
-  try { if (rec) rec.stop(); } catch (e) {}
+  recSeq++; dropRec();
   if (!silent) recUI(false);
 }
 
