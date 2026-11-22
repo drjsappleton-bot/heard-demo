@@ -1,0 +1,758 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Heard: how it works (sample: Steve's voice)</title>
+<link rel="icon" href="heard-icon.png">
+<style>
+  :root {
+    --blue:#1f4e79; --blue-lt:#eaf1f8; --accent:#2e75b6;
+    --red:#b3261e; --red-lt:#fdecea;
+    --green:#1e7d46; --green-lt:#e8f5ee;
+    --amber:#9a6700; --amber-lt:#fff8e1;
+    --ink:#1a1d21; --mut:#5f6b76; --bg:#f4f6f8; --card:#fff; --line:#dde3e9;
+    --teal:#12807c; --teal-deep:#0b5f5c; --coral:#e8735a; --coral-deep:#d45f47; --cream:#fdf8f3;
+    --hi:#ffcc00;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; }
+  .wrap { max-width:600px; margin:0 auto; padding:14px 14px 44px; }
+  .top { text-align:center; }
+  .top img { width:40px; height:40px; border-radius:11px; }
+  .top h1 { font-size:20px; margin:6px 0 2px; color:var(--teal-deep); }
+  .top p { margin:0; font-size:12.5px; color:var(--mut); }
+  .back { display:inline-block; margin-top:7px; font-size:13px; color:var(--blue);
+    text-decoration:none; font-weight:600; }
+
+  .stage { position:relative; width:344px; margin:14px auto 0; }
+  .phone { width:344px; height:724px; border-radius:42px; background:#10161c; padding:12px 11px 15px;
+    box-shadow:0 18px 44px rgba(16,22,28,.34); position:relative; }
+  .notch { position:absolute; top:12px; left:50%; transform:translateX(-50%); width:112px; height:22px;
+    background:#10161c; border-radius:0 0 15px 15px; z-index:9; }
+  .screen { position:relative; width:100%; height:100%; background:var(--bg);
+    border-radius:32px; overflow:hidden; }
+  .viewport { position:absolute; inset:0; overflow:hidden; transition:transform .5s ease; }
+  .view { position:absolute; inset:0; padding:34px 13px 8px; opacity:0; transition:opacity .45s ease; }
+  .view.on { opacity:1; }
+
+  /* Captions are notes laid ON the phone, not part of it. They stack in the empty
+     space below the app content, first one on top, and every one stays on screen
+     until the viewer presses Next. */
+  .capstack { position:absolute; left:8px; right:8px; top:0; z-index:20; display:flex;
+    flex-direction:column; gap:8px; transition:top .5s ease; }
+  .capstack.instant { transition:none; }
+  .capnote { background:#fff; border:12px solid var(--green); border-radius:22px;
+    padding:9px 11px 10px; text-align:center; transform-origin:50% 100%;
+    box-shadow:0 6px 18px rgba(16,22,28,.22); }
+  .capnote.latest { box-shadow:0 0 0 4px rgba(30,125,70,.28), 0 14px 32px rgba(16,22,28,.34); }
+  .capnote.pop { animation:pop .4s cubic-bezier(.2,.9,.3,1.25); }
+  @keyframes pop { 0% { transform:scale(.93); } 100% { transform:scale(1); } }
+  .capnote b { display:block; font-size:21px; line-height:1.18; color:var(--ink); }
+  .capnote small { display:block; font-size:15px; line-height:1.32; color:#33414b; margin-top:4px; }
+
+  .hl { position:absolute; border:3px solid var(--hi); border-radius:11px; pointer-events:none;
+    box-shadow:0 0 0 3px rgba(255,204,0,.3); opacity:0; transition:opacity .3s ease; z-index:14; }
+  .hl.on { opacity:1; }
+  .cur { position:absolute; width:28px; height:28px; z-index:16; opacity:0; left:0; top:0;
+    transition:transform 1s cubic-bezier(.35,.1,.25,1), opacity .3s ease; pointer-events:none; }
+  .cur.on { opacity:1; }
+  .ripple { position:absolute; left:-14px; top:-14px; width:56px; height:56px; border-radius:50%;
+    border:2px solid var(--coral); opacity:0; }
+  .ripple.go { animation:rip .65s ease-out; }
+  @keyframes rip { 0% { transform:scale(.3); opacity:.85; } 100% { transform:scale(1.15); opacity:0; } }
+
+  .bar { width:344px; height:5px; background:var(--line); border-radius:3px; margin:14px auto 0; overflow:hidden; }
+  .bar i { display:block; height:100%; width:0; background:var(--teal); transition:width .4s ease; }
+  .nav { display:flex; align-items:center; justify-content:center; gap:8px; margin-top:14px; }
+  .nav button { border:1px solid var(--line); background:var(--card); color:var(--blue); font-size:14px;
+    font-weight:700; padding:11px 18px; border-radius:10px; cursor:pointer; min-width:90px; }
+  .nav button.pri { background:var(--teal); border-color:var(--teal); color:#fff; }
+  .nav button.pri.ready { animation:nudge 1.7s ease-in-out infinite; }
+  @keyframes nudge { 0%,100% { box-shadow:0 0 0 0 rgba(18,128,124,0); } 50% { box-shadow:0 0 0 8px rgba(18,128,124,.3); } }
+  .nav button:disabled { opacity:.4; cursor:default; }
+  .count { font-size:13px; color:var(--mut); min-width:60px; text-align:center; }
+  .hint { text-align:center; font-size:12.5px; color:var(--mut); margin:10px 0 0; }
+
+  /* ---- app chrome, matched to the live app ---- */
+  .c { background:var(--card); border-radius:14px; padding:11px 12px; margin-bottom:9px; }
+  .sec { font-size:10px; text-transform:uppercase; letter-spacing:.7px; color:var(--mut); margin:0 0 8px; }
+  .note { font-size:11.5px; color:var(--mut); line-height:1.42; }
+  .fld { height:40px; border:1px solid var(--line); border-radius:11px; background:#fff; font-size:13px;
+    display:flex; align-items:center; padding:0 11px; color:var(--ink); margin-bottom:8px; }
+  .fld.ph { color:#9aa4ad; }
+  .fld.sel { justify-content:space-between; }
+  .fld.sel::after { content:"\25BE"; color:var(--mut); font-size:12px; }
+  .btn { height:40px; border-radius:11px; display:flex; align-items:center; justify-content:center;
+    font-weight:700; font-size:13px; color:#fff; }
+  .btn.coral { background:linear-gradient(150deg,var(--coral),var(--coral-deep)); }
+  .btn.navy { background:var(--blue); }
+  .btn.sub { background:#fff; color:var(--blue); border:1px solid var(--line); font-weight:600; margin-top:8px; }
+  .choice { background:var(--cream); border:1px solid #efe3d8; border-radius:16px; padding:13px; margin-bottom:9px; }
+  .choice h2 { font-size:14px; color:var(--teal-deep); margin:0 0 3px; }
+  .choice p { font-size:11.5px; color:var(--mut); margin:0 0 10px; line-height:1.4; }
+  .hero { background:linear-gradient(150deg,var(--teal),var(--teal-deep)); border-radius:16px;
+    padding:13px; text-align:center; color:#fff; margin-bottom:8px; }
+  .hero b { font-size:19px; display:block; }
+  .hero span { font-size:10.5px; opacity:.93; display:block; margin-top:2px; }
+  .code { font-family:ui-monospace,Menlo,Consolas,monospace; font-size:21px; letter-spacing:3px;
+    font-weight:700; color:var(--blue); background:var(--blue-lt); border-radius:10px; padding:10px;
+    text-align:center; margin:8px 0; }
+  .warn { background:var(--amber-lt); border:1px solid #e6d9a8; color:var(--amber);
+    border-radius:10px; padding:9px 10px; font-size:10px; margin-top:8px; line-height:1.4; }
+  .linkline { font-size:9.5px; color:var(--accent); word-break:break-all; margin-top:7px; }
+
+  .privacy { display:flex; align-items:center; gap:7px; font-size:11px; color:var(--mut);
+    justify-content:center; margin-bottom:8px; }
+  .dot { width:10px; height:10px; flex:0 0 10px; border-radius:50%; background:#b7bfc7; }
+  .dot.live { background:var(--red); animation:pulse 1.2s infinite; }
+  @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:.35; } }
+  .mic { width:116px; height:116px; border-radius:50%; margin:6px auto; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; color:#fff; font-size:13px; font-weight:700;
+    background:radial-gradient(circle at 35% 30%,#3d86c8,var(--blue));
+    box-shadow:0 6px 18px rgba(31,78,121,.35); transition:background .45s ease, transform .35s ease; }
+  .mic em { font-style:normal; font-size:24px; margin-bottom:3px; }
+  .mic.rec { background:radial-gradient(circle at 35% 30%,#e05a52,var(--red)); transform:scale(1.04);
+    box-shadow:0 0 0 10px rgba(179,38,30,.14); }
+  .livebox { background:var(--blue-lt); border-radius:10px; padding:9px 11px; font-size:13px;
+    min-height:38px; margin-top:9px; }
+  .typebox { display:flex; gap:7px; margin-top:8px; }
+  .typebox .f { flex:1; height:38px; border:1px solid var(--line); border-radius:10px; background:#fff;
+    display:flex; align-items:center; padding:0 10px; font-size:12.5px; color:#9aa4ad; }
+  .typebox .a { width:52px; height:38px; border-radius:10px; background:var(--accent); color:#fff;
+    font-size:12.5px; font-weight:700; display:flex; align-items:center; justify-content:center; }
+
+  .trow { display:flex; gap:6px; margin-bottom:9px; }
+  .tb { flex:1 1 33%; min-width:0; background:#fff; border:1px solid #cfe0df; border-radius:12px;
+    padding:6px 3px; text-align:center; display:flex; flex-direction:column; align-items:center;
+    justify-content:center; min-height:48px; }
+  .tb b { font-size:9px; color:var(--teal-deep); line-height:1.15; }
+  .tb small { font-size:7.5px; color:var(--mut); margin-top:2px; }
+  .tb.bmk { border:5px solid var(--green); }
+  .tb.bmk b { color:var(--green); }
+  .authhdr { font-size:10px; text-transform:uppercase; letter-spacing:.6px; color:var(--mut); margin:10px 0 1px; }
+  .authhdr.cg { color:var(--accent); }
+  .entry { border-left:3px solid var(--accent); background:#fafcfe; padding:8px 10px;
+    border-radius:0 10px 10px 0; margin-top:7px; font-size:12.5px; line-height:1.35;
+    transition:background .4s ease, border-color .4s ease; }
+  .entry .t { display:block; font-size:9.5px; color:var(--mut); margin-bottom:2px; }
+  .entry.addressed { border-left-color:var(--amber); background:var(--amber-lt); }
+  .entry.closed { border-left-color:var(--green); background:var(--green-lt); }
+  .foot { display:flex; justify-content:space-between; align-items:center; margin-top:6px;
+    font-size:10.5px; gap:7px; }
+  .foot .l { color:var(--green); font-weight:700; }
+  .nhx { border:1px solid #e6b0ac; background:#fdecea; color:var(--red); font-weight:700;
+    border-radius:7px; padding:2px 6px; font-size:10px; }
+  .foot .r { color:var(--mut); }
+  .entry.addressed .foot .r, .entry.closed .foot .r { color:var(--green); font-weight:700; }
+
+  .sheet { position:absolute; left:0; right:0; bottom:0; top:36%; background:#f7f7fa;
+    border-radius:20px 20px 0 0; transform:translateY(100%);
+    transition:transform .85s cubic-bezier(.22,.9,.3,1); box-shadow:0 -8px 26px rgba(16,22,28,.2);
+    padding:11px 12px; z-index:8; }
+  .sheet.up { transform:none; }
+  .sheet .h { text-align:center; font-size:12.5px; font-weight:700; padding-bottom:8px;
+    border-bottom:1px solid #e2e2e8; color:#111; }
+  .to { display:flex; align-items:center; gap:6px; font-size:13px; padding:10px 9px; margin-top:9px;
+    border-radius:9px; }
+  .to b { color:var(--mut); font-weight:600; }
+  .to .cursorbar { width:2px; height:15px; background:var(--accent); animation:blink 1s steps(1) infinite; }
+  @keyframes blink { 50% { opacity:0; } }
+  .bubble { margin-top:12px; background:#e9e9ee; border-radius:15px; padding:10px 11px; font-size:12px;
+    color:#111; line-height:1.45; }
+
+  .final { display:flex; flex-direction:column; align-items:center; text-align:center;
+    padding:56px 22px 0; }
+  .final .tick { width:78px; height:78px; border-radius:50%; background:var(--green-lt); color:var(--green);
+    display:flex; align-items:center; justify-content:center; font-size:38px; margin-bottom:15px; }
+  .final h2 { font-size:20px; margin:0 0 8px; color:var(--teal-deep); }
+  .final p { font-size:13px; color:var(--mut); margin:0; line-height:1.5; }
+
+  /* start gate: browsers only allow sound after a tap */
+  #gate { position:fixed; inset:0; z-index:80; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; gap:15px; text-align:center; padding:24px;
+    background:linear-gradient(160deg, var(--teal) 0%, var(--teal-deep) 70%); color:var(--cream);
+    transition:opacity .6s ease; }
+  #gate img { width:74px; height:74px; border-radius:19px; box-shadow:0 8px 22px rgba(0,0,0,.3); }
+  #gate .gt { font-size:clamp(24px, 4.2vw, 36px); font-weight:800; }
+  #gate .gs { font-size:clamp(14px, 2.1vw, 17px); opacity:.92; margin-bottom:6px; }
+  #gstart { border:0; border-radius:999px; background:var(--coral); color:#fff; cursor:pointer;
+    font-family:inherit; font-size:19px; font-weight:800; padding:15px 42px;
+    box-shadow:0 10px 26px rgba(0,0,0,.25); }
+  #gmute { border:0; background:none; color:rgba(255,255,255,.85); cursor:pointer;
+    font-family:inherit; font-size:14px; text-decoration:underline; padding:8px; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .cur, .view, .sheet, .mic, .entry { transition-duration:.01ms !important; }
+    .ripple.go { animation:none; } .to .cursorbar { animation:none; }
+    .capnote.pop { animation:none; } .nav button.pri.ready { animation:none; }
+  }
+
+  /* standing safety line and the safety message, matched to the live app. The words
+     come from redflags.js, so the film always shows the message the app shows. */
+  .safeline { margin-top:9px; border:1px solid #e6b0ac; background:#fdecea; color:#1a1d21; border-radius:9px;
+    padding:7px 9px; font-size:10.5px; line-height:1.35; text-align:center; font-weight:600; }
+  .rfc { background:#fff; border:2px solid #d9b13b; border-radius:16px; padding:13px 13px 12px; }
+  .rfc h3 { margin:0 0 7px; font-size:15px; line-height:1.25; color:#7a5200; }
+  .rfc .nm { font-size:11.5px; font-weight:700; margin-bottom:8px; color:#1a1d21; }
+  .rfc .where { border-radius:10px; padding:8px 10px; margin-bottom:7px; background:#fff8e1; }
+  .rfc .where .lbl { font-size:9.5px; text-transform:uppercase; letter-spacing:.6px; color:#5f6b76; }
+  .rfc .where .act { font-size:15px; font-weight:800; line-height:1.25; color:#1a1d21; }
+  .rfc .where .sm { font-size:10.5px; color:#5f6b76; margin-top:2px; }
+  .rfc .esc { font-size:11px; font-weight:600; line-height:1.35; margin:6px 0; color:#1a1d21; }
+  .rfc .saved { font-size:10.5px; color:#5f6b76; margin-bottom:9px; }
+  .rfc .ok { background:#1f4e79; color:#fff; font-weight:700; font-size:13px; text-align:center; border-radius:10px; padding:10px; }
+</style>
+</head>
+<body>
+<div id="gate">
+  <img src="heard-icon.png" alt="">
+  <div class="gt">How Heard works</div>
+  <div class="gs">Sample for review: narrated by Steve. A little over four minutes.</div>
+  <button id="gstart">&#9654;&#xFE0E;&nbsp; Start</button>
+  <button id="gmute">Start without sound</button>
+</div>
+<div class="wrap">
+  <div class="top">
+    <img src="heard-icon.png" alt="">
+    <h1>How Heard works</h1>
+    <p>Plays straight through. Jump back any time.</p>
+    <a class="back" href="./">&#8592; Back to Heard</a>
+  </div>
+
+  <div class="stage">
+    <div class="phone">
+      <div class="notch"></div>
+      <div class="screen" id="screen">
+        <div class="viewport" id="viewport"></div>
+        <div class="capstack" id="capstack"></div>
+        <div class="hl" id="hl"></div>
+        <div class="cur" id="cur">
+          <div class="ripple" id="ripple"></div>
+          <svg width="28" height="28" viewBox="0 0 26 26"><path d="M4 2l16 9-7 1.6L9.8 21z" fill="#fff" stroke="#1a1d21" stroke-width="1.6" stroke-linejoin="round"/></svg>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="bar"><i id="prog"></i></div>
+  <div class="nav">
+    <button id="prev">&#8592; Back</button>
+    <button id="pause">Pause</button>
+    <button id="back30">&#8630; 30s</button>
+    <span class="count" id="count">1 / 12</span>
+    <button class="pri" id="next">Next &#8594;</button>
+  </div>
+  <p class="hint">Plays straight through. Back up thirty seconds any time, or use Back and Next to jump between screens.</p>
+</div>
+
+<script src="redflags.js"></script>
+<script>
+const screenEl = document.getElementById("screen");
+const vp     = document.getElementById("viewport");
+const hlEl   = document.getElementById("hl");
+const curEl  = document.getElementById("cur");
+const rip    = document.getElementById("ripple");
+const stack  = document.getElementById("capstack");
+const progEl = document.getElementById("prog");
+const countEl= document.getElementById("count");
+const REDUCED = matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+let token = 0, idx = 0, finished = false, firstCap = null, shift = 0;
+const CAP_GAP = 12, CAP_EDGE = 8, CAP_HOLD = 2200;
+
+/* ---- narration: the same voice as the intro film, one clip per caption ---- */
+const DUR_T = {"01":4.06,"02":5.47,"03":3.74,"04":3.22,"05":5.5,"06":3.89,"07":5.4,"08":4.49,
+  "09":5.93,"10":4.15,"11":4.46,"12":4.99,"13":4.99,"14":5.35,"15":5.04,"16":5.52,
+  "17":3.17,"18":10.03,"19":10.61,"20":10.78,"21":12.53};
+/* 22 and 23: the safety message screen, voiced 21 November 2026 (Kokoro af_heart, speed 0.95). */
+DUR_T["22"] = 8.14; DUR_T["23"] = 8.45;
+/* SAMPLE (22 November 2026): Steve's own voice. The clips are in steve/, and these are
+   their lengths. The live film, tour.html, and its clips are untouched. */
+Object.assign(DUR_T, {"01":4.82,"02":6.22,"03":4.54,"04":3.77,"21":9.46,"05":6.41,"06":4.63,"07":6.46,"22":9.34,"23":9.98,"08":5.04,"17":3.53,"09":7.01,"10":4.8,"11":5.26,"12":5.21,"13":5.45,"18":8.83,"19":9.43,"20":10.37,"16":6.6});
+const player = new Audio(); player.preload = "auto";
+let audioOn = false, voiceUntil = 0, needVoice = false;
+player.onended = () => { needVoice = false; };
+player.onerror = () => { if (player.error) needVoice = false; };
+function voice(id){
+  if (!audioOn || !id || !DUR_T[id]){ voiceUntil = 0; return; }   /* a caption with no clip yet plays silently */
+  needVoice = true;
+  voiceUntil = performance.now() + (DUR_T[id] || 0) * 1000;
+  try {
+    player.src = "steve/tvo-" + id + ".mp3?v=1";
+    const p = player.play();
+    if (p && p.catch) p.catch(() => { try { player.load(); player.play().catch(() => {}); } catch (e) {} });
+  } catch (e) {}
+}
+function stopVoice(){ voiceUntil = 0; needVoice = false; try { player.pause(); } catch (e) {} }
+function setPaused(p){
+  paused = p;
+  const b = document.getElementById("pause");
+  if (b) b.textContent = p ? "Play" : "Pause";
+  if (audioOn){
+    if (p) player.pause();
+    else if (player.src && !player.ended && !player.error) player.play().catch(() => {});
+  }
+}
+/* Opening pause on each screen: at least the reading beat, and never shorter than the voice. */
+async function capWait(min){ await sleep(Math.max(min, voiceUntil - performance.now() + 450)); }
+let paused = false;
+/* Chunked, pause-aware clock, as in the film. While a clip should be sounding and
+   the player has gone quiet without ending or erroring, it is restarted. */
+async function sleep(ms){
+  let left = REDUCED ? Math.min(ms, 80) : ms;
+  while (left > 0){
+    await new Promise(r => setTimeout(r, 110));
+    if (!paused){
+      left -= 110;
+      if (audioOn && needVoice && player.paused && !player.ended && !player.error)
+        player.play().catch(() => {});
+    }
+  }
+}
+function guard(my){ if (my !== token) throw "x"; }
+
+function view(html){
+  const old = vp.querySelector(".view"); if (old) old.remove();
+  const d = document.createElement("div");
+  d.className = "view"; d.innerHTML = html;
+  vp.appendChild(d);
+  void d.offsetWidth;                 /* deterministic; rAF stalls in a background tab */
+  d.classList.add("on");
+  if (firstCap) { const c = firstCap; firstCap = null; addNote(c[0], c[1]); voice(c[2]); }
+  else layoutCaptions();
+  return d;
+}
+
+/* Bottom edge of the app content, relative to the screen and ignoring any shift.
+   The message sheet and the closing card stretch to the bottom, so their children
+   are measured instead. Anything still off the bottom (a sheet before it slides
+   up) does not count. */
+function contentBottom(){
+  const s = screenEl.getBoundingClientRect(), v = vp.getBoundingClientRect();
+  const cur = s.top - v.top, H = screenEl.clientHeight;
+  let b = 0;
+  vp.querySelectorAll(".view > :not(.sheet):not(.final), .view > .sheet > *, .view > .final > *").forEach(el => {
+    const r = el.getBoundingClientRect();
+    const top = r.top - s.top + cur, bottom = r.bottom - s.top + cur;
+    if (r.height && top < H) b = Math.max(b, Math.min(bottom, H));
+  });
+  return b;
+}
+function setShift(px){ shift = px; vp.style.transform = px ? "translateY(-" + px + "px)" : ""; }
+/* Stack goes just under the content. If it would run off the bottom, the app
+   content slides up by the difference, the way a phone page scrolls. */
+function layoutCaptions(instant){
+  if (!stack.children.length) { setShift(0); return; }
+  const H = screenEl.clientHeight;
+  let top = contentBottom() + CAP_GAP;
+  const over = top + stack.offsetHeight + CAP_EDGE - H;
+  const sh = over > 0 ? Math.ceil(over) : 0;
+  setShift(sh);
+  stack.classList.toggle("instant", !!instant);
+  stack.style.top = (top - sh) + "px";
+  if (instant) { void stack.offsetWidth; stack.classList.remove("instant"); }
+}
+function addNote(main, sub){
+  const wasEmpty = !stack.children.length;
+  stack.querySelectorAll(".capnote.latest").forEach(n => n.classList.remove("latest"));
+  const n = document.createElement("div");
+  n.className = "capnote latest pop";
+  n.innerHTML = "<b></b><small></small>";
+  n.firstChild.textContent = main; n.lastChild.textContent = sub || "";
+  stack.appendChild(n);
+  layoutCaptions(wasEmpty);
+}
+/* Mid-screen captions: add the note, then hold long enough to read it before the
+   pointer moves again. Abandons if the viewer has moved on. */
+async function caption(main, sub, id){
+  const t = token;
+  addNote(main, sub);
+  voice(id);
+  const hold = (audioOn && id && DUR_T[id]) ? Math.max(CAP_HOLD, DUR_T[id] * 1000 + 450) : CAP_HOLD;
+  await sleep(hold);
+  if (t !== token) throw "x";
+}
+function rectOf(sel){
+  const el = screenEl.querySelector(sel); if (!el) return null;
+  const s = screenEl.getBoundingClientRect(), r = el.getBoundingClientRect();
+  return { x:r.left - s.left, y:r.top - s.top, w:r.width, h:r.height };
+}
+/* An element part way through a CSS transition reports where it is now, not where
+   it is going. Read it until two reads agree, so highlights and the cursor land on
+   the finished position. setTimeout, not rAF: rAF stalls in a background tab. */
+async function settled(sel){
+  const t = token;
+  let prev = rectOf(sel);
+  if (!prev) return null;
+  for (let i = 0; i < 40; i++){
+    await new Promise(r => setTimeout(r, 50));
+    if (t !== token) return null;
+    const now = rectOf(sel);
+    if (!now) return prev;
+    if (Math.abs(now.y - prev.y) < 0.5 && Math.abs(now.x - prev.x) < 0.5) return now;
+    prev = now;
+  }
+  return prev;
+}
+async function highlight(sel, hold){
+  const t = token;
+  const r = await settled(sel); if (!r || t !== token) return;
+  hlEl.style.left = (r.x - 5) + "px"; hlEl.style.top = (r.y - 5) + "px";
+  hlEl.style.width = (r.w + 10) + "px"; hlEl.style.height = (r.h + 10) + "px";
+  hlEl.classList.add("on");
+  if (hold) { await sleep(hold); if (t !== token) return; hlEl.classList.remove("on"); }
+}
+function clearHighlight(){ hlEl.classList.remove("on"); }
+async function moveTo(sel, dx, dy){
+  const t = token;
+  const r = await settled(sel); if (!r || t !== token) return;
+  curEl.classList.add("on");
+  curEl.style.transform = "translate(" + (r.x + r.w/2 + (dx||0)) + "px," + (r.y + r.h/2 + (dy||0)) + "px)";
+  await sleep(REDUCED ? 60 : 1050);
+}
+function parkCursor(x, y){ curEl.classList.remove("on"); curEl.style.transition = "none";
+  curEl.style.transform = "translate(" + x + "px," + y + "px)"; void curEl.offsetWidth; curEl.style.transition = ""; }
+async function tap(){ rip.classList.remove("go"); void rip.offsetWidth; rip.classList.add("go"); await sleep(560); }
+async function typeInto(el, text, my, sp){
+  el.classList.remove("ph"); el.textContent = "";
+  for (let i=0;i<text.length;i++){ guard(my); el.textContent += text[i]; await sleep(sp||62); }
+}
+
+/* ---- fragments matched to the live app ---- */
+/* ---- the safety message, read from the live list (redflags.js) ----
+   Q_PLAIN are ordinary questions: they must show no message in the app. Q_SAFETY must
+   show the amber message. test/site-copy.test.mjs checks both against the list, so
+   the films cannot drift from what the app does. */
+const Q_PLAIN_1 = "When can I drive again?";
+const Q_PLAIN_2 = "When can I shower with the dressing on?";
+const Q_PLAIN_3 = "Does she keep taking the blood thinner at home?";
+const Q_SAFETY = "My calf feels tight and sore";
+const RFX = window.HeardRedFlags || null;
+const RF_AMBER = (RFX && RFX.MESSAGES && RFX.MESSAGES.amber) || {
+  title: "Tell your care team about this", notMonitored: "Heard is not monitored. No one is reading this right now.",
+  hospitalLabel: "In the hospital", hospitalAction: "Tell your nurse now.", homeLabel: "At home",
+  homeAction: "Call your surgeon's office now.", homeNote: "Do not wait for a reply here.",
+  escalate: "If it is severe or getting worse: in the hospital, press your call button. At home, call 911.",
+  saved: "Your words were saved for your care team to see at their next visit.", button: "I understand" };
+const RF_STANDING = (RFX && RFX.MESSAGE && RFX.MESSAGE.standing) || "Heard is not monitored. Need help now? In the hospital, press your call button. At home, call 911.";
+const escT = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const safeLine = () => '<div class="safeline">' + escT(RF_STANDING) + '</div>';
+const safetyCard = () => { const M = RF_AMBER; return '<div class="rfc" id="rfc">' +
+  '<h3>&#9888; ' + escT(M.title) + '</h3><div class="nm">' + escT(M.notMonitored) + '</div>' +
+  '<div class="where" id="rfhosp"><div class="lbl">' + escT(M.hospitalLabel) + '</div><div class="act">' + escT(M.hospitalAction) + '</div></div>' +
+  '<div class="where" id="rfhome"><div class="lbl">' + escT(M.homeLabel) + '</div><div class="act">' + escT(M.homeAction) + '</div><div class="sm">' + escT(M.homeNote) + '</div></div>' +
+  '<div class="esc">' + escT(M.escalate) + '</div><div class="saved">' + escT(M.saved) + '</div>' +
+  '<div class="ok" id="rfok">' + escT(M.button) + '</div></div>'; };
+const patientHead = () =>
+  '<div class="c"><div class="sec">Hello, Margaret</div>' +
+  '<div class="privacy"><span class="dot" id="dot"></span><span id="plabel">Microphone off &mdash; nothing is being recorded</span></div>' +
+  '<div class="mic" id="mic"><em>&#127908;</em><span id="miclabel">Tap to speak</span></div>' +
+  '<div class="note" style="text-align:center;margin-top:7px">Tap, say your question or concern, tap again to stop. Your care team will see it at their next visit.</div>' +
+  '<div class="livebox" id="live">&nbsp;</div>' +
+  '<div class="typebox"><div class="f">Or type a question / concern&hellip;</div><div class="a">Add</div></div>' + safeLine() + '</div>';
+const entry = (id, text, cls, left, right) =>
+  '<div class="entry ' + (cls||"") + '" id="' + id + '"><span class="t">Today, 9:12 AM</span>' + text +
+  '<div class="foot"><span class="l">' + left + '</span>' +
+  (cls === "addressed" ? '<span class="nhx">&#10006; Not heard</span>' : '') +
+  '<span class="r">' + right + '</span></div></div>';
+const toprowMini = () =>
+  '<div class="trow" id="trow">' +
+  '<div class="tb bmk"><b>&#128278; Bookmark my site</b><small>so you can come back</small></div>' +
+  '<div class="tb"><b>&#9654; Intro</b><small>what is Heard</small></div>' +
+  '<div class="tb"><b>&#9654; See how it works</b><small>step by step</small></div></div>';
+const shareCard = (withCode) =>
+  '<div class="c"><div class="sec">Include your caregiver</div>' +
+  (withCode
+    ? '<div class="note">Give this code to the person helping you. They enter it on their own phone, put in their name, and can then add questions to this list.</div>' +
+      '<div class="code" id="code">7KQ4MP</div>' +
+      '<div class="btn coral" id="txt">&#128241; Text this to a caregiver</div>' +
+      '<div class="btn sub">Share another way</div>' +
+      '<div class="btn sub">Copy caregiver link</div>' +
+      '<div class="linkline">https://imheard.com/#/b/demo/c/7KQ4MP</div>' +
+      '<div class="warn">Anyone who uses this code can see everything on this page, now and later. Replace the code to stop new people joining.</div>'
+    : '<div class="note">Allow access to another person on your caregiving team. A family member or friend can add questions to this same list, from their own phone.</div>' +
+      '<div class="btn coral" id="mk" style="margin-top:10px">Share with a caregiver</div>') +
+  '</div>';
+
+/* ---------------- steps ---------------- */
+const STEPS = [
+{ cap:["Sign in once","Your name, then your doctor. Nothing to install.","01"],
+  async run(my){
+    view('<div class="choice"><h2>I\'m a patient</h2>' +
+      '<p>Sign in once to get your personal page. Everything you capture is under your control.</p>' +
+      '<div class="fld ph" id="f1">First name</div><div class="fld ph" id="f2">Last name</div>' +
+      '<div class="fld sel ph" id="f3">Who is your doctor? (choose if listed)</div>' +
+      '<div class="btn coral" id="go" style="margin-top:16px">Sign in &amp; get my link</div></div>');
+    parkCursor(160, 520); await capWait(2400); guard(my);
+    await highlight("#f1"); await moveTo("#f1"); guard(my); await tap(); clearHighlight();
+    await typeInto(vp.querySelector("#f1"), "Margaret", my); guard(my);
+    await sleep(300);
+    await moveTo("#f2"); await tap(); guard(my);
+    await typeInto(vp.querySelector("#f2"), "Ellis", my); guard(my);
+    await sleep(600);
+    await caption("Choose your doctor", "The list fills in as the practice uses it. Not there? Type the name.", "02");
+    await highlight("#f3"); await moveTo("#f3"); guard(my); await tap();
+    const f3 = vp.querySelector("#f3"); f3.classList.remove("ph"); f3.textContent = "Dr. Appleton";
+    await sleep(1500); clearHighlight(); guard(my);
+    await caption("Then sign in", "You get your own page, and a link you can bookmark.", "03");
+    await highlight("#go"); await moveTo("#go"); guard(my); await tap(); clearHighlight();
+    await sleep(2000);
+  }},
+
+{ cap:["This is your page","One button. Nothing else to learn.","04"],
+  async run(my){
+    view(patientHead() + toprowMini() + '<div class="c"><div class="sec">Captured so far (0)</div>' +
+      '<div class="note">Nothing captured yet.</div></div>');
+    parkCursor(160, 520); await capWait(2400); guard(my);
+    await highlight("#mic", 3600); guard(my);
+    await sleep(600); guard(my);
+    await caption("Need more information?", "These three buttons sit right on your page: bookmark it, watch the intro, or replay these instructions.", "21");
+    await highlight("#trow", 3600); guard(my);
+    await sleep(900);
+  }},
+
+{ cap:["Tap, and say what is on your mind","Any hour of the night. It does not have to wait for rounds.","05"],
+  async run(my){
+    view(patientHead() + '<div class="c"><div class="sec">Captured so far (0)</div>' +
+      '<div class="note">Nothing captured yet.</div></div>');
+    parkCursor(160, 500); await capWait(2400); guard(my);
+    await moveTo("#mic"); guard(my); await tap();
+    vp.querySelector("#mic").classList.add("rec");
+    vp.querySelector("#miclabel").textContent = "Listening…";
+    vp.querySelector("#dot").classList.add("live");
+    vp.querySelector("#plabel").textContent = "Recording — you are in control";
+    await sleep(800); guard(my);
+    await typeInto(vp.querySelector("#live"), Q_PLAIN_1, my, 48);
+    await sleep(1300); guard(my);
+    await caption("Tap again to stop", "The microphone is only on while you say so.", "06");
+    await moveTo("#mic"); await tap(); guard(my);
+    vp.querySelector("#mic").classList.remove("rec");
+    vp.querySelector("#miclabel").textContent = "Tap to speak";
+    vp.querySelector("#dot").classList.remove("live");
+    vp.querySelector("#plabel").textContent = "Microphone off — nothing is being recorded";
+    await sleep(2000);
+  }},
+
+{ cap:["It joins your list","Nothing is lost between visits. It waits for the team, not for you.","07"],
+  async run(my){
+    view(patientHead() + '<div class="c"><div class="sec">Captured so far (1)</div>' +
+      entry("e1",Q_PLAIN_1,"","&#9744; I was heard","Waiting for your care team") + '</div>');
+    parkCursor(160, 520); await capWait(2400); guard(my);
+    await highlight("#e1", 4600); guard(my);
+    await sleep(3400);
+  }},
+
+{ cap:["Some words bring up a safety message","If what you say sounds like it should not wait, Heard saves it, then shows who to contact right now.","22"],
+  async run(my){
+    view(patientHead() + '<div class="c"><div class="sec">Captured so far (1)</div>' +
+      entry("e1", Q_PLAIN_1, "", "&#9744; I was heard", "Waiting for your care team") + '</div>');
+    parkCursor(160, 500); await capWait(2400); guard(my);
+    await typeInto(vp.querySelector("#live"), Q_SAFETY, my, 48);
+    await sleep(1100); guard(my);
+    /* the app saves the words first, then shows the message */
+    view(safetyCard());
+    await sleep(1400); guard(my);
+    await highlight("#rfhosp", 2600); guard(my);
+    await highlight("#rfhome", 2600); guard(my);
+    await caption("Heard does not alert anyone", "Your nurse, your surgeon's office, or 911 is how you get help now. Then tap I understand.", "23");
+    await highlight("#rfok"); await moveTo("#rfok"); guard(my); await tap(); clearHighlight();
+    await sleep(1600);
+  }},
+
+{ cap:["Bring in a family member","Right below the capture button: Share with a caregiver.","08"],
+  async run(my){
+    view(shareCard(false));
+    parkCursor(160, 480); await capWait(2400); guard(my);
+    await highlight("#mk"); guard(my);
+    await caption("Click on this button", "It adds a caregiver to your team.", "17");
+    await moveTo("#mk"); guard(my); await tap(); clearHighlight();
+    view(shareCard(true));
+    await sleep(900); guard(my);
+    await caption("You get a six character code", "Read it out, or send it. Anyone who uses it sees your whole page.", "09");
+    await highlight("#code", 4200);
+    await sleep(2200);
+  }},
+
+{ cap:["Send it as a text","Tap the button and your own messaging app opens.","10"],
+  async run(my){
+    view(shareCard(true) +
+      '<div class="sheet" id="sheet"><div class="h">New Message</div>' +
+      '<div class="to" id="to"><b>To:</b> <span id="toname"></span><span class="cursorbar"></span></div>' +
+      '<div class="bubble">I am using Heard to keep track of questions for my care team. Join with code 7KQ4MP or open https://imheard.com/#/b/demo/c/7KQ4MP</div></div>');
+    parkCursor(160, 480); await capWait(2400); guard(my);
+    await highlight("#txt"); await moveTo("#txt"); guard(my); await tap(); clearHighlight();
+    vp.querySelector("#sheet").classList.add("up");
+    await sleep(1600); guard(my);
+    await caption("You only choose who it goes to", "The invite and the code are already written for you.", "11");
+    await highlight("#to"); await moveTo("#to"); guard(my); await tap();
+    await typeInto(vp.querySelector("#toname"), "Sarah (daughter)", my, 80);
+    await sleep(2600); clearHighlight(); await sleep(800);
+  }},
+
+{ cap:["Sarah joins with the code","She puts in her name, so the team knows who is asking.","12"],
+  async run(my){
+    view('<div class="c"><div class="sec">You have been invited to help Margaret</div>' +
+      '<div class="note" style="margin-bottom:9px">Add your name so the care team knows who asked. Your questions appear on the same list, under your name.</div>' +
+      '<div class="fld ph" id="nm">Your name</div>' +
+      '<div class="btn coral" id="join">Join</div>' +
+      '<div class="warn">You will be able to see everything Margaret has recorded.</div></div>');
+    parkCursor(160, 480); await capWait(2400); guard(my);
+    await moveTo("#nm"); await tap(); guard(my);
+    await typeInto(vp.querySelector("#nm"), "Sarah (daughter)", my, 72);
+    await sleep(600); guard(my);
+    await highlight("#join"); await moveTo("#join"); guard(my); await tap(); clearHighlight();
+    await sleep(3200);
+  }},
+
+{ cap:["Her questions sit beside yours","Labelled with her name, never mixed up with yours.","13"],
+  async run(my){
+    view('<div class="c"><div class="sec">Captured so far (2)</div>' +
+      '<div class="authhdr">From Margaret</div>' +
+      entry("e1",Q_PLAIN_1,"","&#9744; I was heard","Waiting for your care team") +
+      '<div class="authhdr cg" id="cgh">Caregiver &mdash; Sarah (daughter)</div>' +
+      entry("e2",Q_PLAIN_3,"","&#9744; I was heard","Waiting for your care team") +
+      '</div>');
+    parkCursor(160, 500); await capWait(2400); guard(my);
+    await highlight("#cgh", 4600); guard(my);
+    await sleep(3000);
+  }},
+
+{ cap:["Your team sees your list","At their next point of contact. When a concern has been addressed with you, they mark it: Heard by your care team.","18"],
+  async run(my){
+    view('<div class="c"><div class="sec">Captured so far (2)</div>' +
+      '<div class="authhdr">From Margaret</div>' +
+      entry("e1",Q_PLAIN_1,"","&#9744; I was heard","Waiting for your care team") +
+      '<div class="authhdr cg">Caregiver &mdash; Sarah (daughter)</div>' +
+      entry("e2",Q_PLAIN_3,"","&#9744; I was heard","Waiting for your care team") +
+      '</div>');
+    parkCursor(160, 300); await sleep(3200); guard(my);
+    const e1 = vp.querySelector("#e1");
+    e1.classList.add("addressed");
+    e1.querySelector(".foot .r").innerHTML = "&#10003; Heard by your care team";
+    /* The X is stamped in only for entries built as addressed; this one flips
+       at runtime, so it gets its Not heard button here. */
+    e1.querySelector(".foot .r").insertAdjacentHTML("beforebegin", '<span class="nhx">&#10006; Not heard</span>');
+    await highlight("#e1 .foot .r", 3400); guard(my);
+    await capWait(0); guard(my);
+    await caption("If you feel it has been, close the loop", "Tap I was heard. If it has not been, the red Not heard sends it back to your open list.", "19");
+    await highlight("#e1 .nhx", 2200); guard(my);
+    await highlight("#e1 .l"); await moveTo("#e1 .l"); guard(my); await tap();
+    vp.querySelector("#e1 .l").innerHTML = "&#9745; I was heard";
+    clearHighlight(); await sleep(1000); guard(my);
+    view('<div class="c"><div class="sec">Captured so far (1)</div>' +
+      '<div class="authhdr cg">Caregiver &mdash; Sarah (daughter)</div>' +
+      entry("e2",Q_PLAIN_3,"","&#9744; I was heard","Waiting for your care team") +
+      '</div>' +
+      '<div class="c"><div class="sec">Heard by your care team (1)</div>' +
+      '<div class="note" style="margin-bottom:6px">Your care team answered these, and you confirmed you were heard.</div>' +
+      entry("e3",Q_PLAIN_1,"closed","&#9745; I was heard","&#10003; Heard by your care team") + '</div>');
+    await sleep(2800); guard(my);
+  }},
+
+{ cap:["Your caregiver's questions land on your page","And the loop is ultimately yours: only you can tick I was heard, on your questions and on theirs.","20"],
+  async run(my){
+    view('<div class="c"><div class="sec">Captured so far (1)</div>' +
+      '<div class="authhdr cg" id="cgh">Caregiver &mdash; Sarah (daughter)</div>' +
+      entry("e2",Q_PLAIN_3,"addressed","&#9744; I was heard","&#10003; Heard by your care team") +
+      '</div>');
+    parkCursor(160, 300); await sleep(2600); guard(my);
+    await highlight("#cgh", 2600); guard(my);
+    await capWait(0); guard(my);
+    await highlight("#e2 .l"); await moveTo("#e2 .l"); guard(my); await tap();
+    vp.querySelector("#e2 .l").innerHTML = "&#9745; I was heard";
+    clearHighlight(); await sleep(1000); guard(my);
+    view('<div class="c"><div class="sec">Captured so far (0)</div>' +
+      '<div class="note">Everything so far has been answered and closed.</div></div>' +
+      '<div class="c"><div class="sec">Heard by your care team (2)</div>' +
+      '<div class="note" style="margin-bottom:6px">Your care team answered these, and you confirmed you were heard.</div>' +
+      entry("e3",Q_PLAIN_1,"closed","&#9745; I was heard","&#10003; Heard by your care team") +
+      entry("e4",Q_PLAIN_3,"closed","&#9745; I was heard","&#10003; Heard by your care team") + '</div>');
+    await sleep(2600); guard(my);
+  }},
+
+{ cap:["That's the whole loop","Ask when it occurs to you. Your team will hear you. You both know you've been heard.","16"],
+  async run(my){
+    curEl.classList.remove("on");
+    view('<div class="final"><div class="tick">&#10003;</div><h2>You have been heard.</h2>' +
+      '<p>Your care team knows your question was answered.<br>And now you know it too.</p></div>');
+    await sleep(4500);
+  }}
+];
+
+/* Rough seconds per screen, for the continuous time bar and the 30 second backup.
+   The bar is a guide, not a stopwatch. */
+const EST = [24, 25, 13, 9, 24, 22, 17, 14, 9, 30, 15, 11];
+const CUM = EST.reduce((a, v) => (a.push((a[a.length-1] || 0) + v), a), []);
+const TOTAL = CUM[CUM.length - 1];
+let inScreen = 0, timer = null;
+setInterval(() => {
+  if (!paused && !document.hidden) inScreen = Math.min(inScreen + 0.25, EST[idx]);
+  const done = (idx ? CUM[idx - 1] : 0) + inScreen;
+  progEl.style.width = (done / TOTAL * 100).toFixed(2) + "%";
+}, 250);
+
+async function show(i){
+  token++; const my = token;
+  clearTimeout(timer);
+  stopVoice();
+  finished = false;
+  idx = Math.max(0, Math.min(STEPS.length - 1, i));
+  inScreen = 0;
+  const st = STEPS[idx];
+  const nextBtn = document.getElementById("next");
+  stack.innerHTML = ""; setShift(0); firstCap = st.cap;
+  setPaused(false);
+  countEl.textContent = (idx + 1) + " / " + STEPS.length;
+  document.getElementById("prev").disabled = idx === 0;
+  nextBtn.innerHTML = idx === STEPS.length - 1 ? "&#8635; Start over" : "Next &#8594;";
+  nextBtn.classList.remove("ready");
+  clearHighlight();
+  try {
+    await st.run(my); guard(my);
+    finished = true;
+    inScreen = EST[idx];
+    if (idx < STEPS.length - 1) timer = setTimeout(() => show(idx + 1), 600);
+    else nextBtn.classList.add("ready");
+  } catch (e) { if (e !== "x") console.error(e); }
+}
+function goNext(){ show(idx >= STEPS.length - 1 ? 0 : idx + 1); }
+function goPrev(){ if (idx > 0) show(idx - 1); }
+function back30(){
+  const now = (idx ? CUM[idx - 1] : 0) + inScreen;
+  const target = Math.max(0, now - 30);
+  let k = 0; while (k < CUM.length - 1 && CUM[k] <= target) k++;
+  show(k);
+}
+document.getElementById("next").onclick = goNext;
+document.getElementById("prev").onclick = goPrev;
+document.getElementById("back30").onclick = back30;
+document.getElementById("pause").onclick = () => setPaused(!paused);
+addEventListener("keydown", e => {
+  if (e.key === "ArrowRight") goNext();
+  if (e.key === "ArrowLeft")  goPrev();
+  if (e.key === " ") { e.preventDefault(); setPaused(!paused); }
+});
+
+/* A hidden tab freezes everything; pause there and resume on return. */
+let pausedByTab = false;
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) { if (!paused){ pausedByTab = true; setPaused(true); } }
+  else if (pausedByTab) { pausedByTab = false; setPaused(false); }
+});
+
+const SILENT = "data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEAIlYAAESsAAACABAAZGF0YQQAAAAAAA==";
+function begin(sound){
+  audioOn = sound;
+  if (sound){ try { player.src = SILENT; player.play().catch(() => {}); } catch (e) {} }
+  const g = document.getElementById("gate");
+  g.style.opacity = "0"; g.style.pointerEvents = "none";
+  setTimeout(() => g.remove(), 700);
+  show(0);
+}
+document.getElementById("gstart").onclick = () => begin(true);
+document.getElementById("gmute").onclick = () => begin(false);
+</script>
+</body>
+</html>
