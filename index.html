@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Heard — Patient Concern Capture (Demo)</title>
 <link rel="icon" href="heard-icon.png">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
@@ -23,11 +23,11 @@
   .wrap { max-width: 560px; margin: 0 auto; padding: 14px 14px 90px; }
   header { text-align: center; padding: 10px 0 4px; }
   header h1 { font-size: 22px; color: var(--blue); letter-spacing: .3px; cursor: pointer; }
-  header p { font-size: 12px; color: var(--mut); margin-top: 2px; }
-  .demo-banner { background: var(--amber-lt); color: var(--amber); border: 1px solid #e6d9a8; font-size: 11px; padding: 6px 10px; border-radius: 8px; text-align: center; margin: 10px 0; }
+  header p { font-size: 14px; color: var(--mut); margin-top: 2px; }
+  .demo-banner { background: var(--amber-lt); color: var(--amber); border: 1px solid #e6d9a8; font-size: 14px; padding: 6px 10px; border-radius: 8px; text-align: center; margin: 10px 0; }
   .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px; margin-bottom: 12px; }
   .hidden { display: none !important; }
-  h2.sec { font-size: 13px; text-transform: uppercase; letter-spacing: .8px; color: var(--mut); margin-bottom: 8px; }
+  h2.sec { font-size: 14px; text-transform: uppercase; letter-spacing: .8px; color: var(--mut); margin-bottom: 8px; }
   .btn { display: flex; align-items: center; justify-content: center; width: 100%; min-height: 52px; padding: 12px 14px;
     border: 0; border-radius: 12px; background: var(--blue); color: #fff; font-size: 16px; font-weight: 700;
     cursor: pointer; text-align: center; text-decoration: none; box-sizing: border-box; }
@@ -39,12 +39,12 @@
   select.txt { appearance: none; -webkit-appearance: none; padding-right: 40px;
     background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'><path fill='%235f6b76' d='M5.5 7.5 10 12l4.5-4.5z'/></svg>");
     background-repeat: no-repeat; background-position: right 12px center; background-size: 18px; }
-  .note { font-size: 12px; color: var(--mut); margin-top: 8px; text-align: center; }
-  .ok { color: var(--green); font-size: 12px; }
-  .err { color: var(--red); font-size: 12px; }
+  .note { font-size: 14px; color: var(--mut); margin-top: 8px; text-align: center; }
+  .ok { color: var(--green); font-size: 14px; }
+  .err { color: var(--red); font-size: 14px; }
 
   /* patient capture */
-  .privacy { display: flex; align-items: center; gap: 10px; justify-content: center; font-size: 13px; color: var(--mut); margin-bottom: 10px; }
+  .privacy { display: flex; align-items: center; gap: 10px; justify-content: center; font-size: 14px; color: var(--mut); margin-bottom: 10px; }
   .dot { width: 10px; height: 10px; border-radius: 50%; background: #b7bfc7; }
   .dot.live { background: var(--red); animation: pulse 1.2s infinite; }
   @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .35; } }
@@ -53,98 +53,99 @@
     box-shadow: 0 6px 18px rgba(31,78,121,.35); }
   .recbtn.recording { background: radial-gradient(circle at 35% 30%, #e05a52, var(--red)); }
   .recbtn .mic { font-size: 28px; display: block; margin-bottom: 3px; }
-  #liveText { min-height: 40px; margin-top: 12px; font-size: 15px; background: var(--blue-lt); border-radius: 10px; padding: 10px 12px; display: none; }
+  #liveText { min-height: 40px; margin-top: 12px; font-size: 16px; background: var(--blue-lt); border-radius: 10px; padding: 10px 12px; display: none; }
   #liveText.show { display: block; }
   .typebox { display: flex; gap: 8px; margin-top: 12px; }
-  .typebox input { flex: 1; padding: 11px 12px; border: 1px solid var(--line); border-radius: 10px; font-size: 15px; }
-  .typebox button { padding: 0 16px; border: 0; border-radius: 10px; background: var(--accent); color: #fff; font-weight: 600; cursor: pointer; }
-  .entry { border-left: 3px solid var(--accent); background: #fafcfe; padding: 9px 12px; border-radius: 0 10px 10px 0; margin-top: 8px; font-size: 14px; }
-  .entry time { display: block; font-size: 11px; color: var(--mut); margin-bottom: 2px; }
+  .typebox input { flex: 1; min-width: 0; padding: 11px 12px; border: 1px solid var(--line); border-radius: 10px; font-size: 16px; }
+  .typebox button { padding: 0 16px; min-height: 44px; border: 0; border-radius: 10px; background: var(--accent); color: #fff; font-weight: 600; font-size: 16px; font-family: inherit; cursor: pointer; }
+  .entry { border-left: 3px solid var(--accent); background: #fafcfe; padding: 9px 12px; border-radius: 0 10px 10px 0; margin-top: 8px; font-size: 16px; line-height: 1.4; }
+  .entry time { display: block; font-size: 14px; color: var(--mut); margin-bottom: 2px; }
   .qrbox { text-align: center; }
   .qrbox .qr { display: inline-block; padding: 10px; background: #fff; border: 1px solid var(--line); border-radius: 12px; }
-  .linkline { font-size: 11px; color: var(--accent); word-break: break-all; margin-top: 8px; }
+  .linkline { font-size: 14px; color: var(--accent); word-break: break-all; margin-top: 8px; }
 
   /* provider */
   .rnd { border-top: 1px solid var(--line); padding: 12px 4px; }
   .rndhead { display: flex; justify-content: space-between; align-items: center; cursor: pointer; }
   .rndlist { list-style: none; margin: 8px 0 0; padding: 0; }
   .rndlist li { padding: 9px 0; border-top: 1px dashed var(--line); font-size: 15px; line-height: 1.4; overflow: hidden; }
-  .rndlist .cap { font-size: 12px; color: var(--mut); margin-top: 2px; }
-  .rndchk { float: right; margin-left: 10px; font-size: 13px; color: var(--mut); white-space: nowrap; cursor: pointer; }
-  .rndchk input { width: 20px; height: 20px; vertical-align: -5px; margin-right: 4px; }
+  .rndlist .cap { font-size: 14px; color: var(--mut); margin-top: 2px; }
+  .rndchk { float: right; margin-left: 10px; font-size: 14px; color: var(--mut); white-space: nowrap; cursor: pointer;
+    display: inline-flex; align-items: center; gap: 6px; min-height: 44px; }
+  .rndchk input { width: 24px; height: 24px; margin: 0; flex: none; }
   .ptrow { display: flex; justify-content: space-between; align-items: center; padding: 12px 4px; border-top: 1px solid var(--line); cursor: pointer; }
   .ptrow:first-of-type { border-top: 0; }
   .ptrow .nm { font-weight: 600; font-size: 15px; }
-  .ptrow .dt { font-size: 11px; color: var(--mut); }
+  .ptrow .dt { font-size: 14px; color: var(--mut); }
   .ptrow .arrow { color: var(--mut); }
   /* provider rows: open count and safety-list marks. Each mark carries its word, so colour is never the only signal. */
   .ptrow .chips { display: flex; flex-wrap: wrap; gap: 4px 6px; margin: 4px 0 3px; }
-  .chip { display: inline-block; font-size: 12px; font-weight: 700; border-radius: 6px; padding: 2px 7px; white-space: nowrap; border: 1px solid var(--line); color: var(--mut); background: var(--bg); }
+  .chip { display: inline-block; font-size: 14px; font-weight: 700; border-radius: 6px; padding: 2px 7px; white-space: nowrap; border: 1px solid var(--line); color: var(--mut); background: var(--bg); }
   .chip.open { color: var(--ink); }
   .chip.red { background: var(--red); border-color: var(--red); color: #fff; }
   .chip.amber { background: var(--amber-lt); border-color: #d9c36a; color: var(--amber); }
-  .rowlegend { font-size: 12px; color: var(--mut); padding: 0 4px 8px; }
-  .bucket li .cap { display: block; font-size: 12px; color: var(--mut); margin-top: 3px; }
+  .rowlegend { font-size: 14px; color: var(--mut); padding: 0 4px 8px; }
+  .bucket li .cap { display: block; font-size: 14px; color: var(--mut); margin-top: 3px; }
   .bucket li .chip, .addrlist li .chip { margin-right: 6px; vertical-align: 1px; }
-  .addrlist li .cap { display: block; font-size: 12px; color: var(--mut); margin-top: 3px; }
+  .addrlist li .cap { display: block; font-size: 14px; color: var(--mut); margin-top: 3px; }
   details.settings button.danger { color: var(--red); border-color: #e6b0ac; }
   .bucket { margin-top: 12px; }
   .bucket h3 { font-size: 14px; padding: 8px 12px; border-radius: 10px 10px 0 0; color: #fff; }
   .bucket ul { list-style: none; border: 1px solid var(--line); border-top: 0; border-radius: 0 0 10px 10px; }
   .bucket li { padding: 10px 12px; font-size: 14px; border-top: 1px solid var(--line); }
   .bucket li:first-child { border-top: 0; }
-  .bucket li q { display: block; font-size: 12px; color: var(--mut); font-style: italic; margin-top: 3px; }
+  .bucket li q { display: block; font-size: 14px; color: var(--mut); font-style: italic; margin-top: 3px; }
   .b-urgent h3 { background: var(--red); } .b-urgent ul { background: var(--red-lt); }
   .b-md h3 { background: var(--blue); }
   /* Nursing header is yellow. White text on yellow is unreadable, so this one
      header uses dark ink. Every other bucket keeps white on its own colour. */
   .b-rn h3 { background: #f2c200; color: var(--ink); }
   .b-other h3 { background: #6b7683; }
-  .empty { color: var(--mut); font-size: 13px; padding: 10px 4px; }
+  .empty { color: var(--mut); font-size: 14px; padding: 10px 4px; }
   .exportrow { display: flex; gap: 8px; margin-top: 14px; }
-  .exportrow button { flex: 1; padding: 11px; border: 1px solid var(--line); background: var(--card); border-radius: 10px; font-size: 13px; font-weight: 600; color: var(--blue); cursor: pointer; }
-  .alertbar { background: var(--red); color: #fff; padding: 10px 14px; border-radius: 10px; font-size: 13px; font-weight: 600; margin-bottom: 10px; }
+  .exportrow button { flex: 1; padding: 11px; border: 1px solid var(--line); background: var(--card); border-radius: 10px; font-size: 14px; font-weight: 600; color: var(--blue); cursor: pointer; }
+  .alertbar { background: var(--red); color: #fff; padding: 10px 14px; border-radius: 10px; font-size: 14px; font-weight: 600; margin-bottom: 10px; }
   .topbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; gap: 8px; }
   .topbar select.txt { margin-bottom: 0; flex: 1 1 auto; min-width: 0; }
-  .bnc { display: inline-block; margin-left: 6px; font-size: 11px; font-weight: 700; color: var(--red);
+  .bnc { display: inline-block; margin-left: 6px; font-size: 14px; font-weight: 700; color: var(--red);
     background: #fdecea; border: 1px solid #e6b0ac; border-radius: 6px; padding: 1px 6px; white-space: nowrap; }
   .rmx { border: 0; background: none; color: var(--mut); font-size: 17px; cursor: pointer; padding: 4px 10px; }
   .rmx:hover { color: var(--red); }
-  .topbar button, .topbar a { border: 1px solid var(--line); background: var(--card); border-radius: 8px; padding: 6px 12px; font-size: 12px; color: var(--mut); cursor: pointer; text-decoration: none; }
+  .topbar button, .topbar a { border: 1px solid var(--line); background: var(--card); border-radius: 8px; padding: 6px 12px; font-size: 14px; color: var(--mut); cursor: pointer; text-decoration: none; }
   .spin { display: inline-block; width: 16px; height: 16px; border: 2px solid rgba(255,255,255,.4); border-top-color: #fff; border-radius: 50%; animation: rot .8s linear infinite; vertical-align: -3px; margin-right: 6px; }
   @keyframes rot { to { transform: rotate(360deg); } }
-  details.settings summary { font-size: 12px; color: var(--mut); cursor: pointer; padding: 6px 2px; }
-  details.settings input { width: 100%; padding: 10px; border: 1px solid var(--line); border-radius: 8px; font-size: 13px; margin: 6px 0; }
+  details.settings summary { font-size: 14px; color: var(--mut); cursor: pointer; padding: 6px 2px; }
+  details.settings input { width: 100%; padding: 10px; border: 1px solid var(--line); border-radius: 8px; font-size: 14px; margin: 6px 0; }
   details.settings .row { display: flex; gap: 8px; flex-wrap: wrap; }
-  details.settings button { padding: 8px 12px; border: 1px solid var(--line); background: var(--card); border-radius: 8px; font-size: 12px; cursor: pointer; }
+  details.settings button { padding: 8px 12px; border: 1px solid var(--line); background: var(--card); border-radius: 8px; font-size: 14px; cursor: pointer; }
 
   /* PIN modal */
   .pin-overlay { position: fixed; inset: 0; background: rgba(20,28,36,.6); display: flex; align-items: center; justify-content: center; z-index: 50; }
   .pin-card { background: var(--card); border-radius: 16px; padding: 22px 24px 18px; width: 290px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,.3); }
   .pin-card h3 { color: var(--blue); font-size: 16px; margin-bottom: 4px; }
-  .pin-card .sub { font-size: 11px; color: var(--mut); margin-bottom: 14px; }
+  .pin-card .sub { font-size: 14px; color: var(--mut); margin-bottom: 14px; }
   .pin-dots { display: flex; justify-content: center; gap: 14px; margin-bottom: 16px; }
   .pin-dots span { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--blue); }
   .pin-dots span.fill { background: var(--blue); }
   .pin-pad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
   .pin-pad button { padding: 14px 0; font-size: 20px; font-weight: 600; border: 1px solid var(--line); border-radius: 12px; background: #fafbfc; cursor: pointer; }
   .pin-pad button.aux { font-size: 14px; color: var(--mut); }
-  .pin-err { color: var(--red); font-size: 12px; min-height: 16px; margin-top: 10px; }
+  .pin-err { color: var(--red); font-size: 14px; min-height: 16px; margin-top: 10px; }
   .shake { animation: shake .35s; }
   @keyframes shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-8px)} 75%{transform:translateX(8px)} }
-  footer { text-align: center; font-size: 10px; color: var(--mut); padding: 16px 10px; }
+  footer { text-align: center; font-size: 14px; color: var(--mut); padding: 16px 10px; }
 
   /* ===== warm landing (hero) ===== */
-  :root { --teal: #12807c; --teal-deep: #0b5f5c; --coral: #e8735a; --coral-deep: #d45f47; --cream: #fdf8f3; }
+  :root { --teal: #12807c; --teal-deep: #0b5f5c; --coral: #c44a2e; --coral-deep: #a93a22; --cream: #fdf8f3; }
   .hero { background: linear-gradient(150deg, var(--teal) 0%, var(--teal-deep) 78%); border-radius: 22px; padding: 34px 22px 30px; text-align: center; color: #fff; margin-bottom: 16px; box-shadow: 0 10px 26px rgba(11,95,92,.28); }
   .hero .mark { width: 74px; height: 74px; margin: 0 auto 12px; background: rgba(255,255,255,.14); border-radius: 50%; display: flex; align-items: center; justify-content: center; }
   .hero .markimg { width: 78px; height: 78px; display: block; margin: 0 auto 12px; border-radius: 20px; box-shadow: 0 4px 12px rgba(0,0,0,.22); }
   .hero h1 { font-size: 34px; letter-spacing: .5px; font-weight: 800; }
   .hero .tag { font-size: 15px; margin-top: 8px; opacity: .95; line-height: 1.45; font-weight: 500; }
-  .hero .tagsub { font-size: 12px; margin-top: 10px; opacity: .75; }
+  .hero .tagsub { font-size: 14px; margin-top: 10px; opacity: .75; }
   .choice { background: var(--cream); border: 1px solid #efe3d8; border-radius: 18px; padding: 18px; margin-bottom: 12px; }
   .choice h2 { font-size: 17px; color: var(--teal-deep); margin-bottom: 4px; }
-  .choice p { font-size: 13px; color: var(--mut); margin-bottom: 12px; line-height: 1.4; }
+  .choice p { font-size: 14px; color: var(--mut); margin-bottom: 12px; line-height: 1.4; }
   .btn.coral { background: linear-gradient(150deg, var(--coral), var(--coral-deep)); border-radius: 14px; }
   /* The caregiver card runs two points larger throughout, after tester feedback. */
   #shareCard h2.sec { font-size: 15px; }
@@ -156,32 +157,33 @@
   .heroimg { text-align: center; margin: -4px 0 14px; }
   .heroimg svg, .heroimg img { width: 100%; max-width: 430px; height: auto; display: block; margin: 0 auto; border-radius: 18px; box-shadow: 0 4px 14px rgba(11,95,92,.12); }
   .entry.heard { border-left-color: var(--green); background: var(--green-lt); }
-  .heardchk { display: block; margin-top: 6px; font-size: 12px; color: var(--green); cursor: pointer; font-weight: 600; }
-  .heardchk input { vertical-align: -2px; margin-right: 4px; }
-  .itemchk { float: right; margin-left: 10px; font-size: 11px; color: var(--mut); cursor: pointer; white-space: nowrap; }
-  .itemchk input { vertical-align: -2px; margin-right: 3px; }
+  .heardchk { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; margin-top: 6px; font-size: 16px; color: var(--green); cursor: pointer; font-weight: 600; }
+  .heardchk input { width: 24px; height: 24px; margin: 0; flex: none; }
+  .itemchk { float: right; margin-left: 10px; font-size: 14px; color: var(--mut); cursor: pointer; white-space: nowrap;
+    display: inline-flex; align-items: center; gap: 6px; min-height: 44px; }
+  .itemchk input { width: 24px; height: 24px; margin: 0; flex: none; }
   /* loop states: open -> addressed by the care team -> closed once the patient confirms */
   .entryfoot { display: flex; align-items: center; justify-content: space-between; gap: 6px 10px; margin-top: 6px; flex-wrap: wrap; }
   .entryfoot .heardchk { margin-top: 0; }
   /* "I was heard" is locked until the care team marks the question addressed. */
   .heardchk.locked { color: var(--mut); font-weight: 400; cursor: default; }
-  .loopnote { flex: 1 1 100%; font-size: 12px; color: var(--mut); line-height: 1.35; margin-top: 2px; }
+  .loopnote { flex: 1 1 100%; font-size: 14px; color: var(--mut); line-height: 1.35; margin-top: 2px; }
   .entry.addressed .loopnote { color: var(--ink); }
-  .loopkey { font-size: 13px; color: var(--mut); line-height: 1.4; margin: 0 0 8px; }
+  .loopkey { font-size: 14px; color: var(--mut); line-height: 1.4; margin: 0 0 8px; }
   .nhx { border: 1px solid #e6b0ac; background: #fdecea; color: var(--red); font-weight: 700;
-    border-radius: 8px; padding: 3px 9px; font-size: 12px; cursor: pointer; font-family: inherit;
+    border-radius: 10px; padding: 8px 14px; min-height: 44px; font-size: 15px; cursor: pointer; font-family: inherit;
     margin-right: auto; }
-  .ctbadge { font-size: 11px; font-weight: 600; white-space: nowrap; color: var(--amber); }
+  .ctbadge { font-size: 14px; font-weight: 600; white-space: nowrap; color: var(--amber); }
   .entry.closed .ctbadge { color: var(--green); }
   .entry.addressed { border-left-color: var(--amber); background: var(--amber-lt); }
   .entry.closed { border-left-color: var(--green); background: var(--green-lt); }
   .addrlist { list-style: none; }
   .addrlist li { padding: 10px 12px; font-size: 14px; border: 1px solid var(--line); border-radius: 10px; margin-top: 8px; background: var(--green-lt); }
-  .addrlist li q { display: block; font-size: 12px; color: var(--mut); font-style: italic; margin-top: 3px; }
-  .addrstat { float: right; margin-left: 10px; font-size: 11px; white-space: nowrap; }
+  .addrlist li q { display: block; font-size: 14px; color: var(--mut); font-style: italic; margin-top: 3px; }
+  .addrstat { float: right; margin-left: 10px; font-size: 14px; white-space: nowrap; }
   .addrstat.done { color: var(--green); font-weight: 600; }
   .addrstat.wait { color: var(--mut); }
-  .authhdr { font-size: 12px; text-transform: uppercase; letter-spacing: .6px; color: var(--mut); margin: 14px 0 2px; }
+  .authhdr { font-size: 14px; text-transform: uppercase; letter-spacing: .6px; color: var(--mut); margin: 14px 0 2px; }
   .authhdr:first-child { margin-top: 2px; }
   .authhdr.cg { color: var(--accent); }
   /* Two buttons under the hero, side by side, filling the width: save the site, and see how it works. */
@@ -190,24 +192,24 @@
     justify-content: center; text-align: center; border-radius: 18px; text-decoration: none; font-family: inherit;
     cursor: pointer; padding: 6px 8px; box-sizing: border-box; line-height: 1.2; }
   .toprow b { font-size: 15px; font-weight: 800; }
-  .toprow small { font-size: 12px; font-weight: 500; margin-top: 3px; }
+  .toprow small { font-size: 14px; font-weight: 500; margin-top: 3px; }
   .bm { background: #fff; color: var(--green); border: 12px solid var(--green);
     box-shadow: 0 0 0 4px rgba(30,125,70,.22), 0 4px 12px rgba(11,95,92,.14); }
   .bm small { color: #33414b; }
   .tourlink { background: var(--card); color: var(--teal-deep); border: 2px solid #cfe0df; box-shadow: 0 2px 6px rgba(11,95,92,.10); }
-  .tourlink .play { color: var(--coral); font-size: 12px; margin-right: 5px; }
+  .tourlink .play { color: var(--coral); font-size: 14px; margin-right: 5px; }
   .tourlink small { color: var(--mut); }
   @media (max-width: 480px) {
     .toprow { gap: 7px; }
-    .toprow b { font-size: 13px; }
-    .toprow small { font-size: 10.5px; }
+    .toprow b { font-size: 14px; }
+    .toprow small { font-size: 14px; }
     .bm { border-width: 9px; }
   }
   #bmPanel { background: #fff; border: 2px solid var(--green); }
   #bmPanel .how { font-size: 15.5px; line-height: 1.5; color: var(--ink); margin: 0 0 12px; }
-  .cgtag { display: inline-block; margin-left: 8px; font-size: 11px; font-weight: 600; color: var(--accent); background: var(--blue-lt); border-radius: 6px; padding: 1px 6px; vertical-align: 1px; }
+  .cgtag { display: inline-block; margin-left: 8px; font-size: 14px; font-weight: 600; color: var(--accent); background: var(--blue-lt); border-radius: 6px; padding: 1px 6px; vertical-align: 1px; }
   .sharecode { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 28px; letter-spacing: 4px; font-weight: 700; color: var(--blue); text-align: center; background: var(--blue-lt); border-radius: 10px; padding: 12px; margin: 8px 0; }
-  .warnbox { background: var(--amber-lt); border: 1px solid #e6d9a8; color: var(--amber); border-radius: 10px; padding: 10px 12px; font-size: 12px; margin-top: 8px; }
+  .warnbox { background: var(--amber-lt); border: 1px solid #e6d9a8; color: var(--amber); border-radius: 10px; padding: 10px 12px; font-size: 14px; margin-top: 8px; }
   /* ===== red-flag safety message =====
      Large type and one button: the reader may be elderly, in pain and without glasses. */
   .rf-overlay { position: fixed; inset: 0; background: rgba(20,28,36,.8); display: flex; align-items: flex-start; justify-content: center; z-index: 60; padding: 14px; overflow-y: auto; }
@@ -217,12 +219,12 @@
   .rf-where { border-radius: 12px; padding: 12px 14px; margin-bottom: 10px; }
   .rf-where.hosp { background: var(--red-lt); border: 1px solid #e6b0ac; }
   .rf-where.home { background: var(--amber-lt); border: 1px solid #e6d9a8; }
-  .rf-where .lbl { font-size: 13px; text-transform: uppercase; letter-spacing: .8px; font-weight: 700; color: var(--mut); }
+  .rf-where .lbl { font-size: 14px; text-transform: uppercase; letter-spacing: .8px; font-weight: 700; color: var(--mut); }
   .rf-where .act { font-size: 22px; font-weight: 800; line-height: 1.25; margin-top: 3px; color: var(--ink); }
   .rf-where .act a { color: var(--red); }
   .rf-where .sm { font-size: 15px; margin-top: 6px; line-height: 1.35; color: var(--ink); }
   .rf-card .rf-crisis { font-size: 17px; font-weight: 700; margin: 2px 0 10px; line-height: 1.3; }
-  .rf-card .rf-saved { font-size: 13px; color: var(--mut); margin: 4px 0 14px; }
+  .rf-card .rf-saved { font-size: 14px; color: var(--mut); margin: 4px 0 14px; }
   .rf-card .btn { background: var(--red); font-size: 18px; min-height: 58px; }
   .rf-card.amber { border-color: var(--amber); }
   .rf-card.amber h3 { color: var(--amber); }
@@ -233,16 +235,16 @@
   .rf-card .rf-rec { font-size: 15px; font-weight: 800; margin: 0 0 6px; }
   .rf-card .rf-list { border: 1px solid var(--line, #d9dee3); border-radius: 12px; padding: 10px 14px; margin: 4px 0 10px; }
   .rf-card .rf-list h4 { font-size: 15px; margin: 0 0 4px; }
-  .rf-card .rf-list .grp { font-size: 13px; font-weight: 700; color: var(--mut); margin: 6px 0 2px; text-transform: uppercase; letter-spacing: .5px; }
+  .rf-card .rf-list .grp { font-size: 14px; font-weight: 700; color: var(--mut); margin: 6px 0 2px; text-transform: uppercase; letter-spacing: .5px; }
   .rf-card .rf-list ul { margin: 0 0 4px 18px; padding: 0; }
   .rf-card .rf-list li { font-size: 15px; line-height: 1.35; margin: 2px 0; }
   .rf-card .rf-list .note { font-size: 14px; font-weight: 700; margin: 2px 0 6px; line-height: 1.3; }
-  .rf-card .rf-src { font-size: 11.5px; color: var(--mut); margin: 0 0 10px; line-height: 1.3; }
+  .rf-card .rf-src { font-size: 14px; color: var(--mut); margin: 0 0 10px; line-height: 1.3; }
   .rftag { display: block; margin-top: 6px; border: 1px solid #e6b0ac; background: var(--red-lt); color: var(--red); font-weight: 700;
-    border-radius: 8px; padding: 6px 9px; font-size: 12.5px; cursor: pointer; font-family: inherit; text-align: left; width: 100%; }
-  .rfnote { display: block; margin-top: 4px; font-size: 12px; font-weight: 700; color: var(--red); }
+    border-radius: 8px; padding: 6px 9px; font-size: 14px; cursor: pointer; font-family: inherit; text-align: left; width: 100%; }
+  .rfnote { display: block; margin-top: 4px; font-size: 14px; font-weight: 700; color: var(--red); }
   .safeline { margin-top: 12px; border: 1px solid #e6b0ac; background: var(--red-lt); color: var(--ink); border-radius: 10px; padding: 11px 14px; font-size: 15.5px; line-height: 1.4; text-align: center; font-weight: 600; }
-  .provtag { display: inline-block; background: var(--blue-lt); color: var(--blue); border-radius: 8px; padding: 4px 10px; font-size: 13px; font-weight: 600; margin: 2px 4px 2px 0; }
+  .provtag { display: inline-block; background: var(--blue-lt); color: var(--blue); border-radius: 8px; padding: 4px 10px; font-size: 14px; font-weight: 600; margin: 2px 4px 2px 0; }
 </style>
 </head>
 <body>
@@ -505,7 +507,9 @@ async function syncProviderRecord(doc, provs){
   return rec;
 }
 
-const SI_LBL = 'style="display:block;font-size:13px;font-weight:600;color:var(--mut);margin:10px 0 4px"';
+const SI_LBL = 'style="display:block;text-align:left;font-size:14px;font-weight:600;color:var(--mut);margin:10px 0 4px"';
+/* The same label, hidden until its field is shown (the "My doctor is not listed" fields). */
+const SI_LBL_HIDE = (hide) => 'style="display:' + (hide ? 'none' : 'block') + ';text-align:left;font-size:14px;font-weight:600;color:var(--mut);margin:10px 0 4px"';
 function siField(id, label, type, auto, extra){
   return '<label for="' + id + '" ' + SI_LBL + '>' + label + '</label><input class="txt" id="' + id + '" type="' + type + '" autocomplete="' + auto + '" ' + (extra || "") + '>';
 }
@@ -593,16 +597,16 @@ async function adminCardHTML(){
   let list = [];
   try { list = (await authApi("accounts")).accounts || []; } catch (e) { return '<div class="card"><div class="warnbox">Could not load the accounts: ' + esc(e.message) + '</div></div>'; }
   const pending = list.filter(a => a.status === "pending"), rest = list.filter(a => a.status !== "pending");
-  const who = a => '<b>' + esc(a.name) + '</b> &middot; ' + esc(a.role) + (a.lead ? ' with ' + esc(a.lead) : '') + '<div style="font-size:12px;color:var(--mut)">' + esc(a.email) + '</div>';
+  const who = a => '<b>' + esc(a.name) + '</b> &middot; ' + esc(a.role) + (a.lead ? ' with ' + esc(a.lead) : '') + '<div style="font-size:14px;color:var(--mut)">' + esc(a.email) + '</div>';
   const btn = (a, action, label, cls) => '<button class="btn ' + cls + '" style="flex:1;margin-top:0" data-e="' + esc(a.email) + '" onclick="decideAccount(this.dataset.e,\'' + action + '\')">' + label + '</button>';
   let h = '<div class="card"><h2 class="sec">Access requests' + (pending.length ? ' (' + pending.length + ')' : '') + '</h2>' +
     (pending.length ? pending.map(a => '<div class="warnbox" style="margin-top:6px">' + who(a) + ' asks for access.' +
         '<div style="display:flex;gap:8px;margin-top:8px">' + btn(a, "approve", "Approve", "teal") + btn(a, "decline", "Decline", "sub") + '</div></div>').join("")
       : '<div class="empty">No one is waiting for approval.</div>') +
     (lastResetCode ? '<div class="warnbox" style="margin-top:10px">Reset code for <b>' + esc(lastResetCode.email) + '</b>: <b style="font-size:18px;letter-spacing:1px">' + esc(lastResetCode.code) + '</b><br>Give it to them directly. It works once, for ' + lastResetCode.hours + ' hours, and is not shown again.</div>' : '') +
-    '<details style="margin-top:10px"><summary style="cursor:pointer;font-size:13px;color:var(--mut)">All accounts (' + list.length + ')</summary>' +
+    '<details style="margin-top:10px"><summary style="cursor:pointer;font-size:14px;color:var(--mut)">All accounts (' + list.length + ')</summary>' +
     rest.map(a => '<div style="border-top:1px solid var(--line);padding:8px 0">' + who(a) +
-      '<div style="font-size:12px;margin-top:2px">' + (a.admin ? 'Administrator' : a.status === "disabled" ? 'Turned off' : 'Approved') + '</div>' +
+      '<div style="font-size:14px;margin-top:2px">' + (a.admin ? 'Administrator' : a.status === "disabled" ? 'Turned off' : 'Approved') + '</div>' +
       (a.admin ? '' : '<div style="display:flex;gap:8px;margin-top:6px">' +
         (a.status === "disabled" ? btn(a, "enable", "Turn on", "sub") : btn(a, "disable", "Turn off", "sub")) +
         btn(a, "reset-code", "Reset code", "sub") + '</div>') + '</div>').join("") +
@@ -710,7 +714,7 @@ function heroFallback(im){ im.parentNode.innerHTML = HERO_ART; }
 function iconFallback(im){ im.outerHTML = '<div class="mark">' + LOGO_SVG + '</div>'; }
 function npDocChange(sel){
   const other = sel.value === "__other";
-  ["npDocOther", "npTeam", "npDocNote"].forEach(function(id){
+  ["npDocOtherLbl", "npDocOther", "npTeamLbl", "npTeam", "npDocNote"].forEach(function(id){
     const el = document.getElementById(id);
     if (el) el.style.display = other ? "block" : "none";
   });
@@ -728,13 +732,15 @@ async function renderLanding(){
   const hideFree = known.length ? ' style="display:none"' : '';
   const docOptions =
     (known.length
-      ? '<select class="txt" id="npDoc" onchange="npDocChange(this)">' +
+      ? '<label for="npDoc" ' + SI_LBL + '>Your doctor</label><select class="txt" id="npDoc" onchange="npDocChange(this)">' +
         '<option value="">Who is your doctor? (choose if listed)</option>' +
         known.map(p => '<option>' + esc(p.name) + '</option>').join("") +
         '<option value="__other">My doctor is not listed</option></select>'
       : '') +
-    '<input class="txt" id="npDocOther"' + hideFree + ' placeholder="Your doctor\'s name">' +
-    '<input class="txt" id="npTeam"' + hideFree + ' placeholder="Practice or care team (optional)">' +
+    '<label for="npDocOther" id="npDocOtherLbl" ' + SI_LBL_HIDE(known.length) + '>Your doctor\'s name</label>' +
+    '<input class="txt" id="npDocOther"' + hideFree + '>' +
+    '<label for="npTeam" id="npTeamLbl" ' + SI_LBL_HIDE(known.length) + '>Practice or care team (optional)</label>' +
+    '<input class="txt" id="npTeam"' + hideFree + '>' +
     '<div class="note" id="npDocNote"' + hideFree + '>A name typed here goes to the practice, which links you to your doctor. It does not notify anyone.</div>';
   app().innerHTML =
     '<div class="hero">' +
@@ -752,8 +758,8 @@ async function renderLanding(){
     '<div class="heroimg"><img src="' + HERO_IMG_URL + '" alt="A patient speaking, and walking out of the hospital satisfied" onerror="heroFallback(this)"></div>' +
     '<div class="choice"><h2>I\'m a patient</h2>' +
     '<p>Sign in once to get your personal page. Everything you capture is under your control.</p>' +
-    '<input class="txt" id="npFirst" placeholder="First name">' +
-    '<input class="txt" id="npLast" placeholder="Last name">' +
+    '<label for="npFirst" ' + SI_LBL + '>First name</label><input class="txt" id="npFirst" autocomplete="given-name">' +
+    '<label for="npLast" ' + SI_LBL + '>Last name</label><input class="txt" id="npLast" autocomplete="family-name">' +
     docOptions +
     '<button class="btn coral" style="margin-top:16px" onclick="newPatient()">Sign in &amp; get my link</button>' +
     '<div class="note" id="npMsg"></div>' +
@@ -761,7 +767,8 @@ async function renderLanding(){
     '<div class="choice"><h2>Already have a page?</h2>' +
     '<p>Come back to it from any phone or computer.</p>' +
     (mine ? '<button class="btn" onclick="location.hash=\'#/b/\'+bucket+\'/p/\'+localStorage.getItem(LS.myPatient)">Return to my patient page</button><div style="height:14px"></div>' : '') +
-    '<input class="txt" id="reCode" maxlength="6" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="' + (mine ? 'Or open a different code' : 'Enter your 6-character page code') + '">' +
+    '<label for="reCode" ' + SI_LBL + '>' + (mine ? 'Or open a different code' : 'Your 6-character page code') + '</label>' +
+    '<input class="txt" id="reCode" maxlength="6" autocapitalize="off" autocorrect="off" spellcheck="false">' +
     '<button class="btn' + (mine ? ' sub' : '') + '" onclick="openMyPage()">Open my page</button>' +
     '<div class="note" id="reMsg">Your code is the last part of your saved link, after /p/. A caregiver invite code works here too.</div></div>' +
     '<div class="choice"><h2>I\'m a provider</h2>' +
@@ -857,7 +864,7 @@ async function renderPatient(){
       : 'On this browser, tap the box below and use the microphone key on your keyboard to speak. Your care team will see it at their next visit.'
       ) + (IS_IOS_NON_SAFARI ? ' Opening this page in Safari lets you speak with one tap instead.' : '') + '</div>' +
     '<div id="liveText"></div>' +
-    '<div class="typebox"><input id="typeInput" type="text" placeholder="Or type a question / concern&hellip;" onkeydown="if(event.key===\'Enter\')addTyped()"><button onclick="addTyped()">Add</button></div>' +
+    '<div class="typebox"><input id="typeInput" type="text" aria-label="Type a question or concern" placeholder="Or type a question / concern&hellip;" onkeydown="if(event.key===\'Enter\')addTyped()"><button onclick="addTyped()">Add</button></div>' +
     '<div id="capMsg" class="note"></div>' + safeLineHTML() + '</div>' +
     '<div class="card" id="shareCard"><h2 class="sec">Include your caregiver</h2><div id="shareBox"></div></div>' +
     '<div class="toprow" style="margin:0 0 12px">' +
@@ -942,7 +949,7 @@ async function renderCaregiver(){
   if (!stored) {
     app().innerHTML = '<div class="card"><h2 class="sec">You have been invited to help ' + esc(ptRec.first) + '</h2>' +
       '<p style="font-size:14px;margin-bottom:10px">Add your name so the care team knows who asked. Your questions appear on the same list, under your name.</p>' +
-      '<input class="txt" id="cgName" placeholder="Your name">' +
+      '<label for="cgName" ' + SI_LBL + '>Your name</label><input class="txt" id="cgName" autocomplete="name">' +
       '<button class="btn coral" onclick="joinAsCaregiver()">Join</button>' +
       '<div class="note" id="cgMsg"></div>' +
       '<div class="warnbox">You will be able to see everything ' + esc(ptRec.first) + ' has recorded.</div></div>';
@@ -974,7 +981,7 @@ function drawCaregiver(name){
       : 'On this browser, tap the box below and use the microphone key on your keyboard to speak.'
       ) + (IS_IOS_NON_SAFARI ? ' Opening this page in Safari lets you speak with one tap instead.' : '') + '</div>' +
     '<div id="liveText"></div>' +
-    '<div class="typebox"><input id="typeInput" type="text" placeholder="Or type a question / concern&hellip;" onkeydown="if(event.key===\'Enter\')addTyped()"><button onclick="addTyped()">Add</button></div>' +
+    '<div class="typebox"><input id="typeInput" type="text" aria-label="Type a question or concern" placeholder="Or type a question / concern&hellip;" onkeydown="if(event.key===\'Enter\')addTyped()"><button onclick="addTyped()">Add</button></div>' +
     '<div id="capMsg" class="note"></div>' + safeLineHTML() + '</div>' +
     '<div class="card"><h2 class="sec">Captured so far (<span id="count">0</span>)</h2><div id="entries"></div></div>' +
     '<div class="card" id="closedCard" style="display:none"><h2 class="sec">Heard by your care team (<span id="closedCount">0</span>)</h2>' +
@@ -1527,9 +1534,9 @@ async function renderDrHome(){
     whoCard =
       '<div class="card"><h2 class="sec">Who are you?</h2>' +
       '<p style="font-size:14px;color:var(--mut);margin-bottom:10px">Pick your role. If you are not the physician, choose whose care team you belong to; they approve you from their own page.</p>' +
-      '<input class="txt" id="tmName" placeholder="Your name (e.g. Katy Neary, PA)">' +
-      '<select class="txt" id="tmRole">' + roles.map(r => '<option>' + r + '</option>').join("") + '</select>' +
-      '<select class="txt" id="tmLead"><option value="__self">I am the physician (team lead)</option>' +
+      '<input class="txt" id="tmName" aria-label="Your name" placeholder="Your name (e.g. Katy Neary, PA)">' +
+      '<select class="txt" id="tmRole" aria-label="Your role">' + roles.map(r => '<option>' + r + '</option>').join("") + '</select>' +
+      '<select class="txt" id="tmLead" aria-label="The physician you work with"><option value="__self">I am the physician (team lead)</option>' +
       docsList.map(p => '<option>' + esc(p.name) + '</option>').join("") + '</select>' +
       '<button class="btn teal" onclick="joinCareTeam()">I&rsquo;m part of this care team</button>' +
       '<div class="note" id="tmMsg"></div></div>';
@@ -1596,7 +1603,7 @@ async function renderDrHome(){
   let topbar, listCard;
   const roundShown = [];   /* patients whose open questions are put on screen */
   if (me && !canSee) {
-    topbar = '<div class="topbar"><span style="font-size:13px;font-weight:600;color:var(--blue)">Provider</span><button onclick="signOut()">Sign out</button></div>';
+    topbar = '<div class="topbar"><span style="font-size:14px;font-weight:600;color:var(--blue)">Provider</span><button onclick="signOut()">Sign out</button></div>';
     listCard = '<div class="card"><div class="warnbox">Waiting for <b>' + esc(leadName || "the physician") + '</b> to approve you. They approve care team requests from this same provider page.</div></div>';
   } else if (me) {
     /* Whose patients are on screen. The default is the signed-in provider's own team:
@@ -1652,7 +1659,7 @@ async function renderDrHome(){
                    : '<div class="empty">' + (viewing === "__none" ? 'Every patient is linked to a physician.' : viewing === "__all" ? 'No patients have signed in yet.' : 'No patients here yet. Patients who choose ' + esc(viewing) + ' at sign-in appear here.') + '</div>') +
       '</div>';
   } else {
-    topbar = '<div class="topbar"><span style="font-size:13px;font-weight:600;color:var(--blue)">Patient list</span><button onclick="signOut()">Sign out</button></div>';
+    topbar = '<div class="topbar"><span style="font-size:14px;font-weight:600;color:var(--blue)">Patient list</span><button onclick="signOut()">Sign out</button></div>';
     listCard = '<div class="card" id="ptList">' + (idx.length
       ? legend + ordered(idx).map(q => ptRow(q, false)).join("")
       : '<div class="empty">No patients have signed in yet. New patients sign in from the landing page.</div>') + '</div>';
@@ -1680,7 +1687,7 @@ async function renderDrHome(){
   const waiting = /Access requests \(|Care team requests/.test(reqCard);
   app().innerHTML = topbar + (waiting ? reqCard : "") + listCard + whoCard + (waiting ? "" : reqCard) +
     '<div class="card"><h2 class="sec">Open by patient code</h2>' +
-    '<div class="typebox"><input id="ptCode" placeholder="6-character code (e.g. from QR link)"><button onclick="openByCode()">Open</button></div></div>' +
+    '<div class="typebox"><input id="ptCode" aria-label="Patient page code" placeholder="6-character code (e.g. from QR link)"><button onclick="openByCode()">Open</button></div></div>' +
     dirCard + settingsHTML();
   wireSettings();
   /* Steve, 22 November 2026: when a patient's questions are shown on this screen, that is
@@ -1868,8 +1875,8 @@ async function renderDrPatient(again){
   app().innerHTML =
     '<div class="topbar"><a href="#/b/' + bucket + '/dr">&#8249; All patients</a><button onclick="signOut()">Sign out</button></div>' +
     '<div class="card"><h2 class="sec">Patient</h2><div class="nm" style="font-size:17px;font-weight:700">' + esc(drRec.last) + ', ' + esc(drRec.first) + '</div>' +
-    '<div class="dt" style="font-size:12px;color:var(--mut)">' + drRec.entries.length + ' captured item(s) &middot; signed in ' + new Date(drRec.created).toLocaleString() + (drRec.doctor ? ' &middot; Doctor: ' + esc(drRec.doctor) : '') + '</div>' +
-    (LR ? '<div class="dt" id="drLastRead" style="font-size:12px;color:var(--mut);margin-top:4px">' + esc(LR.providerLine(drRec.reads, Date.now())) + ' The patient is not shown this.</div>' : '') +
+    '<div class="dt" style="font-size:14px;color:var(--mut)">' + drRec.entries.length + ' captured item(s) &middot; signed in ' + new Date(drRec.created).toLocaleString() + (drRec.doctor ? ' &middot; Doctor: ' + esc(drRec.doctor) : '') + '</div>' +
+    (LR ? '<div class="dt" id="drLastRead" style="font-size:14px;color:var(--mut);margin-top:4px">' + esc(LR.providerLine(drRec.reads, Date.now())) + ' The patient is not shown this.</div>' : '') +
     '<button id="genBtn" class="btn sub hidden" style="margin-top:12px" onclick="generate()">Sort with AI</button>' +
     '<div class="note" id="modeNote"></div></div>' +
     '<div id="results"></div>' + settingsHTML(true);
@@ -1883,7 +1890,7 @@ async function renderDrPatient(again){
    It used to sit directly under the main button at the same size. */
 function settingsHTML(forPatient){
   return '<div class="card"><details class="settings"><summary>Settings: AI mode' + (forPatient ? ', clear this patient&rsquo;s items' : '') + '</summary>' +
-    '<input id="apiKey" type="password" placeholder="Anthropic API key (sk-ant-...) — blank = offline keyword mode">' +
+    '<input id="apiKey" type="password" aria-label="Anthropic API key" placeholder="Anthropic API key (sk-ant-...) — blank = offline keyword mode">' +
     '<div class="row"><button onclick="saveKey()">Save key</button><button onclick="clearKey()">Remove key</button></div><div id="keyStatus"></div>' +
     (forPatient
       ? '<div class="note" style="text-align:left;margin-top:12px">Clearing removes every captured item for this patient, including the record of which safety messages were shown. It cannot be undone.</div>' +
@@ -2127,7 +2134,7 @@ function addressedHTML(){
       : '<span class="addrstat wait">&#9744; Not linked to a captured item</span>';
     const by = entriesForItem(i).map(e => e.addressedBy).filter(Boolean)[0];
     return '<li>' + stat + '&#10003; ' + esc(i.text) + itemAuthorTag(i) + (q && q !== i.text ? '<q>“' + esc(q) + '”</q>' : '') + capHTML(i) +
-      (by ? '<div class="cap" style="font-size:12px;color:var(--mut)">Addressed by ' + esc(by) + '</div>' : '') + '</li>';
+      (by ? '<div class="cap" style="font-size:14px;color:var(--mut)">Addressed by ' + esc(by) + '</div>' : '') + '</li>';
   }).join("");
   return '<div class="bucket"><h3 style="background:var(--green)">Addressed (' + rows.length + ')</h3>' +
     '<ul class="addrlist">' + lis + '</ul></div>';
