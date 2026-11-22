@@ -7,6 +7,7 @@
 <link rel="icon" href="heard-icon.png">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script src="redflags.js"></script>
+<script src="lastread.js"></script>
 <style>
   :root {
     --blue: #1f4e79; --blue-lt: #eaf1f8; --accent: #2e75b6;
@@ -146,6 +147,11 @@
     border-radius: 8px; padding: 3px 9px; font-size: 12px; cursor: pointer; font-family: inherit;
     margin-right: auto; }
   .ctbadge { font-size: 11px; font-weight: 600; white-space: nowrap; color: var(--amber); }
+  /* last-read indicator: when a provider last opened this list */
+  .lastread { margin: 2px 0 10px; border: 1px solid var(--line, #d9dee3); border-radius: 10px; padding: 9px 12px; font-size: 14px; line-height: 1.4; }
+  .lastread b { display: block; }
+  .lastread .since { display: block; color: var(--amber); font-weight: 600; }
+  .lastread .next { display: block; color: var(--mut); font-size: 13px; }
   .entry.closed .ctbadge { color: var(--green); }
   .entry.addressed { border-left-color: var(--amber); background: var(--amber-lt); }
   .entry.closed { border-left-color: var(--green); background: var(--green-lt); }
@@ -361,7 +367,7 @@ function teamLeadName(p){ return !p ? null : (isPhysician(p) ? p.name : (p.lead 
 
 const EMPTY_DOC = () => ({ idx: [], pts: {}, providers: [] });
 function normDoc(d){ if (!d || typeof d !== "object") return null; if (!Array.isArray(d.idx)) d.idx = []; if (!d.pts || typeof d.pts !== "object") d.pts = {}; if (!Array.isArray(d.providers)) d.providers = []; return d; }
-function normRec(r){ if (r) { if (!Array.isArray(r.entries)) r.entries = []; if (!Array.isArray(r.deleted)) r.deleted = []; if (!Array.isArray(r.caregivers)) r.caregivers = []; } return r; }
+function normRec(r){ if (r) { if (!Array.isArray(r.entries)) r.entries = []; if (!Array.isArray(r.deleted)) r.deleted = []; if (!Array.isArray(r.caregivers)) r.caregivers = []; if (!Array.isArray(r.reads)) r.reads = []; } return r; }
 /* Invite codes are read aloud and typed by hand, so the alphabet drops
    characters that get confused: O/0, I/1/L, and lower case entirely. */
 function rndCode(n){ let s = ""; const c = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"; for (let i=0;i<n;i++) s += c[Math.floor(Math.random()*c.length)]; return s; }
@@ -711,7 +717,7 @@ async function renderPatient(){
     '<a class="tourlink" href="tour.html"><b><span class="play">&#9654;</span>See how it works</b><small>step by step</small></a>' +
     '</div>' +
     '<div class="choice" id="bmPanel" style="display:none"></div>' +
-    '<div class="card"><h2 class="sec">Captured so far (<span id="count">' + ptRec.entries.length + '</span>)</h2><div id="entries"></div></div>' +
+    '<div class="card"><h2 class="sec">Captured so far (<span id="count">' + ptRec.entries.length + '</span>)</h2><div id="lastRead" class="lastread" role="status" style="display:none"></div><div id="entries"></div></div>' +
     '<div class="card" id="closedCard" style="display:none"><h2 class="sec">Heard by your care team (<span id="closedCount">0</span>)</h2>' +
     '<div class="note" style="margin-bottom:6px">Your care team answered these, and you confirmed you were heard.</div>' +
     '<div id="closedEntries"></div></div>' +
@@ -821,7 +827,7 @@ function drawCaregiver(name){
     '<div id="liveText"></div>' +
     '<div class="typebox"><input id="typeInput" type="text" placeholder="Or type a question / concern&hellip;" onkeydown="if(event.key===\'Enter\')addTyped()"><button onclick="addTyped()">Add</button></div>' +
     '<div id="capMsg" class="note"></div>' + safeLineHTML() + '</div>' +
-    '<div class="card"><h2 class="sec">Captured so far (<span id="count">0</span>)</h2><div id="entries"></div></div>' +
+    '<div class="card"><h2 class="sec">Captured so far (<span id="count">0</span>)</h2><div id="lastRead" class="lastread" role="status" style="display:none"></div><div id="entries"></div></div>' +
     '<div class="card" id="closedCard" style="display:none"><h2 class="sec">Heard by your care team (<span id="closedCount">0</span>)</h2>' +
     '<div class="note" style="margin-bottom:6px">The care team answered these, and ' + esc(ptRec.first) + ' confirmed.</div>' +
     '<div id="closedEntries"></div></div>' +
@@ -878,7 +884,7 @@ function copyText(jsonStr){
 function entryHTML(e, i, closed, readOnly){
   const badge = e.addressed
     ? '<span class="ctbadge">&#10003; Heard by your care team</span>'
-    : '<span class="ctbadge" style="color:var(--mut);font-weight:400">Waiting for your care team</span>';
+    : '<span class="ctbadge" style="color:var(--mut);font-weight:400">' + esc(LR ? (LR.seen(e, ptRec && ptRec.reads) ? LR.TEXT.badgeSeen : LR.TEXT.badgeUnseen) : 'Waiting for your care team') + '</span>';
   const who = authorLabel(e);
   /* "I was heard" belongs to the patient. A caregiver sees its state, and cannot set it. */
   const control = readOnly
@@ -927,6 +933,7 @@ function renderEntries(){
   a.forEach((e, i) => ((e.addressed && e.heard) ? closed : open).push([e, i]));
   const cnt = document.getElementById("count");
   if (cnt) cnt.textContent = open.length;
+  renderLastRead(open.map(pr => pr[0]));
   box.innerHTML = open.length
     ? groupedHTML(open, false, RENDER_READONLY)
     : (a.length ? '<div class="empty">Everything so far has been answered and closed.</div>' : '<div class="empty">Nothing captured yet.</div>');
@@ -939,6 +946,41 @@ function renderEntries(){
     cbox.innerHTML = groupedHTML(closed, true, RENDER_READONLY);
   }
 }
+/* ---------- last-read indicator ----------
+   The wording and the rules live in lastread.js. The patient is told when a
+   provider device last opened the list and how many items were added since. It
+   states no time for the next visit. It never replaces the safety message. */
+const LR = window.HeardLastRead || null;
+function renderLastRead(openEntries){
+  const box = document.getElementById("lastRead"); if (!box) return;
+  if (!LR || !ptRec) { box.style.display = "none"; return; }
+  const st = LR.status(ptRec.reads, openEntries, Date.now());
+  box.style.display = "";
+  box.innerHTML = '<b>' + esc(st.line) + '</b>' +
+    (st.since ? '<span class="since">' + esc(st.since) + '</span> ' : '') +
+    '<span class="next">' + esc(st.next) + '</span>';
+}
+/* Picks up a provider's open, and anything they marked answered, without the
+   patient having to reload. Reads only; it never writes. */
+let ptRefreshBusy = false;
+async function refreshPatientView(){
+  if (ptRefreshBusy || !ptRec || !(route.v === "patient" || route.v === "care") || document.hidden) return;
+  if (!document.getElementById("entries")) return;
+  ptRefreshBusy = true;
+  try {
+    const doc = await loadDoc();
+    const srv = doc ? normRec(doc.pts[route.id]) : null;
+    if (srv && ptRec) {
+      if (LR) ptRec.reads = LR.mergeReads(srv.reads, ptRec.reads);
+      ptRec.deleted = [...new Set((srv.deleted || []).concat(ptRec.deleted || []))];
+      ptRec.entries = mergeEntries(srv.entries, ptRec.entries, ptRec.deleted);
+      renderEntries();
+    }
+  } catch (e) {}
+  ptRefreshBusy = false;
+}
+document.addEventListener("visibilitychange", () => { if (!document.hidden) refreshPatientView(); });
+setInterval(refreshPatientView, 60000);
 function markHeard(i, v){
   if (ptRec.entries[i]) { ptRec.entries[i].heard = !!v; renderEntries(); saveRecord(); }
 }
@@ -961,6 +1003,7 @@ async function saveRecord(){
     const srv = normRec(doc.pts[route.id]) || ptRec;
     ptRec.deleted = [...new Set((srv.deleted || []).concat(ptRec.deleted || []))];
     ptRec.entries = mergeEntries(srv.entries, ptRec.entries, ptRec.deleted);
+    if (LR) ptRec.reads = LR.mergeReads(srv.reads, ptRec.reads);
     doc.pts[route.id] = ptRec;
     await saveDoc(doc);
     localStorage.setItem("heard_cache_" + route.id, JSON.stringify(ptRec));
@@ -1483,6 +1526,7 @@ async function renderDrPatient(){
     '<div class="topbar"><a href="#/b/' + bucket + '/dr">&#8249; All patients</a><button onclick="lockProvider()">&#128274; Lock</button></div>' +
     '<div class="card"><h2 class="sec">Patient</h2><div class="nm" style="font-size:17px;font-weight:700">' + esc(drRec.last) + ', ' + esc(drRec.first) + '</div>' +
     '<div class="dt" style="font-size:12px;color:var(--mut)">' + drRec.entries.length + ' captured item(s) &middot; signed in ' + new Date(drRec.created).toLocaleString() + (drRec.doctor ? ' &middot; Doctor: ' + esc(drRec.doctor) : '') + '</div>' +
+    (LR ? '<div class="dt" id="drLastRead" style="font-size:12px;color:var(--mut);margin-top:4px">' + esc(LR.providerLine(drRec.reads, Date.now())) + ' The patient is shown when this list was last opened, and by which role.</div>' : '') +
     '<button id="genBtn" class="btn" style="margin-top:12px" onclick="generate()">Generate rounding summary</button>' +
     '<button class="btn sub" style="margin-top:10px;color:var(--red)" onclick="clearPatientItems()">Clear ALL items for this patient</button>' +
     '<div class="note" id="modeNote"></div></div>' +
@@ -1577,8 +1621,27 @@ async function aiSummarize(entries, key){
   const j = JSON.parse(txt);
   return { urgent: j.urgent || [], md: j.md || [], rn: j.rn || [], other: j.other || [] };
 }
+/* Records that a provider device showed this patient's list, with the role the
+   provider declared. Written with the same load, merge, save pattern as the
+   rest of the demo. A failure here never blocks the list from showing. */
+async function recordOpen(){
+  if (!LR || !drRec) return;
+  try {
+    const ident = provIdent();
+    const doc = (await loadDoc()) || EMPTY_DOC();
+    const rec = normRec(doc.pts[route.id]);
+    if (!rec) return;
+    const me = ident ? provRecOf(doc.providers, ident.name) : null;
+    const role = me ? (me.role || "Physician") : "";
+    rec.reads = LR.recordRead(LR.mergeReads(rec.reads, drRec.reads), role, Date.now());
+    drRec.reads = rec.reads;
+    doc.pts[route.id] = rec;
+    await saveDoc(doc);
+  } catch (e) { try { console.warn("Heard: could not record that the list was opened.", e); } catch (x) {} }
+}
 async function generate(){
   const res = document.getElementById("results");
+  recordOpen();
   if (!drRec.entries.length) { res.innerHTML = '<div class="card"><div class="empty">This patient has not captured any items yet.</div></div>'; return; }
   const btn = document.getElementById("genBtn");
   btn.disabled = true; btn.innerHTML = '<span class="spin"></span>Summarizing…';
