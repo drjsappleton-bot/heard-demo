@@ -536,7 +536,10 @@
      (https://www.cdc.gov/other/agencymaterials.html, read 21 November 2026) require
      four things: the source credit, a prominent no-endorsement note, unchanged
      substance, and a statement that the material is available on the agency website
-     at no charge. So do not reword an item, and keep all of LIST_TEXT's source line. NIDDK's terms (https://www.niddk.nih.gov/copyright, read 21 November
+     at no charge. So do not reword an item. The no-charge statement is not shown
+     on the message itself (physician's decision, 21 November 2026). It is kept in
+     LIST_TEXT.sourceFree and belongs on a sources page, which must exist before
+     the condition lists are switched on. NIDDK's terms (https://www.niddk.nih.gov/copyright, read 21 November
      2026) ask for NIDDK to be named as the source of unchanged content, and say its
      content must not be used to imply endorsement or "to recommend specific medical
      advice, treatments, or referrals". That last clause is a question for counsel.
@@ -545,8 +548,8 @@
      returned a stroke line ("in one or both eyes") that is not on the CDC page.
      The test file pins every item, so a change here must be made there too.
      NIDDK is the National Institute of Diabetes and Digestive and Kidney Diseases,
-     one of the institutes of NIH. The source line leads with NIH because patients
-     know that name.
+     one of the institutes of NIH. The source line gives the institute's full name,
+     not "National Institutes of Health" (physician's decision, 21 November 2026).
      The heart attack list uses the opening sentence of each CDC bullet. A list's
      heading, a group's "label" and a group's "note" are Heard's wording, not the
      source's. */
@@ -635,7 +638,7 @@
           "sweating"
         ], note: CALL_NOW }
       ],
-      source: "National Institutes of Health (NIDDK)",
+      source: "National Institute of Diabetes and Digestive and Kidney Diseases",
       url: "https://www.niddk.nih.gov/health-information/digestive-diseases/gastrointestinal-bleeding/symptoms-causes",
       reviewed: "NIDDK page reviewed July 2024, checked word for word 21 November 2026"
     }
@@ -648,7 +651,9 @@
     recommends: "Heard recommends:",
     homeNote: "Do not wait for a reply here.",
     sourceStart: "Source: ",
-    sourceEnd: ". This material is available on the source's website at no charge. This does not imply endorsement of Heard by the source or the United States Government."
+    sourceEnd: ". This does not imply endorsement of Heard by the source or the United States Government.",
+    /* Not shown on the message. For the sources page. */
+    sourceFree: "This material is available on the source's website at no charge."
   };
 
   var api = { VERSION: VERSION, RULES: RULES, MESSAGE: MESSAGE, MESSAGE_AMBER: MESSAGE_AMBER, MESSAGES: MESSAGES, LISTS: LISTS, LIST_TEXT: LIST_TEXT, COMBOS: COMBOS, check: check, normalize: normalize };

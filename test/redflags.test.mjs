@@ -377,7 +377,12 @@ test("condition lists follow the rule that matched, and every list names its sou
   assert.ok(RF.LIST_TEXT.sourceStart.includes("Source"));
   assert.ok(RF.LIST_TEXT.sourceEnd.includes("does not imply endorsement"));
   // CDC's fourth reuse requirement: say the material is free on the agency website.
-  assert.ok(RF.LIST_TEXT.sourceEnd.includes("at no charge"));
+  // Physician's decision, 21 November 2026: not on the message itself. The sentence is
+  // kept for a sources page, which must exist before the condition lists are switched on.
+  assert.ok(RF.LIST_TEXT.sourceFree.includes("at no charge"));
+  assert.ok(!RF.LIST_TEXT.sourceEnd.includes("at no charge"));
+  // The GI bleeding list names the institute in full, not "National Institutes of Health".
+  assert.equal(RF.LISTS.gi_bleed.source, "National Institute of Diabetes and Digestive and Kidney Diseases");
 });
 
 // The condition lists, item by item, as each source page read in a browser on
