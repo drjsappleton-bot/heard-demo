@@ -544,6 +544,9 @@
      Read the page itself in a browser: on 21 November 2026 a page-summarizing tool
      returned a stroke line ("in one or both eyes") that is not on the CDC page.
      The test file pins every item, so a change here must be made there too.
+     NIDDK is the National Institute of Diabetes and Digestive and Kidney Diseases,
+     one of the institutes of NIH. The source line leads with NIH because patients
+     know that name.
      The heart attack list uses the opening sentence of each CDC bullet. A list's
      heading, a group's "label" and a group's "note" are Heard's wording, not the
      source's. */
@@ -632,7 +635,7 @@
           "sweating"
         ], note: CALL_NOW }
       ],
-      source: "NIDDK, National Institutes of Health",
+      source: "National Institutes of Health (NIDDK)",
       url: "https://www.niddk.nih.gov/health-information/digestive-diseases/gastrointestinal-bleeding/symptoms-causes",
       reviewed: "NIDDK page reviewed July 2024, checked word for word 21 November 2026"
     }
