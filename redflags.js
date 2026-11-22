@@ -18,8 +18,9 @@
 
    How a tier is chosen, decided 21 November 2026: follow the source. Where the
    source says to see a doctor as soon as possible, the phrase is amber. Where it
-   says to get help immediately or call 911, the phrase is red. GI bleeding is the
-   physician's exception: amber by default, red with dizziness or fainting.
+   says to get help immediately or call 911, the phrase is red. Black stool and
+   blood in the stool are the physician's exception: amber by default, red with
+   dizziness or fainting. Vomiting blood is red.
 
    What this is not: triage of the patient. It does not score anything, ask the
    patient questions, or notify anyone. Which message appears depends only on which
@@ -46,7 +47,7 @@
 (function (root) {
   "use strict";
 
-  var VERSION = "2026-11-21.6";
+  var VERSION = "2026-11-21.7";
 
   /* Review status at this version (21 November 2026 review): every group has been
      revised. Open points are listed in the project's START-HERE. */
@@ -128,8 +129,21 @@
       /\bblood\b.{0,15}\b(gush\w*|pour\w*|spurt\w*|squirt\w*)\b/,
       /\bblood (is )?(everywhere|all over)\b/,
       /* coughing or spitting blood */
-      /\b(cough\w*|spit\w*)\b.{0,15}\bblood\b/,
-      /* blood in the urine, either order; not "blood test" and the like */
+      /\b(cough\w*|spit\w*)\b.{0,15}\bblood\b/
+    ]) },
+
+    /* ---- vomit_blood (red, shows the GI bleeding list): vomiting blood, or vomit
+       that looks like coffee grounds. Reviewed 21 Nov 2026 ---- */
+    { id: "vomit_blood", tier: "red", lists: ["gi_bleed"], rx: any([
+      /\b(vomit\w*|throw\w* up|threw up)\b.{0,15}\bblood\b/,
+      /\bblood\b.{0,20}\bvomit\b/,
+      /\bbloody vomit\b/,
+      /\bcoffee grounds?\b/
+    ]) },
+
+    /* ---- blood_urine (amber): blood in the urine, either order; not "blood test"
+       and the like. Reviewed 21 Nov 2026 ---- */
+    { id: "blood_urine", tier: "amber", rx: any([
       /\bblood\b.{0,20}\b(urine|pee)\b/,
       /\b(urine|pee)\b.{0,20}\bblood\b(?! (test|tests|work|draw|pressure|sugar|thinner|thinners|count|clot|clots))/,
       /\bbloody (urine|pee)\b/
@@ -154,19 +168,15 @@
     ]) },
 
     /* ---- gi_bleed (amber, shows the GI bleeding list): black or tarry stool, blood
-       in the stool, vomiting blood. With dizzy or lightheaded in the same entry it
-       becomes red (see COMBOS). Reviewed 21 Nov 2026 ---- */
+       in the stool. With dizzy or lightheaded in the same entry it becomes red (see
+       COMBOS). Vomiting blood is its own red rule. Reviewed 21 Nov 2026 ---- */
     { id: "gi_bleed", tier: "amber", lists: ["gi_bleed"], rx: any([
       /\b(black|tarry)\b.{0,15}\b(stool|stools|poop|bowel movement|bowel movements)\b/,
       /\b(stool|stools|poop|bowel movement|bowel movements)\b.{0,20}\b(black|tarry)\b/,
       /* blood in the stool, either order; not "blood test" and the like */
       /\bblood\b.{0,20}\b(stool|stools|poop|bowel movement|toilet)\b/,
       /\b(stool|stools|poop|bowel movement)\b.{0,20}\bblood\b(?! (test|tests|work|draw|pressure|sugar|thinner|thinners|count|clot|clots))/,
-      /\bbloody (stool|stools|poop|diarrhea|vomit)\b/,
-      /* vomiting blood */
-      /\b(vomit\w*|throw\w* up|threw up)\b.{0,15}\bblood\b/,
-      /\bblood\b.{0,20}\bvomit\b/,
-      /\bcoffee grounds?\b/
+      /\bbloody (stool|stools|poop|diarrhea)\b/
     ]) },
 
     /* ---- clot (amber, shows the blood clot list): leg signs. The source says to see

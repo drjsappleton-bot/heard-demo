@@ -55,8 +55,17 @@ const MUST_FLAG = [
   ["blood everywhere", "bleeding", R],
   ["blood all over the sheets", "bleeding", R],
   ["I am coughing up blood", "bleeding", R],
-  ["my urine has blood in it", "bleeding", R],
   ["I am vomiting a lot of blood", "bleeding", R],
+  ["there is a lot of blood in my urine", "bleeding", R],
+
+  // ---- vomit_blood (red, shows the GI bleeding list) ----
+  ["I am vomiting blood", "vomit_blood", R],
+  ["I threw up blood", "vomit_blood", R],
+  ["vomit looks like coffee grounds", "vomit_blood", R],
+
+  // ---- blood_urine (amber) ----
+  ["my urine has blood in it", "blood_urine", A],
+  ["blood in my urine", "blood_urine", A],
 
   // ---- bleeding_other (amber): other bleeding, soaked or leaking dressing, nosebleed, black stool ----
   ["the dressing is soaked and it is bleeding", "bleeding_other", A],
@@ -76,11 +85,8 @@ const MUST_FLAG = [
   ["black tarry stools", "gi_bleed", A],
   ["there was blood in my stool", "gi_bleed", A],
   ["bloody stool", "gi_bleed", A],
-  ["I am vomiting blood", "gi_bleed", A],
-  ["vomit looks like coffee grounds", "gi_bleed", A],
   ["my stool is black and I am lightheaded", "gi_bleed_with_dizzy", R],
   ["I feel dizzy and my poop is black", "gi_bleed_with_dizzy", R],
-  ["I am vomiting blood and I feel dizzy", "gi_bleed_with_dizzy", R],
 
   // ---- clot (amber, shows the blood clot list): leg signs ----
   ["my calf hurts and it is swollen", "clot", A],
@@ -356,6 +362,7 @@ test("condition lists follow the rule that matched, and every list names its sou
   assert.deepEqual(RF.check("I can't catch my breath").lists, ["heart_attack", "pe"]);
   assert.deepEqual(RF.check("my calf hurts and it is swollen").lists, ["clot"]);   // amber, with a list
   assert.deepEqual(RF.check("my stool is black").lists, ["gi_bleed"]);             // amber, with a list
+  assert.deepEqual(RF.check("I am vomiting blood").lists, ["gi_bleed"]);           // red, with a list
   assert.deepEqual(RF.check("my chest hurts and my calf is swollen").lists, ["heart_attack", "clot"]);
   assert.deepEqual(RF.check("I fell").lists, []);
   assert.deepEqual(RF.check("I am lightheaded").lists, []);
