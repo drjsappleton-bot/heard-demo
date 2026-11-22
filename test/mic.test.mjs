@@ -24,3 +24,12 @@ test("a quick second tap saves the capture that was still pending, and an unknow
   assert.match(fnBody("startRec"), /if \(pending && pending !== lastSaved\) persistEntry\(pending\);/);
   assert.match(fnBody("finishCapture"), /The microphone stopped \(" \+ lastRecError \+ "\)\. /);
 });
+
+test("on an iPhone a capture that heard nothing sends the patient to the keyboard microphone", () => {
+  // WebKit bug 321436 (open, 22 November 2026): later listening sessions on iPhone Safari hear
+  // nothing and report no error. The page cannot fix that, so it must not leave the patient
+  // tapping a button that will not work.
+  const f = fnBody("finishCapture");
+  assert.match(f, /if \(IS_IOS && !IS_IOS_NON_SAFARI\) \{\s*useKeyboardDictation\(/);
+  assert.match(f, /setTimeout\(\(\) => \{ speechBlocked = false; \}, 120000\);/, "the button is tried again after two minutes");
+});
