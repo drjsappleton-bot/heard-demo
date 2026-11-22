@@ -141,7 +141,9 @@
   .entry.closed { border-left-color:var(--green); background:var(--green-lt); }
   .foot { display:flex; justify-content:space-between; align-items:center; margin-top:6px;
     font-size:10.5px; gap:7px; }
-  .foot .l { color:var(--green); font-weight:700; }
+  /* "I was heard" is locked, and grey, until the care team marks the question addressed. */
+  .foot .l { color:var(--mut); }
+  .entry.addressed .foot .l, .entry.closed .foot .l { color:var(--green); font-weight:700; }
   .nhx { border:1px solid #e6b0ac; background:#fdecea; color:var(--red); font-weight:700;
     border-radius:7px; padding:2px 6px; font-size:10px; }
   .foot .r { color:var(--mut); }
@@ -642,7 +644,7 @@ const STEPS = [
       entry("e2",Q_PLAIN_3,"","&#9744; I was heard","Waiting for your care team") +
       '</div>' +
       '<div class="c"><div class="sec">Heard by your care team (1)</div>' +
-      '<div class="note" style="margin-bottom:6px">Your care team answered these, and you confirmed you were heard.</div>' +
+      '<div class="note" style="margin-bottom:6px">Your care team addressed these, and you confirmed you were heard.</div>' +
       entry("e3",Q_PLAIN_1,"closed","&#9745; I was heard","&#10003; Heard by your care team") + '</div>');
     await sleep(2800); guard(my);
   }},
@@ -660,9 +662,9 @@ const STEPS = [
     vp.querySelector("#e2 .l").innerHTML = "&#9745; I was heard";
     clearHighlight(); await sleep(1000); guard(my);
     view('<div class="c"><div class="sec">Captured so far (0)</div>' +
-      '<div class="note">Everything so far has been answered and closed.</div></div>' +
+      '<div class="note">Everything so far has been addressed and closed.</div></div>' +
       '<div class="c"><div class="sec">Heard by your care team (2)</div>' +
-      '<div class="note" style="margin-bottom:6px">Your care team answered these, and you confirmed you were heard.</div>' +
+      '<div class="note" style="margin-bottom:6px">Your care team addressed these, and you confirmed you were heard.</div>' +
       entry("e3",Q_PLAIN_1,"closed","&#9745; I was heard","&#10003; Heard by your care team") +
       entry("e4",Q_PLAIN_3,"closed","&#9745; I was heard","&#10003; Heard by your care team") + '</div>');
     await sleep(2600); guard(my);

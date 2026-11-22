@@ -34,6 +34,7 @@ test("a patient's page is built from that patient's record alone", () => {
 
 test("addressing from the list saves the provider's name and deletes nothing", () => {
   const f = fnBody("addressEntry");
-  assert.match(f, /e\.addressed = true; e\.addressedAt = Date\.now\(\); if \(who\) e\.addressedBy = who;/);
+  // Since 22 November 2026 the mark is made by loop.js, which also saves the name.
+  assert.match(f, /LOOP\.address\(e, Date\.now\(\), who\)/);
   assert.ok(!/splice|deleted\.push|filter\(/.test(f));
 });

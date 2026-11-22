@@ -42,7 +42,9 @@ test("row counts, marks and list order are used on the provider side only", () =
   assert.match(home, /if \(roundShown\.length\) recordRoundOpens\(roundShown\);/);
   assert.ok(!/recordRoundOpens|roundShown|LR\.recordRead/.test(before), "the patient side must not record or read opens");
   // The patient's entry badge is unchanged.
-  assert.ok(html.includes("Waiting for your care team</span>"));
+  // The badge wording lives in loop.js since 22 November 2026 and is unchanged.
+  assert.ok(html.includes("esc(T.waiting) + '</span>'"));
+  assert.ok(readFileSync(new URL("../loop.js", import.meta.url), "utf8").includes('waiting: "Waiting for your care team"'));
 });
 
 test("the wording states facts and never a judgement of urgency", () => {

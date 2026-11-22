@@ -27,7 +27,9 @@ test("the patient and caregiver pages show nothing about a provider opening the 
   const uses = html.match(/\bLR\.\w+/g) || [];
   assert.deepEqual(uses.sort(), ["LR.mergeReads", "LR.mergeReads", "LR.providerLine", "LR.recordRead", "LR.recordRead"]);
   // The patient's entry badge is the one from before, and the page has no "seen" or "opened" status for patients.
-  assert.ok(html.includes("Waiting for your care team</span>"));
+  // The badge wording lives in loop.js since 22 November 2026 and is unchanged.
+  assert.ok(html.includes("esc(T.waiting) + '</span>'"));
+  assert.ok(readFileSync(new URL("../loop.js", import.meta.url), "utf8").includes('waiting: "Waiting for your care team"'));
   for (const gone of ['id="lastRead"', "renderLastRead", "refreshPatientView", "badgeSeen", "Not seen yet", "Your list was last opened"]) {
     assert.ok(!html.includes(gone), "patient-side indicator is back: " + gone);
   }
