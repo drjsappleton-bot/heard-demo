@@ -1,23 +1,17 @@
-/* Heard last-read indicator.
+/* Heard: provider-side record of when a list was opened.
 
-   What this is: a record of when a provider last opened a patient's list, and the
-   wording that tells the patient so. Product change 3 in the website proposal of
-   21 November 2026: the patient should be able to see that the list is being
-   looked at, and what happens next.
+   The rule this file serves (physician owner, 21 November 2026): Heard records
+   questions. It is not two-way communication. Questions are collected and then
+   addressed at a later contact with the patient. Nothing on the patient or
+   caregiver side changes because a provider looked at the list, and the patient
+   is never told a question was seen or read. So nothing in this file is shown to
+   a patient or caregiver. The test file enforces that.
 
-   What "opened" means, exactly: a provider device showed the list (the rounding
-   summary was generated). Heard cannot know that a person read every line, so the
-   patient is told the list was opened, not that it was read. In the demo the
-   provider's role is self-declared behind a shared PIN, so the role shown is a
-   claim, not a verified identity. Times come from the provider device's clock.
-
-   What this is not: a promise of when the list will be opened next. The line about
-   the next visit is fixed wording (NEXT below). A stated time window is a
-   commitment that the practice and the hospital have to make, so none is invented
-   here.
-
-   It never replaces the safety message. An entry that matched the red-flag list
-   keeps its "do not wait for a reply here" line whether or not the list was opened.
+   What it does: records when a provider device opened a patient's list (the
+   rounding summary was generated) and tells the next provider who opened it last.
+   "Opened" means a device showed the list. It does not mean a person read every
+   line. In the demo the role is self-declared behind a shared PIN, so the role
+   is a claim, not a verified identity. Times come from the provider device's clock.
 
    Loaded as a plain script in the browser (window.HeardLastRead) and imported by
    the Node tests (globalThis.HeardLastRead). */
@@ -27,21 +21,14 @@
   var MAX_READS = 50;            /* keep the most recent opens only */
   var SAME_OPEN_MS = 60 * 1000;  /* a second open by the same role within a minute is the same open */
 
-  /* All patient-facing wording in one place. */
+  /* Provider-side wording only. Nothing here is shown to a patient or caregiver. */
   var TEXT = {
-    never: "Your care team has not opened your list yet.",
-    openedStart: "Your list was last opened by ",
-    sinceOne: "1 item added since then has not been seen yet.",
-    sinceMany: " items added since then have not been seen yet.",
-    NEXT: "Your care team opens this list at their next visit.",
-    badgeUnseen: "Not seen yet",
-    badgeSeen: "Seen, waiting for an answer",
     providerNever: "This list has not been opened by a provider before.",
     providerStart: "Last opened by "
   };
 
-  /* The provider roles offered at sign-in, as a patient would say them. Anything
-     else, including a missing role, is "a member of your care team". */
+  /* The provider roles offered at sign-in, in plain words. Anything else,
+     including a missing role, is "a member of the care team". */
   var ROLE_LABEL = {
     "Physician": "a physician",
     "APP (PA or NP)": "a PA or NP",
@@ -49,7 +36,7 @@
     "MA": "a medical assistant"
   };
   function roleLabel(role) {
-    return Object.prototype.hasOwnProperty.call(ROLE_LABEL, role) ? ROLE_LABEL[role] : "a member of your care team";
+    return Object.prototype.hasOwnProperty.call(ROLE_LABEL, role) ? ROLE_LABEL[role] : "a member of the care team";
   }
 
   function clean(list) {
@@ -62,8 +49,8 @@
     return out;
   }
 
-  /* Union of two read lists, oldest first, no duplicates, capped. Used wherever a
-     record is written, so a save from the patient's phone can never erase an open
+  /* Union of two lists of opens, oldest first, no duplicates, capped. Used wherever
+     a record is written, so a save from the patient's phone can never erase an open
      recorded from the provider's device, and the other way round. */
   function mergeReads(a, b) {
     var all = clean(a).concat(clean(b));
@@ -91,12 +78,6 @@
     return best;
   }
 
-  /* Was this entry on the list the last time it was opened? */
-  function seen(entry, reads) {
-    var l = lastRead(reads);
-    return !!(l && entry && typeof entry.ts === "number" && entry.ts <= l.ts);
-  }
-
   function sameDay(a, b) {
     var x = new Date(a), y = new Date(b);
     return x.getFullYear() === y.getFullYear() && x.getMonth() === y.getMonth() && x.getDate() === y.getDate();
@@ -110,28 +91,11 @@
     return "on " + d.toLocaleDateString([], { month: "short", day: "numeric" }) + " at " + time;
   }
 
-  /* What the patient page shows above the list. entries are the patient's open
-     (unanswered) entries. Returns { opened, line, since, next, unseen }. */
-  function status(reads, entries, now) {
-    var l = lastRead(reads);
-    var unseen = 0;
-    var list = Array.isArray(entries) ? entries : [];
-    for (var i = 0; i < list.length; i++) if (!seen(list[i], reads)) unseen++;
-    if (!l) return { opened: false, line: TEXT.never, since: "", next: TEXT.NEXT, unseen: unseen };
-    return {
-      opened: true,
-      line: TEXT.openedStart + roleLabel(l.role) + " " + when(l.ts, now) + ".",
-      since: unseen === 0 ? "" : (unseen === 1 ? TEXT.sinceOne : unseen + TEXT.sinceMany),
-      next: TEXT.NEXT,
-      unseen: unseen
-    };
-  }
-
   /* What the provider sees before opening: who opened it last. */
   function providerLine(reads, now) {
     var l = lastRead(reads);
     return l ? TEXT.providerStart + roleLabel(l.role) + " " + when(l.ts, now) + "." : TEXT.providerNever;
   }
 
-  root.HeardLastRead = { TEXT: TEXT, MAX_READS: MAX_READS, SAME_OPEN_MS: SAME_OPEN_MS, roleLabel: roleLabel, mergeReads: mergeReads, recordRead: recordRead, lastRead: lastRead, seen: seen, when: when, status: status, providerLine: providerLine };
+  root.HeardLastRead = { TEXT: TEXT, MAX_READS: MAX_READS, SAME_OPEN_MS: SAME_OPEN_MS, roleLabel: roleLabel, mergeReads: mergeReads, recordRead: recordRead, lastRead: lastRead, when: when, providerLine: providerLine };
 })(typeof globalThis !== "undefined" ? globalThis : this);

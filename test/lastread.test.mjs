@@ -1,56 +1,50 @@
 // Run with: node --test
-// The last-read indicator: when a provider last opened a patient's list, and what
-// the patient is told. Edit lastread.js and this file together.
+// The provider-side record of when a patient's list was opened.
+// Edit lastread.js and this file together.
+//
+// The rule (physician owner, 21 November 2026): Heard records questions. It is not
+// two-way communication. Nothing on the patient or caregiver side changes because a
+// provider looked at the list. The first test below enforces that.
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 await import("../lastread.js");
 const LR = globalThis.HeardLastRead;
 
 const NOON = new Date(2026, 10, 21, 12, 0, 0).getTime();   // 21 November 2026, noon, local time
 const MIN = 60 * 1000, HOUR = 60 * MIN, DAY = 24 * HOUR;
 
-test("a list nobody has opened says so, and promises no time", () => {
-  const s = LR.status([], [{ ts: NOON - HOUR, text: "when can I go home" }], NOON);
-  assert.equal(s.opened, false);
-  assert.equal(s.line, "Your care team has not opened your list yet.");
-  assert.equal(s.unseen, 1);
-  assert.equal(s.next, "Your care team opens this list at their next visit.");
-  // No clock time and no window is stated for the next visit. That is a commitment
-  // for the practice and the hospital to make, not the software.
-  assert.ok(!/\d/.test(s.next));
-  assert.deepEqual(LR.status(undefined, undefined, NOON).unseen, 0);
-});
-
-test("an opened list names the role and the time, never a person", () => {
-  const reads = LR.recordRead([], "Nurse", NOON - 2 * HOUR);
-  const s = LR.status(reads, [{ ts: NOON - 3 * HOUR, text: "a" }], NOON);
-  assert.equal(s.opened, true);
-  assert.match(s.line, /^Your list was last opened by a nurse today at 10:00/);
-  assert.equal(s.since, "");
-  assert.equal(s.unseen, 0);
-  assert.match(LR.status(LR.recordRead([], "Physician", NOON - DAY), [], NOON).line, /by a physician yesterday at 12:00/);
-  assert.match(LR.status(LR.recordRead([], "APP (PA or NP)", NOON - 3 * DAY), [], NOON).line, /by a PA or NP on Nov 18 at 12:00/);
-  assert.match(LR.status(LR.recordRead([], "MA", NOON - MIN), [], NOON).line, /by a medical assistant today/);
-  // An unknown or missing role is never shown as typed.
-  for (const role of ["Other", "", undefined, "Dr. Jane Smith", "constructor", "toString"]) {
-    assert.match(LR.status(LR.recordRead([], role, NOON - MIN), [], NOON).line, /by a member of your care team today/);
+test("the patient and caregiver pages show nothing about a provider opening the list", () => {
+  // No patient-facing wording exists in the module.
+  assert.deepEqual(Object.keys(LR.TEXT).sort(), ["providerNever", "providerStart"]);
+  assert.equal(LR.status, undefined);
+  assert.equal(LR.seen, undefined);
+  // The page uses the record in exactly three places: the merge on save (never
+  // displayed), the provider's line, and the write when a provider opens the list.
+  const html = readFileSync(new URL("../index.html", import.meta.url), "utf8");
+  const uses = html.match(/\bLR\.\w+/g) || [];
+  assert.deepEqual(uses.sort(), ["LR.mergeReads", "LR.mergeReads", "LR.providerLine", "LR.recordRead"]);
+  // The patient's entry badge is the one from before, and the page has no "seen" or "opened" status for patients.
+  assert.ok(html.includes("Waiting for your care team</span>"));
+  for (const gone of ['id="lastRead"', "renderLastRead", "refreshPatientView", "badgeSeen", "Not seen yet", "Your list was last opened"]) {
+    assert.ok(!html.includes(gone), "patient-side indicator is back: " + gone);
   }
 });
 
-test("the patient is told the list was opened, not that it was read", () => {
-  for (const v of Object.values(LR.TEXT)) assert.ok(!/\bread\b/i.test(v), "wording claims a read: " + v);
+test("the provider sees who opened the list last, by role and time, never by name", () => {
+  assert.equal(LR.providerLine([], NOON), "This list has not been opened by a provider before.");
+  assert.match(LR.providerLine(LR.recordRead([], "Nurse", NOON - HOUR), NOON), /^Last opened by a nurse today at 11:00/);
+  assert.match(LR.providerLine(LR.recordRead([], "Physician", NOON - DAY), NOON), /by a physician yesterday at 12:00/);
+  assert.match(LR.providerLine(LR.recordRead([], "APP (PA or NP)", NOON - 3 * DAY), NOON), /by a PA or NP on Nov 18 at 12:00/);
+  assert.match(LR.providerLine(LR.recordRead([], "MA", NOON - MIN), NOON), /by a medical assistant today/);
+  // An unknown or missing role is never shown as typed.
+  for (const role of ["Other", "", undefined, "Dr. Jane Smith", "constructor", "toString"]) {
+    assert.match(LR.providerLine(LR.recordRead([], role, NOON - MIN), NOON), /by a member of the care team today/);
+  }
 });
 
-test("items added after the last open are counted as not seen", () => {
-  const reads = LR.recordRead([], "Physician", NOON - HOUR);
-  const before = { ts: NOON - 2 * HOUR, text: "before" };
-  const after1 = { ts: NOON - 30 * MIN, text: "after" };
-  const after2 = { ts: NOON - 10 * MIN, text: "after again" };
-  assert.equal(LR.seen(before, reads), true);
-  assert.equal(LR.seen(after1, reads), false);
-  assert.equal(LR.seen(before, []), false);
-  assert.equal(LR.status(reads, [before, after1], NOON).since, "1 item added since then has not been seen yet.");
-  assert.equal(LR.status(reads, [before, after1, after2], NOON).since, "2 items added since then have not been seen yet.");
+test("the wording says opened, not read", () => {
+  for (const v of Object.values(LR.TEXT)) assert.ok(!/\bread\b/i.test(v), "wording claims a read: " + v);
 });
 
 test("opens merge from both devices and nothing is lost or doubled", () => {
@@ -76,9 +70,4 @@ test("a second open by the same role within a minute is one open, and the list i
   for (let i = 0; i < 80; i++) many = LR.recordRead(many, "Nurse", NOON + i * HOUR);
   assert.equal(many.length, LR.MAX_READS);
   assert.equal(LR.lastRead(many).ts, NOON + 79 * HOUR);
-});
-
-test("the provider sees who opened the list last", () => {
-  assert.equal(LR.providerLine([], NOON), "This list has not been opened by a provider before.");
-  assert.match(LR.providerLine(LR.recordRead([], "Nurse", NOON - HOUR), NOON), /^Last opened by a nurse today at 11:00/);
 });

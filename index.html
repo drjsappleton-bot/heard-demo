@@ -147,11 +147,6 @@
     border-radius: 8px; padding: 3px 9px; font-size: 12px; cursor: pointer; font-family: inherit;
     margin-right: auto; }
   .ctbadge { font-size: 11px; font-weight: 600; white-space: nowrap; color: var(--amber); }
-  /* last-read indicator: when a provider last opened this list */
-  .lastread { margin: 2px 0 10px; border: 1px solid var(--line, #d9dee3); border-radius: 10px; padding: 9px 12px; font-size: 14px; line-height: 1.4; }
-  .lastread b { display: block; }
-  .lastread .since { display: block; color: var(--amber); font-weight: 600; }
-  .lastread .next { display: block; color: var(--mut); font-size: 13px; }
   .entry.closed .ctbadge { color: var(--green); }
   .entry.addressed { border-left-color: var(--amber); background: var(--amber-lt); }
   .entry.closed { border-left-color: var(--green); background: var(--green-lt); }
@@ -717,7 +712,7 @@ async function renderPatient(){
     '<a class="tourlink" href="tour.html"><b><span class="play">&#9654;</span>See how it works</b><small>step by step</small></a>' +
     '</div>' +
     '<div class="choice" id="bmPanel" style="display:none"></div>' +
-    '<div class="card"><h2 class="sec">Captured so far (<span id="count">' + ptRec.entries.length + '</span>)</h2><div id="lastRead" class="lastread" role="status" style="display:none"></div><div id="entries"></div></div>' +
+    '<div class="card"><h2 class="sec">Captured so far (<span id="count">' + ptRec.entries.length + '</span>)</h2><div id="entries"></div></div>' +
     '<div class="card" id="closedCard" style="display:none"><h2 class="sec">Heard by your care team (<span id="closedCount">0</span>)</h2>' +
     '<div class="note" style="margin-bottom:6px">Your care team answered these, and you confirmed you were heard.</div>' +
     '<div id="closedEntries"></div></div>' +
@@ -827,7 +822,7 @@ function drawCaregiver(name){
     '<div id="liveText"></div>' +
     '<div class="typebox"><input id="typeInput" type="text" placeholder="Or type a question / concern&hellip;" onkeydown="if(event.key===\'Enter\')addTyped()"><button onclick="addTyped()">Add</button></div>' +
     '<div id="capMsg" class="note"></div>' + safeLineHTML() + '</div>' +
-    '<div class="card"><h2 class="sec">Captured so far (<span id="count">0</span>)</h2><div id="lastRead" class="lastread" role="status" style="display:none"></div><div id="entries"></div></div>' +
+    '<div class="card"><h2 class="sec">Captured so far (<span id="count">0</span>)</h2><div id="entries"></div></div>' +
     '<div class="card" id="closedCard" style="display:none"><h2 class="sec">Heard by your care team (<span id="closedCount">0</span>)</h2>' +
     '<div class="note" style="margin-bottom:6px">The care team answered these, and ' + esc(ptRec.first) + ' confirmed.</div>' +
     '<div id="closedEntries"></div></div>' +
@@ -884,7 +879,7 @@ function copyText(jsonStr){
 function entryHTML(e, i, closed, readOnly){
   const badge = e.addressed
     ? '<span class="ctbadge">&#10003; Heard by your care team</span>'
-    : '<span class="ctbadge" style="color:var(--mut);font-weight:400">' + esc(LR ? (LR.seen(e, ptRec && ptRec.reads) ? LR.TEXT.badgeSeen : LR.TEXT.badgeUnseen) : 'Waiting for your care team') + '</span>';
+    : '<span class="ctbadge" style="color:var(--mut);font-weight:400">Waiting for your care team</span>';
   const who = authorLabel(e);
   /* "I was heard" belongs to the patient. A caregiver sees its state, and cannot set it. */
   const control = readOnly
@@ -933,7 +928,6 @@ function renderEntries(){
   a.forEach((e, i) => ((e.addressed && e.heard) ? closed : open).push([e, i]));
   const cnt = document.getElementById("count");
   if (cnt) cnt.textContent = open.length;
-  renderLastRead(open.map(pr => pr[0]));
   box.innerHTML = open.length
     ? groupedHTML(open, false, RENDER_READONLY)
     : (a.length ? '<div class="empty">Everything so far has been answered and closed.</div>' : '<div class="empty">Nothing captured yet.</div>');
@@ -946,41 +940,13 @@ function renderEntries(){
     cbox.innerHTML = groupedHTML(closed, true, RENDER_READONLY);
   }
 }
-/* ---------- last-read indicator ----------
-   The wording and the rules live in lastread.js. The patient is told when a
-   provider device last opened the list and how many items were added since. It
-   states no time for the next visit. It never replaces the safety message. */
+/* ---------- provider-side record of opens ----------
+   Heard records questions. It is not two-way communication (physician's rule,
+   21 November 2026). Nothing on the patient or caregiver side changes because a
+   provider looked at the list. The only provider action the patient sees is a
+   question marked addressed. lastread.js keeps a record of when a provider
+   device opened a list and shows it on the provider side only. */
 const LR = window.HeardLastRead || null;
-function renderLastRead(openEntries){
-  const box = document.getElementById("lastRead"); if (!box) return;
-  if (!LR || !ptRec) { box.style.display = "none"; return; }
-  const st = LR.status(ptRec.reads, openEntries, Date.now());
-  box.style.display = "";
-  box.innerHTML = '<b>' + esc(st.line) + '</b>' +
-    (st.since ? '<span class="since">' + esc(st.since) + '</span> ' : '') +
-    '<span class="next">' + esc(st.next) + '</span>';
-}
-/* Picks up a provider's open, and anything they marked answered, without the
-   patient having to reload. Reads only; it never writes. */
-let ptRefreshBusy = false;
-async function refreshPatientView(){
-  if (ptRefreshBusy || !ptRec || !(route.v === "patient" || route.v === "care") || document.hidden) return;
-  if (!document.getElementById("entries")) return;
-  ptRefreshBusy = true;
-  try {
-    const doc = await loadDoc();
-    const srv = doc ? normRec(doc.pts[route.id]) : null;
-    if (srv && ptRec) {
-      if (LR) ptRec.reads = LR.mergeReads(srv.reads, ptRec.reads);
-      ptRec.deleted = [...new Set((srv.deleted || []).concat(ptRec.deleted || []))];
-      ptRec.entries = mergeEntries(srv.entries, ptRec.entries, ptRec.deleted);
-      renderEntries();
-    }
-  } catch (e) {}
-  ptRefreshBusy = false;
-}
-document.addEventListener("visibilitychange", () => { if (!document.hidden) refreshPatientView(); });
-setInterval(refreshPatientView, 60000);
 function markHeard(i, v){
   if (ptRec.entries[i]) { ptRec.entries[i].heard = !!v; renderEntries(); saveRecord(); }
 }
@@ -1003,6 +969,7 @@ async function saveRecord(){
     const srv = normRec(doc.pts[route.id]) || ptRec;
     ptRec.deleted = [...new Set((srv.deleted || []).concat(ptRec.deleted || []))];
     ptRec.entries = mergeEntries(srv.entries, ptRec.entries, ptRec.deleted);
+    /* never shown here; merged so a save from this device cannot erase the provider-side record */
     if (LR) ptRec.reads = LR.mergeReads(srv.reads, ptRec.reads);
     doc.pts[route.id] = ptRec;
     await saveDoc(doc);
@@ -1526,7 +1493,7 @@ async function renderDrPatient(){
     '<div class="topbar"><a href="#/b/' + bucket + '/dr">&#8249; All patients</a><button onclick="lockProvider()">&#128274; Lock</button></div>' +
     '<div class="card"><h2 class="sec">Patient</h2><div class="nm" style="font-size:17px;font-weight:700">' + esc(drRec.last) + ', ' + esc(drRec.first) + '</div>' +
     '<div class="dt" style="font-size:12px;color:var(--mut)">' + drRec.entries.length + ' captured item(s) &middot; signed in ' + new Date(drRec.created).toLocaleString() + (drRec.doctor ? ' &middot; Doctor: ' + esc(drRec.doctor) : '') + '</div>' +
-    (LR ? '<div class="dt" id="drLastRead" style="font-size:12px;color:var(--mut);margin-top:4px">' + esc(LR.providerLine(drRec.reads, Date.now())) + ' The patient is shown when this list was last opened, and by which role.</div>' : '') +
+    (LR ? '<div class="dt" id="drLastRead" style="font-size:12px;color:var(--mut);margin-top:4px">' + esc(LR.providerLine(drRec.reads, Date.now())) + ' The patient is not shown this.</div>' : '') +
     '<button id="genBtn" class="btn" style="margin-top:12px" onclick="generate()">Generate rounding summary</button>' +
     '<button class="btn sub" style="margin-top:10px;color:var(--red)" onclick="clearPatientItems()">Clear ALL items for this patient</button>' +
     '<div class="note" id="modeNote"></div></div>' +
