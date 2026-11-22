@@ -34,9 +34,13 @@ test("row counts, marks and list order are used on the provider side only", () =
     assert.ok(before.includes(fn), fn + " should be above the provider section");
   }
   assert.deepEqual(before.match(/\bROWS\.\w+/g) || [], [], "a patient-side use of the row summary appeared");
-  // Looking at the list of patients is not recorded as opening a patient's list.
+  // Steve, 22 November 2026: the provider home now shows each patient's open questions on
+  // the list itself, and that counts as opening that patient's list. It is recorded only
+  // for patients whose questions were put on screen, and only on the provider side.
   const home = html.slice(cut, html.indexOf("async function joinCareTeam"));
-  assert.ok(!/recordOpen|LR\.recordRead/.test(home), "the patient list must not record an open");
+  assert.match(home, /if \(open\.length\) roundShown\.push\(q\.id\);/, "only a patient with open questions on screen is recorded");
+  assert.match(home, /if \(roundShown\.length\) recordRoundOpens\(roundShown\);/);
+  assert.ok(!/recordRoundOpens|roundShown|LR\.recordRead/.test(before), "the patient side must not record or read opens");
   // The patient's entry badge is unchanged.
   assert.ok(html.includes("Waiting for your care team</span>"));
 });

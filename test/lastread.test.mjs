@@ -19,11 +19,13 @@ test("the patient and caregiver pages show nothing about a provider opening the 
   assert.deepEqual(Object.keys(LR.TEXT).sort(), ["providerNever", "providerStart"]);
   assert.equal(LR.status, undefined);
   assert.equal(LR.seen, undefined);
-  // The page uses the record in exactly three places: the merge on save (never
-  // displayed), the provider's line, and the write when a provider opens the list.
+  // The page uses the record in exactly four places: the merge on save (never
+  // displayed), the provider's line, the write when a provider opens a patient, and,
+  // since 22 November 2026 on Steve's decision, the write when a patient's open questions
+  // are shown on the provider home. All four are on the provider side.
   const html = readFileSync(new URL("../index.html", import.meta.url), "utf8");
   const uses = html.match(/\bLR\.\w+/g) || [];
-  assert.deepEqual(uses.sort(), ["LR.mergeReads", "LR.mergeReads", "LR.providerLine", "LR.recordRead"]);
+  assert.deepEqual(uses.sort(), ["LR.mergeReads", "LR.mergeReads", "LR.providerLine", "LR.recordRead", "LR.recordRead"]);
   // The patient's entry badge is the one from before, and the page has no "seen" or "opened" status for patients.
   assert.ok(html.includes("Waiting for your care team</span>"));
   for (const gone of ['id="lastRead"', "renderLastRead", "refreshPatientView", "badgeSeen", "Not seen yet", "Your list was last opened"]) {
