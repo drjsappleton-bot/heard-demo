@@ -9,8 +9,9 @@
   node_bundler = "esbuild"
 
 # Security headers on every page and file (demo recommendation 6, 22 November 2026).
-# Scripts, styles, sound and pictures load from this site only. The one outside
-# address the page may call is the AI service used by the optional AI mode.
+# Scripts, styles, sound and pictures load from this site only, and the page may
+# send data to this site only. (The optional AI mode and its outside address were
+# removed with demo recommendation 7.)
 # The policy has to allow inline script and inline style, because the page is
 # written with inline handlers. So it limits where code and data can come from and
 # go to. It does not, by itself, stop script injected into the page. Escaping does
@@ -18,7 +19,7 @@
 [[headers]]
   for = "/*"
   [headers.values]
-    Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; media-src 'self'; font-src 'self'; connect-src 'self' https://api.anthropic.com; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+    Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; media-src 'self'; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
     X-Content-Type-Options = "nosniff"
     X-Frame-Options = "DENY"
     Referrer-Policy = "no-referrer"

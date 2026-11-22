@@ -149,9 +149,9 @@ test("the patient's list shows when it is opened, and Clear ALL is in Settings",
   const open = html.slice(html.indexOf("async function renderDrPatient"), html.indexOf("function settingsHTML"));
   assert.ok(/\bshowList\(\);/.test(open), "opening a patient must show the list");
   assert.ok(!open.includes("clearPatientItems"), "Clear ALL is back beside the list");
-  const settings = html.slice(html.indexOf("function settingsHTML"), html.indexOf("function wireSettings"));
+  const settings = html.slice(html.indexOf("function settingsHTML"), html.indexOf("/* ---------- summarization"));
   assert.ok(settings.includes("clearPatientItems()"), "Clear ALL should be inside Settings");
   // Showing the list on open uses the keyword sorter. It never calls the AI by itself.
-  const show = html.slice(html.indexOf("function showList"), html.indexOf("async function generate"));
-  assert.ok(show.includes("mockSummarize") && !show.includes("aiSummarize"), "showing the list must not call the AI");
+  const show = html.slice(html.indexOf("function showList"), html.indexOf("function entriesForItem"));
+  assert.ok(show.includes("mockSummarize") && !/aiSummarize|aiSortPrompt|fetch\(/.test(show), "showing the list must not call the AI");
 });
