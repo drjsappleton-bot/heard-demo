@@ -8,6 +8,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script src="redflags.js"></script>
 <script src="lastread.js"></script>
+<script src="rows.js"></script>
 <style>
   :root {
     --blue: #1f4e79; --blue-lt: #eaf1f8; --accent: #2e75b6;
@@ -68,6 +69,17 @@
   .ptrow .nm { font-weight: 600; font-size: 15px; }
   .ptrow .dt { font-size: 11px; color: var(--mut); }
   .ptrow .arrow { color: var(--mut); }
+  /* provider rows: open count and safety-list marks. Each mark carries its word, so colour is never the only signal. */
+  .ptrow .chips { display: flex; flex-wrap: wrap; gap: 4px 6px; margin: 4px 0 3px; }
+  .chip { display: inline-block; font-size: 12px; font-weight: 700; border-radius: 6px; padding: 2px 7px; white-space: nowrap; border: 1px solid var(--line); color: var(--mut); background: var(--bg); }
+  .chip.open { color: var(--ink); }
+  .chip.red { background: var(--red); border-color: var(--red); color: #fff; }
+  .chip.amber { background: var(--amber-lt); border-color: #d9c36a; color: var(--amber); }
+  .rowlegend { font-size: 12px; color: var(--mut); padding: 0 4px 8px; }
+  .bucket li .cap { display: block; font-size: 12px; color: var(--mut); margin-top: 3px; }
+  .bucket li .chip, .addrlist li .chip { margin-right: 6px; vertical-align: 1px; }
+  .addrlist li .cap { display: block; font-size: 12px; color: var(--mut); margin-top: 3px; }
+  details.settings button.danger { color: var(--red); border-color: #e6b0ac; }
   .bucket { margin-top: 12px; }
   .bucket h3 { font-size: 14px; padding: 8px 12px; border-radius: 10px 10px 0 0; color: #fff; }
   .bucket ul { list-style: none; border: 1px solid var(--line); border-top: 0; border-radius: 0 0 10px 10px; }
@@ -947,6 +959,8 @@ function renderEntries(){
    question marked addressed. lastread.js keeps a record of when a provider
    device opened a list and shows it on the provider side only. */
 const LR = window.HeardLastRead || null;
+/* Provider-side only: row counts, safety-list marks and list order (rows.js). */
+const ROWS = window.HeardRows || null;
 function markHeard(i, v){
   if (ptRec.entries[i]) { ptRec.entries[i].heard = !!v; renderEntries(); saveRecord(); }
 }
@@ -1310,9 +1324,30 @@ async function renderDrHome(){
     ? idx.filter(q => q.doctor && nameMatch(q.doctor, leadName) !== "none" && !hidden.has(q.id))
     : [];
 
+  /* Each row says what is waiting before the patient is opened: how many entries
+     are open, and whether any open entry matched the safety list. Rows with a
+     mark come first. This is provider-side only, and looking at this list is not
+     recorded as opening a patient's list. */
+  const now = Date.now();
+  const sumOf = (q) => ROWS ? ROWS.summarize(doc && doc.pts ? doc.pts[q.id] : null, RF ? RF.check : null) : null;
+  const ordered = (list) => ROWS
+    ? ROWS.sortRows(list.map(q => ({ q: q, s: sumOf(q), created: q.created || 0 }))).map(x => x.q)
+    : list.slice().reverse();
+  const chipsHTML = (q) => {
+    const sm = sumOf(q); if (!sm) return "";
+    return '<div class="chips">' +
+      (sm.red.n ? '<span class="chip red">' + esc(ROWS.badgeText("red", sm.red, now)) + '</span>' : '') +
+      (sm.amber.n ? '<span class="chip amber">' + esc(ROWS.badgeText("amber", sm.amber, now)) + '</span>' : '') +
+      '<span class="chip' + (sm.open ? ' open' : '') + '">' + esc(ROWS.openText(sm)) + '</span></div>';
+  };
+  const optTag = (q) => {
+    const sm = sumOf(q); if (!sm) return "";
+    return (sm.red.n ? " \u00b7 " + ROWS.TEXT.red : sm.amber.n ? " \u00b7 " + ROWS.TEXT.amber : "") + (sm.open ? " \u00b7 " + ROWS.openText(sm) : "");
+  };
+  const legend = ROWS ? '<div class="rowlegend">' + esc(ROWS.TEXT.legend) + '</div>' : '';
   const ptRow = (q, removable) =>
     '<div class="ptrow" onclick="location.hash=\'#/b/\'+bucket+\'/dr/' + q.id + '\'">' +
-    '<div><div class="nm">' + esc(q.last) + ', ' + esc(q.first) + '</div><div class="dt">Signed in ' + new Date(q.created).toLocaleString() + ' &middot; code ' + q.id + (q.doctor ? ' &middot; ' + esc(q.doctor) : '') + (q.team ? ' &middot; ' + esc(q.team) : '') + '</div></div>' +
+    '<div><div class="nm">' + esc(q.last) + ', ' + esc(q.first) + '</div>' + chipsHTML(q) + '<div class="dt">Signed in ' + new Date(q.created).toLocaleString() + ' &middot; code ' + q.id + (q.doctor ? ' &middot; ' + esc(q.doctor) : '') + (q.team ? ' &middot; ' + esc(q.team) : '') + '</div></div>' +
     (removable ? '<button class="rmx" title="Remove from my list (hides it from your view only)" data-id="' + q.id + '" onclick="event.stopPropagation(); removeMyPatient(this.dataset.id)">&#10006;</button>' : '<span class="arrow">&#8250;</span>') +
     '</div>';
 
@@ -1324,22 +1359,22 @@ async function renderDrHome(){
     topbar =
       '<div class="topbar"><select class="txt" id="myPts" onchange="if (this.value) location.hash = \'#/b/\' + bucket + \'/dr/\' + this.value">' +
       '<option value="">My patients (' + mine.length + ')</option>' +
-      mine.map(q => '<option value="' + q.id + '">' + esc(q.last) + ', ' + esc(q.first) + '</option>').join("") +
+      ordered(mine).map(q => '<option value="' + q.id + '">' + esc(q.last) + ', ' + esc(q.first) + esc(optTag(q)) + '</option>').join("") +
       '</select><button onclick="lockProvider()">&#128274; Lock</button></div>';
     const others = idx.filter(q => !mine.some(mq => mq.id === q.id));
     listCard =
       '<div class="card" id="ptList">' +
-      (mine.length ? mine.slice().reverse().map(q => ptRow(q, true)).join("")
+      (mine.length ? legend + ordered(mine).map(q => ptRow(q, true)).join("")
                    : '<div class="empty">No patients on your list yet. Patients who pick ' + esc(leadName || "your team") + ' at sign-in appear here.</div>') +
       (others.length
         ? '<details style="margin-top:10px"><summary style="cursor:pointer;font-size:13px;color:var(--mut)">Show all patients on this demo site (' + others.length + ' more)</summary>' +
-          others.slice().reverse().map(q => ptRow(q, false)).join("") + '</details>'
+          ordered(others).map(q => ptRow(q, false)).join("") + '</details>'
         : '') +
       '</div>';
   } else {
     topbar = '<div class="topbar"><span style="font-size:13px;font-weight:600;color:var(--blue)">Patient list</span><button onclick="lockProvider()">&#128274; Lock</button></div>';
     listCard = '<div class="card" id="ptList">' + (idx.length
-      ? idx.slice().reverse().map(q => ptRow(q, false)).join("")
+      ? legend + ordered(idx).map(q => ptRow(q, false)).join("")
       : '<div class="empty">No patients have signed in yet. New patients sign in from the landing page.</div>') + '</div>';
   }
 
@@ -1482,8 +1517,13 @@ function openByCode(){
 }
 
 /* ---------- provider: single patient ---------- */
+/* The list shows as soon as the patient is opened. No button has to be pressed
+   to find out whether anything is there. It is sorted by the keyword sorter,
+   which runs on this device and sends nothing anywhere. Sorting with AI stays
+   behind its own button, and the button exists only when a key is saved.
+   Showing the list is what gets recorded as an open (lastread.js). */
 let drRec = null, lastSummary = null;
-async function renderDrPatient(){
+async function renderDrPatient(again){
   document.getElementById("tagline").textContent = "Provider";
   app().innerHTML = '<div class="card"><div class="empty">Loading…</div></div>';
   try { const doc = await loadDoc(); drRec = doc ? doc.pts[route.id] : null; } catch (e) { drRec = null; }
@@ -1494,19 +1534,27 @@ async function renderDrPatient(){
     '<div class="card"><h2 class="sec">Patient</h2><div class="nm" style="font-size:17px;font-weight:700">' + esc(drRec.last) + ', ' + esc(drRec.first) + '</div>' +
     '<div class="dt" style="font-size:12px;color:var(--mut)">' + drRec.entries.length + ' captured item(s) &middot; signed in ' + new Date(drRec.created).toLocaleString() + (drRec.doctor ? ' &middot; Doctor: ' + esc(drRec.doctor) : '') + '</div>' +
     (LR ? '<div class="dt" id="drLastRead" style="font-size:12px;color:var(--mut);margin-top:4px">' + esc(LR.providerLine(drRec.reads, Date.now())) + ' The patient is not shown this.</div>' : '') +
-    '<button id="genBtn" class="btn" style="margin-top:12px" onclick="generate()">Generate rounding summary</button>' +
-    '<button class="btn sub" style="margin-top:10px;color:var(--red)" onclick="clearPatientItems()">Clear ALL items for this patient</button>' +
+    '<button id="genBtn" class="btn sub hidden" style="margin-top:12px" onclick="generate()">Sort with AI</button>' +
     '<div class="note" id="modeNote"></div></div>' +
-    '<div id="results"></div>' + settingsHTML();
+    '<div id="results"></div>' + settingsHTML(true);
   wireSettings();
   updateModeNote();
+  showList();
+  /* Recorded after the line above was drawn, so the line names the open before this one. */
+  if (!again) recordOpen();
 }
-function settingsHTML(){
-  return '<div class="card"><details class="settings"><summary>Settings &mdash; AI mode, PIN</summary>' +
+/* forPatient adds the one destructive control, kept out of the way of the list.
+   It used to sit directly under the main button at the same size. */
+function settingsHTML(forPatient){
+  return '<div class="card"><details class="settings"><summary>Settings: AI mode, PIN' + (forPatient ? ', clear this patient&rsquo;s items' : '') + '</summary>' +
     '<input id="apiKey" type="password" placeholder="Anthropic API key (sk-ant-...) — blank = offline keyword mode">' +
     '<div class="row"><button onclick="saveKey()">Save key</button><button onclick="clearKey()">Remove key</button></div><div id="keyStatus"></div>' +
     '<input id="newPin" type="tel" inputmode="numeric" maxlength="4" placeholder="New 4-digit provider PIN (this device)">' +
     '<div class="row"><button onclick="changePin()">Change PIN</button></div><div id="pinStatus"></div>' +
+    (forPatient
+      ? '<div class="note" style="text-align:left;margin-top:12px">Clearing removes every captured item for this patient, including the record of which safety messages were shown. It cannot be undone.</div>' +
+        '<div class="row"><button class="danger" onclick="clearPatientItems()">Clear ALL items for this patient</button></div>'
+      : '') +
     '</details></div>';
 }
 function wireSettings(){
@@ -1535,9 +1583,12 @@ function changePin(){
 }
 function updateModeNote(){
   const n = document.getElementById("modeNote"); if (!n) return;
-  n.textContent = localStorage.getItem(LS.key)
-    ? "AI mode: summaries generated by Claude via your API key."
-    : "Offline keyword mode (no AI). Add an API key in Settings for real AI summaries.";
+  const key = localStorage.getItem(LS.key);
+  n.textContent = key
+    ? "Sorted by keyword on this device. Sort with AI sends this patient's entries to Claude through your API key."
+    : "Sorted by keyword on this device (no AI).";
+  const b = document.getElementById("genBtn");
+  if (b) b.classList.toggle("hidden", !key);
 }
 
 /* ---------- summarization ---------- */
@@ -1548,7 +1599,7 @@ const RN_RX = /(pain|medic|pill|dose|iv\b|bathroom|toilet|nausea|vomit|sleep|itc
 function mockSummarize(entries){
   const out = { urgent: [], md: [], rn: [], other: [] };
   for (const e of entries) {
-    const item = { text: e.text, quote: e.text };
+    const item = { text: e.text, quote: e.text, ts: e.ts };
     if (isRedFlag(e)) { item.rf = true; out.urgent.push(item); }
     else if (MD_RX.test(e.text)) out.md.push(item);
     else if (RN_RX.test(e.text)) out.rn.push(item);
@@ -1569,7 +1620,7 @@ function pinRedFlags(s, entries){
     (s.urgent || []).forEach(it => { if (linked(it, e)) { it.rf = true; found = true; } });
     if (found) return;
     ["md", "rn", "other"].forEach(k => { s[k] = (s[k] || []).filter(it => low(cleanQuote(it.quote) || it.text) !== low(e.text)); });
-    s.urgent.push({ text: e.text, quote: e.text, rf: true });
+    s.urgent.push({ text: e.text, quote: e.text, ts: e.ts, rf: true });
   });
   return s;
 }
@@ -1606,23 +1657,50 @@ async function recordOpen(){
     await saveDoc(doc);
   } catch (e) { try { console.warn("Heard: could not record that the list was opened.", e); } catch (x) {} }
 }
+/* The tier and capture time of a summary line, taken from the entries it came
+   from. Red wins when a line covers both. The time is the earliest capture. */
+function itemFacts(item){
+  const all = entriesForItem(item);
+  /* a line made from one entry knows which one; an AI line may cover several */
+  const own = item.ts ? all.filter(e => e.ts === item.ts) : [];
+  const m = own.length ? own : all;
+  let tier = null, ts = 0;
+  m.forEach(e => {
+    const t = ROWS ? ROWS.tierOf(e, RF ? RF.check : null) : (isRedFlag(e) ? rfTierOf(e) : null);
+    if (t === "red" || (t === "amber" && !tier)) tier = t;
+    if (e.ts && (!ts || e.ts < ts)) ts = e.ts;
+  });
+  return { tier: tier, ts: ts };
+}
+/* "Review first" is ordered red above amber, newest first in each. The other
+   sections keep the order the entries were captured in. */
+function orderReview(s){
+  if (ROWS && s && Array.isArray(s.urgent)) {
+    s.urgent = ROWS.sortReview(s.urgent.map(it => { const f = itemFacts(it); return { it: it, tier: f.tier, ts: f.ts }; })).map(x => x.it);
+  }
+  return s;
+}
+/* Shown the moment a patient is opened: the keyword sorter, on this device. */
+function showList(){
+  const res = document.getElementById("results"); if (!res || !drRec) return;
+  if (!drRec.entries.length) { lastSummary = null; res.innerHTML = '<div class="card"><div class="empty">This patient has not captured any items yet.</div></div>'; return; }
+  lastSummary = orderReview(pinRedFlags(mockSummarize(drRec.entries), drRec.entries));
+  lastUsedAI = false;
+  renderSummaryHTML();
+}
+/* Sorting with AI: only on a press, and only when a key is saved on this device. */
 async function generate(){
-  const res = document.getElementById("results");
-  recordOpen();
-  if (!drRec.entries.length) { res.innerHTML = '<div class="card"><div class="empty">This patient has not captured any items yet.</div></div>'; return; }
-  const btn = document.getElementById("genBtn");
-  btn.disabled = true; btn.innerHTML = '<span class="spin"></span>Summarizing…';
   const key = localStorage.getItem(LS.key);
+  if (!key || !drRec || !drRec.entries.length) { showList(); return; }
+  const btn = document.getElementById("genBtn");
+  btn.disabled = true; btn.innerHTML = '<span class="spin"></span>Sorting…';
   let s, usedAI = false, failNote = "";
-  try {
-    if (key) { s = await aiSummarize(drRec.entries, key); usedAI = true; }
-    else s = mockSummarize(drRec.entries);
-  } catch (err) { s = mockSummarize(drRec.entries); failNote = '<div class="err" style="margin-bottom:8px">AI call failed (' + esc(err.message) + '); fell back to keyword mode.</div>'; }
-  s = pinRedFlags(s, drRec.entries);
-  lastSummary = s;
+  try { s = await aiSummarize(drRec.entries, key); usedAI = true; }
+  catch (err) { s = mockSummarize(drRec.entries); failNote = '<div class="err" style="margin-bottom:8px">AI call failed (' + esc(err.message) + '); fell back to keyword mode.</div>'; }
+  lastSummary = orderReview(pinRedFlags(s, drRec.entries));
   lastUsedAI = usedAI;
   renderSummaryHTML(failNote);
-  btn.disabled = false; btn.textContent = "Generate rounding summary";
+  btn.disabled = false; btn.textContent = "Sort with AI";
 }
 let lastUsedAI = false;
 /* Ties a summary line back to the captured entries it came from, so the
@@ -1664,7 +1742,7 @@ function renderSummaryHTML(failNote){
   html += bucketHTML("Other / comfort", "b-other", "other", s.other);
   html += addressedHTML();
   html += '<div class="exportrow"><button onclick="exportMD(false)">Download .md</button><button onclick="exportMD(true)">Share summary</button></div>';
-  html += '<div class="note">' + (lastUsedAI ? "Generated by Claude (AI mode)." : "Keyword demo mode — not AI.") + ' Marking an item addressed moves it to the Addressed list below. Nothing is deleted.</div></div>';
+  html += '<div class="note">' + (lastUsedAI ? "Sorted by Claude (AI mode)." : "Sorted by keyword, not AI.") + ' Marking an item addressed moves it to the Addressed list below. Nothing is deleted.</div></div>';
   res.innerHTML = html;
 }
 /* Marks an item addressed. It is NOT deleted: it moves to the Addressed list
@@ -1699,7 +1777,7 @@ async function clearPatientItems(){
       await saveDoc(doc);
       drRec = rec; lastSummary = null;
     }
-    renderDrPatient();
+    renderDrPatient(true);
   } catch (e) { alert("Could not clear items: " + e.message); }
 }
 function cleanQuote(q){ return String(q || "").replace(/^["“”'\s]+|["“”'\s]+$/g, ""); }
@@ -1717,7 +1795,7 @@ function addressedHTML(){
       ? (st.heard ? '<span class="addrstat done">&#9745; Patient confirmed heard</span>'
                   : '<span class="addrstat wait">&#9744; Awaiting patient</span>')
       : '<span class="addrstat wait">&#9744; Not linked to a captured item</span>';
-    return '<li>' + stat + '&#10003; ' + esc(i.text) + itemAuthorTag(i) + (q && q !== i.text ? '<q>“' + esc(q) + '”</q>' : '') + '</li>';
+    return '<li>' + stat + '&#10003; ' + esc(i.text) + itemAuthorTag(i) + (q && q !== i.text ? '<q>“' + esc(q) + '”</q>' : '') + capHTML(i) + '</li>';
   }).join("");
   return '<div class="bucket"><h3 style="background:var(--green)">Addressed (' + rows.length + ')</h3>' +
     '<ul class="addrlist">' + lis + '</ul></div>';
@@ -1731,10 +1809,22 @@ function bucketHTML(title, cls, key, items){
           ? '<span class="bnc" title="The team marked this addressed, and the patient tapped Not heard, so it is back on the list">&#10006; Patient: not heard yet</span>'
           : "";
         return "<li><label class=\"itemchk\" title=\"Mark addressed. The item stays, and moves to the Addressed list below\"><input type=\"checkbox\" onchange=\"completeItem('" + key + "'," + idx + ")\"> Addressed</label>" +
-          esc(i.text) + itemAuthorTag(i) + bounced + (q && q !== i.text ? "<q>“" + esc(q) + "”</q>" : "") + safetyNote(i, key) + "</li>";
+          tierChip(i, key) + esc(i.text) + itemAuthorTag(i) + bounced + (q && q !== i.text ? "<q>“" + esc(q) + "”</q>" : "") + capHTML(i) + safetyNote(i, key) + "</li>";
       }).join("")
     : '<li class="empty">' + (items.length ? "All addressed" : "None") + '</li>';
   return '<div class="bucket ' + cls + '"><h3>' + title + '</h3><ul>' + lis + '</ul></div>';
+}
+/* When the entry behind a line was captured. Shown on every line, in every section. */
+function capHTML(item){
+  if (!ROWS) return "";
+  const f = itemFacts(item);
+  return f.ts ? '<span class="cap">' + esc(ROWS.capturedText(f.ts, Date.now())) + '</span>' : '';
+}
+/* In the top section each line carries its tier in a word, so red and amber can be told apart at a glance. */
+function tierChip(item, key){
+  if (key !== "urgent" || !ROWS) return "";
+  const t = itemFacts(item).tier;
+  return t ? '<span class="chip ' + t + '">' + esc(t === "amber" ? ROWS.TEXT.amber : ROWS.TEXT.red) + '</span>' : '';
 }
 /* For the top section: was the patient shown the safety message, and when. */
 function safetyNote(item, key){
