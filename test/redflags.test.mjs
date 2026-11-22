@@ -101,11 +101,38 @@ const MUST_FLAG = [
   ["I am having palpitations", "heart", A],
   ["my heart is racing and my chest hurts", "heart", R], // red wins
 
-  // ---- neuro (red, first draft) ----
-  ["my speech is slurred", "neuro", R],
-  ["I can't feel my toes", "neuro", R],
-  ["my foot is numb", "neuro", R],
-  ["he is confused and not making sense", "neuro", R],
+  // ---- stroke_signs (red, shows the stroke list) ----
+  ["my speech is slurred", "stroke_signs", R],
+  ["she has trouble speaking", "stroke_signs", R],
+  ["I can't talk", "stroke_signs", R],
+  ["her face is drooping", "stroke_signs", R],
+  ["my arm is weak", "stroke_signs", R],
+  ["double vision", "stroke_signs", R],
+  ["worst headache of my life", "stroke_signs", R],
+  ["my dad had a stroke, is surgery safe", "stroke_signs", R], // accepted false alarm
+
+  // ---- numb_stroke (red, stroke list): numb face, arm, hand or one side ----
+  ["my arm is numb", "numb_stroke", R],
+  ["the left side of her face is numb", "numb_stroke", R],
+
+  // ---- seizure (red) ----
+  ["he had a seizure", "seizure", R],
+
+  // ---- confusion (amber) ----
+  ["he is confused and not making sense", "confusion", A],
+  ["she is confused about where she is", "confusion", A],
+  ["he is confused when he wakes up", "confusion", A],
+  ["she is hallucinating", "confusion", A],
+  ["he doesn't know where he is", "confusion", A],
+
+  // ---- numb (amber) ----
+  ["my foot is numb", "numb", A],
+  ["tingling in my foot", "numb", A],
+
+  // ---- weak (amber) ----
+  ["I can't feel my toes", "weak", A],
+  ["I can't lift my foot", "weak", A],
+  ["I feel weak", "weak", A],
 
   // ---- faint (red) ----
   ["I passed out in the bathroom", "faint", R],
@@ -168,14 +195,53 @@ const MUST_FLAG = [
   ["I have chills", "fever", A],
   ["my temp is 101.4", "fever", A],
 
-  // ---- allergic, overdose, severe_pain, self_harm (red, first draft) ----
+  // ---- allergic (red) ----
   ["my throat is closing", "allergic", R],
   ["my lips are swelling", "allergic", R],
+  ["I have a swollen tongue", "allergic", R],
+  ["swelling in my throat", "allergic", R],
+  ["I can't swallow", "allergic", R],
+
+  // ---- allergic_other (amber) ----
+  ["I broke out in hives", "allergic_other", A],
+  ["I have a rash all over", "allergic_other", A],
+  ["itching all over", "allergic_other", A],
+  ["I am having a reaction to the medication", "allergic_other", A],
+
+  // ---- overdose (red) ----
   ["I took too many pain pills", "overdose", R],
-  ["the pain is unbearable", "severe_pain", R],
-  ["my pain is ten out of ten", "severe_pain", R],
+  ["he took too much oxycodone", "overdose", R],
+  ["can I overdose on tylenol", "overdose", R], // open question
+
+  // ---- overdose_other (amber) ----
+  ["I took a double dose", "overdose_other", A],
+  ["I took my pills twice", "overdose_other", A],
+  ["I took extra pills", "overdose_other", A],
+  ["I accidentally took two", "overdose_other", A],
+
+  // ---- severe_pain (amber) ----
+  ["the pain is unbearable", "severe_pain", A],
+  ["my pain is ten out of ten", "severe_pain", A],
+  ["my pain is a 10", "severe_pain", A],
+  ["10/10 pain", "severe_pain", A],
+  ["severe pain", "severe_pain", A],
+  ["I am in agony", "severe_pain", A],
+  ["my pain is out of control", "severe_pain", A],
+  ["the pain medicine is not working", "severe_pain", A],
+  ["the food here is unbearable", "severe_pain", A], // accepted false alarm
+
+  // ---- self_harm (red, adds the 988 line) ----
   ["I want to kill myself", "self_harm", R],
-  ["I don't want to live anymore", "self_harm", R]
+  ["I don't want to live anymore", "self_harm", R],
+  ["he says he wants to kill himself", "self_harm", R],
+  ["she wants to die", "self_harm", R],
+  ["I wish I was dead", "self_harm", R],
+  ["I want to end it all", "self_harm", R],
+  ["no reason to live", "self_harm", R],
+  ["I don't want to go on", "self_harm", R],
+  ["I want to hurt myself", "self_harm", R],
+  ["thoughts of harming myself", "self_harm", R],
+  ["I don't want to be here anymore, when can I go home", "self_harm", R] // open question
 ];
 
 const MUST_NOT_FLAG = [
@@ -220,6 +286,24 @@ const MUST_NOT_FLAG = [
   "how do I prevent infection",
   "my incision is a little red",
   "my temperature is 98.6",
+  // nerve block numbness
+  "my arm is numb from the block",
+  "my leg is still numb from the nerve block",
+  "when does the numbness from the block wear off",
+  "numbing cream",
+  // groups 5 and 9 to 12
+  "I can't talk to the doctor until Monday",
+  "I'm confused why I need this pill",
+  "I can't swallow these big pills",
+  "bring my face wash and close the door",
+  "I am allergic to penicillin",
+  "therapy took too much out of me",
+  "I take it twice a day",
+  "my pain pill is due at 10",
+  "I don't want to go on the blood thinner",
+  "I don't want to go on a walker",
+  "I am afraid I will hurt myself doing therapy",
+  "I don't want to hurt myself getting out of bed",
   "",
   "   "
 ];
@@ -253,6 +337,26 @@ test("every rule has a tier, and red wins over amber", () => {
   }
 });
 
+test("condition lists come only with the red message and only from rules that carry one", () => {
+  assert.deepEqual(RF.check("my speech is slurred").lists, ["stroke"]);
+  assert.deepEqual(RF.check("I have chest pain").lists, ["heart_attack"]);
+  assert.deepEqual(RF.check("my calf hurts and it is swollen").lists, ["clot"]);
+  assert.deepEqual(RF.check("my chest hurts and my calf is swollen").lists, ["heart_attack", "clot"]);
+  assert.deepEqual(RF.check("I fell").lists, []);            // red, no list
+  assert.deepEqual(RF.check("I am lightheaded").lists, []);  // amber
+  for (const rule of RF.RULES) {
+    if (!rule.list) continue;
+    assert.equal(rule.tier, "red", "rule " + rule.id + " shows a list, so it must be red");
+    assert.ok(RF.LISTS[rule.list], "rule " + rule.id + " names an unknown list: " + rule.list);
+  }
+  for (const [key, L] of Object.entries(RF.LISTS)) {
+    assert.ok(L.name && L.heading && L.url.startsWith("https://www.cdc.gov/") && L.reviewed, "list " + key + " needs a name, heading, CDC link and review date");
+    for (const g of L.groups) assert.ok(g.items.length > 0);
+  }
+  assert.ok(RF.LIST_TEXT.source.includes("Source: CDC"));
+  assert.ok(RF.LIST_TEXT.source.includes("does not imply endorsement"));
+});
+
 test("check never throws on odd input and always reports a version", () => {
   for (const v of [null, undefined, 42, {}, [], "’’’"]) {
     const r = RF.check(v);
@@ -261,7 +365,7 @@ test("check never throws on odd input and always reports a version", () => {
   }
 });
 
-test("neither message names a condition", () => {
+test("neither base message names a condition (only the condition lists do)", () => {
   for (const M of [RF.MESSAGES.red, RF.MESSAGES.amber]) {
     const all = Object.values(M).join(" ").toLowerCase();
     for (const word of ["clot", "stroke", "heart attack", "infection", "embol", "sepsis", "overdose", "bleed"]) {

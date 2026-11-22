@@ -204,6 +204,13 @@
   .rf-card.amber .rf-where.hosp { background: var(--amber-lt); border: 1px solid #e6d9a8; }
   .rf-card .rf-wound { font-size: 16px; font-weight: 700; margin: 2px 0 10px; line-height: 1.35; }
   .rf-card .rf-esc { font-size: 15px; font-weight: 700; margin: 2px 0 10px; line-height: 1.35; }
+  .rf-card .rf-rec { font-size: 15px; font-weight: 800; margin: 0 0 6px; }
+  .rf-card .rf-list { border: 1px solid var(--line, #d9dee3); border-radius: 12px; padding: 10px 14px; margin: 4px 0 10px; }
+  .rf-card .rf-list h4 { font-size: 15px; margin: 0 0 4px; }
+  .rf-card .rf-list .grp { font-size: 13px; font-weight: 700; color: var(--mut); margin: 6px 0 2px; text-transform: uppercase; letter-spacing: .5px; }
+  .rf-card .rf-list ul { margin: 0 0 4px 18px; padding: 0; }
+  .rf-card .rf-list li { font-size: 15px; line-height: 1.35; margin: 2px 0; }
+  .rf-card .rf-src { font-size: 11.5px; color: var(--mut); margin: 0 0 10px; line-height: 1.3; }
   .rftag { display: block; margin-top: 6px; border: 1px solid #e6b0ac; background: var(--red-lt); color: var(--red); font-weight: 700;
     border-radius: 8px; padding: 6px 9px; font-size: 12.5px; cursor: pointer; font-family: inherit; text-align: left; width: 100%; }
   .rfnote { display: block; margin-top: 4px; font-size: 12px; font-weight: 700; color: var(--red); }
@@ -385,7 +392,7 @@ function mergeEntries(a, b, deleted){
       if ((e.addressedAt || 0) > (t.addressedAt || 0)) t.addressedAt = e.addressedAt;
       if ((e.bouncedAt || 0) > (t.bouncedAt || 0)) t.bouncedAt = e.bouncedAt;
       /* the safety-message trail must survive a merge in either direction */
-      if (e.rf && !t.rf) { t.rf = e.rf; t.rfVer = e.rfVer; t.rfShownAt = e.rfShownAt; if (e.rfTier) t.rfTier = e.rfTier; }
+      if (e.rf && !t.rf) { t.rf = e.rf; t.rfVer = e.rfVer; t.rfShownAt = e.rfShownAt; if (e.rfTier) t.rfTier = e.rfTier; if (e.rfLists) t.rfLists = e.rfLists; }
       if ((e.rfAckAt || 0) > (t.rfAckAt || 0)) t.rfAckAt = e.rfAckAt;
     }
   }
@@ -964,8 +971,9 @@ async function saveRecord(){
 /* ---------- red-flag safety message ----------
    The list and the wording live in redflags.js. This shows one of two fixed
    messages, red or amber, when something captured matches the list. Which one
-   depends only on the phrase matched. It never blocks or delays the save, it
-   names no condition, and it notifies no one. */
+   depends only on the phrase matched. Some red phrases also show a condition
+   list (stroke, heart attack, blood clot) taken from CDC. It never blocks or
+   delays the save, it asks the patient nothing, and it notifies no one. */
 const RF = window.HeardRedFlags || null;
 if (!RF) { try { console.warn("Heard: redflags.js did not load; the safety message is off, the standing safety line still shows."); } catch (e) {} }
 /* A tap-to-dial 911 link. Off in the demo so nobody trying it out dials by accident. */
@@ -991,14 +999,26 @@ function showSafetyMessage(entry){
   const selfHarm = !amber && ids.indexOf("self_harm") > -1;
   const wound = amber && ids.indexOf("wound") > -1;
   const homeAct = (!amber && RF_DIAL_LINK) ? '<a href="tel:911">' + esc(M.homeAction) + '</a>' : esc(M.homeAction);
+  /* condition lists: red only, and only the ones recorded on the entry */
+  const lists = (!amber && RF.LISTS) ? (entry.rfLists || []).map(k => RF.LISTS[k]).filter(Boolean) : [];
+  const LT = RF.LIST_TEXT || {};
+  const title = lists.length ? LT.headlineStart + lists.map(l => l.name).join(" or ") + "." : M.title;
+  const listHTML = lists.map(l =>
+    '<div class="rf-list"><h4>' + esc(l.heading) + '</h4>' +
+    l.groups.map(g => (g.label ? '<div class="grp">' + esc(g.label) + '</div>' : '') +
+      '<ul>' + g.items.map(it => '<li>' + esc(it) + '</li>').join("") + '</ul>').join("") +
+    '</div>').join("");
   o.innerHTML =
     '<div class="rf-card' + (amber ? ' amber' : '') + '">' +
-    '<h3 id="rfTitle">&#9888; ' + esc(M.title) + '</h3>' +
+    '<h3 id="rfTitle">&#9888; ' + esc(title) + '</h3>' +
     '<div id="rfBody">' +
     '<div class="rf-nm">' + esc(M.notMonitored) + '</div>' +
+    (lists.length ? '<div class="rf-rec">' + esc(LT.recommends) + '</div>' : '') +
     '<div class="rf-where hosp"><div class="lbl">' + esc(M.hospitalLabel) + '</div><div class="act">' + esc(M.hospitalAction) + '</div></div>' +
     '<div class="rf-where home"><div class="lbl">' + esc(M.homeLabel) + '</div><div class="act">' + homeAct + '</div>' +
-    '<div class="sm">' + esc(M.homeNote) + '</div></div>' +
+    '<div class="sm">' + esc(lists.length ? LT.homeNote : M.homeNote) + '</div></div>' +
+    listHTML +
+    (lists.length ? '<div class="rf-src">' + esc(LT.source) + '</div>' : '') +
     (wound ? '<div class="rf-wound">' + esc(M.wound) + '</div>' : '') +
     (amber ? '<div class="rf-esc">' + esc(M.escalate) + '</div>' : '') +
     (selfHarm ? '<div class="rf-crisis">' + esc(M.crisis) + '</div>' : '') +
@@ -1009,7 +1029,9 @@ function showSafetyMessage(entry){
   o.classList.remove("hidden");
   o.scrollTop = 0;
   const b = document.getElementById("rfOk");
-  if (b) { try { b.focus(); } catch (e) {} }
+  /* keep the top of the message on screen: a long message must not open scrolled to its button */
+  if (b) { try { b.focus({ preventScroll: true }); } catch (e) {} }
+  o.scrollTop = 0;
 }
 function reshowSafetyMessage(i){ const e = ptRec && ptRec.entries[i]; if (e) showSafetyMessage(e); }
 /* Records that the reader dismissed the message. This is the audit trail, not a
@@ -1026,7 +1048,7 @@ function persistEntry(text){
   const e = { text: text, ts: Date.now(), by: AUTHOR.by };
   if (AUTHOR.by === "caregiver" && AUTHOR.name) e.byName = AUTHOR.name;
   const rf = rfCheck(text);
-  if (rf.hit) { e.rf = rf.ids; e.rfVer = rf.version; e.rfTier = rf.tier || "red"; e.rfShownAt = e.ts; }
+  if (rf.hit) { e.rf = rf.ids; e.rfVer = rf.version; e.rfTier = rf.tier || "red"; if (rf.lists && rf.lists.length) e.rfLists = rf.lists; e.rfShownAt = e.ts; }
   ptRec.entries.push(e);
   renderEntries();
   saveRecord();                       /* saved first, always */
@@ -1682,7 +1704,7 @@ function safetyNote(item, key){
   const m = entriesForItem(item).filter(e => e.rfShownAt);
   if (!m.length) return '<span class="rfnote" style="color:var(--mut)">Safety message not shown for this item (captured before it existed, or flagged by AI only).</span>';
   const e = m[0];
-  return '<span class="rfnote">' + (rfTierOf(e) === "amber" ? 'Amber message (tell your nurse, call the surgeon\'s office)' : 'Red message (call button, 911)') + ' shown to the ' + (e.by === "caregiver" ? "caregiver" : "patient") + " " + new Date(e.rfShownAt).toLocaleString() +
+  return '<span class="rfnote">' + (rfTierOf(e) === "amber" ? 'Amber message (tell your nurse, call the surgeon\'s office)' : 'Red message (call button, 911)' + (e.rfLists && e.rfLists.length ? ' with the ' + e.rfLists.map(k => (RF && RF.LISTS && RF.LISTS[k] ? RF.LISTS[k].name : k)).join(" and ") + ' list' : '')) + ' shown to the ' + (e.by === "caregiver" ? "caregiver" : "patient") + " " + new Date(e.rfShownAt).toLocaleString() +
     (e.rfAckAt ? ", dismissed " + new Date(e.rfAckAt).toLocaleTimeString() : ", not yet dismissed") + '</span>';
 }
 function summaryMD(){

@@ -9,13 +9,20 @@
             getting worse.
    If an entry matches both tiers, the red message is shown.
 
-   What this is not: triage of the patient. It does not name a condition, give a
-   recommendation specific to the patient, or notify anyone. Which message appears
-   depends only on which listed phrase was matched. The two-message design was a
+   Some red rules also carry a condition list (stroke, heart attack, blood clot).
+   When one matches, the red message says the concern represents a possible
+   condition, shows the public CDC list of its signs word for word with the source,
+   and gives the same red instruction. There is one button, to acknowledge. The
+   patient is not asked to answer anything. Decided 21 November 2026.
+
+   What this is not: triage of the patient. It does not score anything, ask the
+   patient questions, or notify anyone. Which message appears depends only on which
+   listed phrase was matched. The two-message design was a
    deliberate decision by the product's physician on 21 November 2026; it replaced
    the single message. The tier of a phrase, the wording of either message, and any
    move toward naming a condition or notifying someone are regulatory questions, not
-   code changes.
+   code changes. Naming a possible condition was added on 21 November 2026 and is on
+   the list for counsel with the rest.
 
    Rules for editing this list:
    - It is clinical content. The physician who owns the product reviews every change.
@@ -33,12 +40,10 @@
 (function (root) {
   "use strict";
 
-  var VERSION = "2026-11-21.4";
+  var VERSION = "2026-11-21.5";
 
-  /* Review status at this version (21 November 2026 review):
-     - revised and tiered: chest, breathing, bleeding, bleeding_other, black_stool,
-       clot, heart, faint, dizzy, bp_drop, fall, near_fall, wound, dislocation, fever
-     - still the first draft: neuro, allergic, overdose, severe_pain, self_harm */
+  /* Review status at this version (21 November 2026 review): every group has been
+     revised. Open points are listed in the project's START-HERE. */
 
   /* One rule can hold several patterns. Any one of them matching is a match. */
   function any(list) {
@@ -63,12 +68,17 @@
   /* Words for the surgical wound. */
   var W = "(?:wound|incision|stitch|stitches|staple|staples|suture|sutures|surgical site)";
 
+  /* An entry that mentions a nerve block is expected to mention numbness. The numb
+     rules do not fire when one of these words is in the entry. */
+  var BLOCK_WORDS = /\b(block|blocks|spinal|epidural|numbing)\b/;
+
   /* Each rule: an id for the audit trail, a tier ("red" or "amber"), and one pattern
-     (see any() above). Text is lower-cased and curly apostrophes are straightened
+     (see any() above). Optional: "unless", a pattern that cancels the rule when it
+     is found anywhere in the entry; "list", the condition list a red rule shows. Text is lower-cased and curly apostrophes are straightened
      before matching. */
   var RULES = [
     /* ---- chest: reviewed 21 Nov 2026 ---- */
-    { id: "chest", tier: "red", rx: any([
+    { id: "chest", tier: "red", list: "heart_attack", rx: any([
       /* "chest", then a symptom word */
       /\bchest\b.{0,30}\b(pain|pains|painful|hurt|hurts|hurting|pressure|tight|tightness|heavy|heaviness|sore|soreness|ache|aches|aching|discomfort|burning|sharp|stabbing|squeez\w*|crush\w*)\b/,
       /* a symptom word, then "chest", with any words between */
@@ -142,7 +152,7 @@
     ]) },
 
     /* ---- clot: reviewed 21 Nov 2026 ---- */
-    { id: "clot", tier: "red", rx: any([
+    { id: "clot", tier: "red", list: "clot", rx: any([
       /* calf and a symptom word, either order */
       /\b(calf|calves)\b.{0,30}\b(pain|pains|painful|hurt\w*|sore|swollen|swelling|swell\w*|cramp\w*|tender|red|hot|warm|hard|tight)\b/,
       /\b(pain|pains|painful|hurt\w*|sore|soreness|swollen|swelling|cramp\w*|tender|tenderness|tight|tightness)\b.{0,20}\b(calf|calves)\b/,
@@ -166,8 +176,72 @@
       /\bpalpitation\w*/
     ]) },
 
-    { id: "neuro", tier: "red",
-      rx: /\bslurr\w*|\bface\b.{0,15}\bdroop\w*|\bdroop\w*\b.{0,15}\bface\b|\b(can't|cant|cannot) (feel|move)\b.{0,20}\b(arm|arms|leg|legs|foot|feet|toes|hand|hands|fingers|side)\b|\bnumb\w*|\bworst headache\b|\bconfus(ed|ion)\b(?!\s+(about|by|on|as to|why|what|when|which|how|with))|\bdisoriented\b|\bseizure\w*|\bconvuls\w*|\bstroke\b|\b(lost|losing|loss of)\b.{0,10}\b(vision|sight)\b|\bparaly\w*/ },
+    /* ---- stroke_signs (red, shows the stroke list). Reviewed 21 Nov 2026 ---- */
+    { id: "stroke_signs", tier: "red", list: "stroke", rx: any([
+      /\bslurr\w*/,
+      /* trouble speaking; "can't talk to the doctor" passes */
+      /\b(trouble|difficulty|hard time|problem|problems)\b.{0,10}\b(speaking|talking|getting (the |my |his |her )?words)\b/,
+      /\b(can't|cant|cannot|couldn't|unable to)\b.{0,6}\b(speak|talk)\b(?! (to|with|about)\b)/,
+      /* face drooping, either order */
+      /\bface\b.{0,15}\bdroop\w*/,
+      /\bdroop\w*\b.{0,15}\b(face|mouth|smile)\b/,
+      /* weak, or cannot move or feel: arm, hand, face or one side, either order */
+      /\b(arm|arms|hand|hands|face|one side|left side|right side)\b.{0,20}\b(weak|weakness|limp|won't move|wont move|not moving)\b/,
+      /\b(weak|weakness)\b.{0,20}\b(arm|arms|hand|hands|face|one side|left side|right side)\b/,
+      /\b(can't|cant|cannot|couldn't) (feel|move|lift|raise)\b.{0,20}\b(arm|arms|hand|hands|fingers|face|side)\b/,
+      /* vision */
+      /\b(lost|losing|loss of)\b.{0,10}\b(vision|sight)\b/,
+      /\bdouble vision\b/,
+      /\bseeing double\b/,
+      /* headache */
+      /\b(worst|sudden)\b.{0,12}\bheadache\b/,
+      /\bparaly\w*/,
+      /\bstroke\b/
+    ]) },
+
+    /* ---- numb_stroke (red, shows the stroke list): numb face, arm, hand or one
+       side, unless a nerve block is mentioned. Reviewed 21 Nov 2026 ---- */
+    { id: "numb_stroke", tier: "red", list: "stroke", unless: BLOCK_WORDS, rx: any([
+      /\b(arm|arms|hand|hands|face|one side|left side|right side)\b.{0,20}\bnumb\w*/,
+      /\bnumb\w*\b.{0,20}\b(arm|arms|hand|hands|face|one side|left side|right side)\b/
+    ]) },
+
+    /* ---- seizure (red). First-draft phrases, kept ---- */
+    { id: "seizure", tier: "red", rx: any([
+      /\bseizure\w*/,
+      /\bconvuls\w*/
+    ]) },
+
+    /* ---- confusion (amber). "Confused about my medication" passes; "confused about
+       where she is" does not. Reviewed 21 Nov 2026 ---- */
+    { id: "confusion", tier: "amber", rx: any([
+      /\bconfus(ed|ion)\b(?! (about|by|with|as to|on|over|why|what|how|which|whether|if) (?!where|who|what day|what year|what time)\S)/,
+      /\bconfus(ed|ion) (about )?(where|who|what day|what year|what time)\b/,
+      /\bdisoriented\b/,
+      /\bdelirious\b/,
+      /\bhallucinat\w*/,
+      /\bseeing things\b/,
+      /\bnot making sense\b/,
+      /\btalking (nonsense|gibberish)\b/,
+      /\b(doesn't|doesnt|does not|don't|dont|do not) know (where|who|what day|what year)\b/
+    ]) },
+
+    /* ---- numb (amber): any other numbness or tingling, unless a nerve block is
+       mentioned. Reviewed 21 Nov 2026 ---- */
+    { id: "numb", tier: "amber", unless: BLOCK_WORDS, rx: any([
+      /\bnumb\w*/,
+      /\btingl\w*/,
+      /\bpins and needles\b/
+    ]) },
+
+    /* ---- weak (amber): cannot feel or move a leg, foot or toes; foot drop; any
+       other "weak". Reviewed 21 Nov 2026 ---- */
+    { id: "weak", tier: "amber", rx: any([
+      /\b(can't|cant|cannot|couldn't|unable to)\b.{0,6}\b(feel|move|lift|raise|wiggle|bend)\b.{0,20}\b(leg|legs|foot|feet|toe|toes|ankle)\b/,
+      /\bfoot drop\b/,
+      /\bdrop foot\b/,
+      /\bweak(ness|er)?\b/
+    ]) },
 
     /* ---- faint (red). Reviewed 21 Nov 2026 ---- */
     { id: "faint", tier: "red", rx: any([
@@ -258,17 +332,84 @@
       /\b(temp|temperature)\b.{0,12}\b10[0-9](\.\d)?\b/
     ]) },
 
-    { id: "allergic", tier: "red",
-      rx: /\b(throat|tongue|lips|face)\b.{0,20}\b(swell\w*|swollen|clos\w*|tight\w*)\b|\ballergic reaction\b|\banaphyla\w*/ },
+    /* ---- allergic (red): swelling of the throat, tongue, lips or face; throat
+       closing; cannot swallow. Reviewed 21 Nov 2026 ---- */
+    { id: "allergic", tier: "red", rx: any([
+      /\b(throat|tongue|lip|lips|face)\b.{0,20}\b(swell\w*|swollen)\b/,
+      /\b(swell\w*|swollen)\b.{0,20}\b(throat|tongue|lip|lips|face)\b/,
+      /\bthroat\b.{0,20}\b(clos\w*|tight\w*)\b/,
+      /* cannot swallow; "can't swallow these big pills" passes */
+      /\b(can't|cant|cannot|couldn't|trouble|difficulty|hard to)\b.{0,6}\bswallow\w*\b(?!.{0,15}\b(pill|pills|tablet|tablets|capsule|capsules)\b)/,
+      /\ballergic reaction\b/,
+      /\banaphyla\w*/
+    ]) },
 
-    { id: "overdose", tier: "red",
-      rx: /\boverdos\w*|\btook too (many|much)\b|\btoo many pills\b/ },
+    /* ---- allergic_other (amber): hives, rash, itching all over, a reaction to a
+       medicine. Reviewed 21 Nov 2026 ---- */
+    { id: "allergic_other", tier: "amber", rx: any([
+      /\bhives\b/,
+      /\brash\b/,
+      /\bitch\w*\b.{0,12}\b(all over|everywhere)\b/,
+      /\breaction to\b.{0,15}\b(medication|medications|medicine|meds|pill|pills|antibiotic|antibiotics|drug|shot|iv)\b/
+    ]) },
 
-    { id: "severe_pain", tier: "red",
-      rx: /\bunbearable\b|\bexcruciating\b|\bworst pain\b|\bpain\b.{0,15}\b(10|ten) out of (10|ten)\b|\b(can't|cant|cannot) (stand|take) (the|this) pain\b/ },
+    /* ---- overdose (red). Reviewed 21 Nov 2026 ---- */
+    { id: "overdose", tier: "red", rx: any([
+      /\boverdos\w*/,
+      /* "took too much out of me" passes */
+      /\btook too (many|much)\b(?! out of)/,
+      /\btoo many pills\b/
+    ]) },
 
-    { id: "self_harm", tier: "red",
-      rx: /\bsuicid\w*|\bkill myself\b|\bend my life\b|\b(hurt|harm) myself\b|\b(don't|dont|do not) want to (live|be here|go on)\b|\bwant to die\b|\bbetter off dead\b/ }
+    /* ---- overdose_other (amber): double dose, took it twice, took extra, took the
+       wrong pill, took something by mistake. Reviewed 21 Nov 2026 ---- */
+    { id: "overdose_other", tier: "amber", rx: any([
+      /\bdouble dose\b/,
+      /\b(took|taken|gave|given)\b.{0,15}\b(double|extra|wrong)\b/,
+      /\b(took|taken|gave|given)\b.{0,25}\btwice\b/,
+      /\b(accidentally|by mistake|by accident)\b.{0,15}\b(took|taken|gave|given)\b/,
+      /\b(took|taken|gave|given)\b.{0,25}\b(accidentally|by mistake|by accident)\b/
+    ]) },
+
+    /* ---- severe_pain (amber). Reviewed 21 Nov 2026 ---- */
+    { id: "severe_pain", tier: "amber", rx: any([
+      /\bunbearable\b/,
+      /\bexcruciating\b/,
+      /\bagony\b/,
+      /\bworst pain\b/,
+      /\bsevere\b.{0,10}\bpain\b/,
+      /\bpain\b.{0,15}\bsevere\b/,
+      /* a pain score of ten; "my pain pill is due at 10" passes */
+      /\bpain\b(?! (pill|pills|med|meds|medicine|medication))\b.{0,15}\b(10|ten)\b/,
+      /\b(10|ten) out of (10|ten)\b.{0,15}\bpain\b/,
+      /\b10\/10\b.{0,15}\bpain\b/,
+      /\bpain\b.{0,15}\b10\/10\b/,
+      /\b(can't|cant|cannot) (stand|take) (the|this) pain\b/,
+      /\bpain\b.{0,15}\b(out of control|not controlled|uncontrolled|not under control)\b/,
+      /\bpain (pill|pills|med|meds|medicine|medication|medications)\b.{0,20}\b(not|isn't|isnt|aren't|arent|doesn't|doesnt|don't|dont|stopped)\b.{0,10}\b(working|work|help|helping)\b/
+    ]) },
+
+    /* ---- self_harm (red, adds the 988 line). Reviewed 21 Nov 2026, except
+       "don't want to be here", which is still an open question ---- */
+    { id: "self_harm", tier: "red", rx: any([
+      /\bsuicid\w*/,
+      /\bkill (myself|himself|herself|themselves|themself)\b/,
+      /\bend (my|his|her|their) (own )?life\b/,
+      /\btake (my|his|her|their) own life\b/,
+      /\bwants? to die\b/,
+      /\bbetter off dead\b/,
+      /\bwish (i|he|she) (was|were) dead\b/,
+      /\bend it all\b/,
+      /\bno reason to live\b/,
+      /\b(don't|dont|do not|doesn't|doesnt|does not) want to live\b/,
+      /* "don't want to go on", but not "go on the blood thinner" or "go on a walker" */
+      /\b(don't|dont|do not|doesn't|doesnt|does not) want to go on\b(?! (the|a|an|my|any|this|that|blood|oxygen|more|with the|to)\b)/,
+      /* open question: this also fires for "I don't want to be here, when can I go home" */
+      /\b(don't|dont|do not) want to be here\b/,
+      /* hurting oneself, only with intent; "afraid I will hurt myself in therapy" passes */
+      /(?:^|(?:^|\s)(?!don't\s|dont\s|not\s|never\s|didn't\s|didnt\s)\S+\s)(want|wants|wanted) to (hurt|harm) (myself|himself|herself|themselves)\b/,
+      /\b(going to|thinking about|thinking of|thought about|thoughts of|might|plan to|planning to|tried to|trying to|feel like)\b.{0,6}\b(hurt|harm|hurting|harming) (myself|himself|herself|themselves)\b/
+    ]) }
   ];
 
   /* Two amber rules that together are red. Each combo has its own id for the audit
@@ -285,17 +426,20 @@
       .trim();
   }
 
-  /* Returns { hit, ids, tier, version }. ids lists every rule that matched, for the
+  /* Returns { hit, ids, tier, lists, version }. lists names the condition lists to
+     show with the red message; it is empty unless the tier is red. ids lists every rule that matched, for the
      audit trail. It is never shown to the patient. tier is "red" if any red rule
      or red combo matched, otherwise "amber" if any amber rule matched, otherwise null. */
   function check(text) {
     var t = normalize(text);
     var ids = [];
+    var lists = [];
     var tier = null;
     if (t) {
       for (var i = 0; i < RULES.length; i++) {
-        if (RULES[i].rx.test(t)) {
+        if (RULES[i].rx.test(t) && !(RULES[i].unless && RULES[i].unless.test(t))) {
           ids.push(RULES[i].id);
+          if (RULES[i].list && lists.indexOf(RULES[i].list) === -1) lists.push(RULES[i].list);
           if (RULES[i].tier === "red") tier = "red";
           else if (!tier) tier = "amber";
         }
@@ -308,7 +452,7 @@
         if (all) { ids.push(COMBOS[c].id); if (COMBOS[c].tier === "red") tier = "red"; }
       }
     }
-    return { hit: ids.length > 0, ids: ids, tier: tier, version: VERSION };
+    return { hit: ids.length > 0, ids: ids, tier: tier, lists: tier === "red" ? lists : [], version: VERSION };
   }
 
   /* The red message. No condition is named and nothing is tailored to the patient,
@@ -346,6 +490,70 @@
 
   var MESSAGES = { red: MESSAGE, amber: MESSAGE_AMBER };
 
-  var api = { VERSION: VERSION, RULES: RULES, MESSAGE: MESSAGE, MESSAGE_AMBER: MESSAGE_AMBER, MESSAGES: MESSAGES, COMBOS: COMBOS, check: check, normalize: normalize };
+  /* Condition lists shown with the red message. The items are CDC's public signs
+     pages, word for word; CDC's reuse terms require the source credit, the
+     no-endorsement note, and unchanged substance, so do not reword an item. Check
+     each list against its page before every release and update "reviewed".
+     The stroke and clot lists are complete. The heart attack list uses the opening
+     sentence of each CDC bullet. */
+  var LISTS = {
+    stroke: {
+      name: "stroke",
+      heading: "Signs of stroke",
+      groups: [ { label: "", items: [
+        "Sudden numbness or weakness in the face, arm, or leg, especially on one side of the body.",
+        "Sudden confusion, trouble speaking, or difficulty understanding speech.",
+        "Sudden trouble seeing in one or both eyes.",
+        "Sudden trouble walking, dizziness, loss of balance, or lack of coordination.",
+        "Sudden severe headache with no known cause."
+      ] } ],
+      url: "https://www.cdc.gov/stroke/signs-symptoms/",
+      reviewed: "CDC page dated 19 May 2026, retrieved 21 November 2026"
+    },
+    heart_attack: {
+      name: "heart attack",
+      heading: "Major symptoms of a heart attack",
+      groups: [ { label: "", items: [
+        "Chest pain or discomfort.",
+        "Feeling weak, light-headed, or faint.",
+        "Pain or discomfort in the jaw, neck, or back.",
+        "Pain or discomfort in one or both arms or shoulders.",
+        "Shortness of breath."
+      ] } ],
+      url: "https://www.cdc.gov/heart-disease/about/heart-attack.html",
+      reviewed: "CDC page dated 24 October 2024, retrieved 21 November 2026"
+    },
+    clot: {
+      name: "blood clot",
+      heading: "Signs of a blood clot",
+      groups: [
+        { label: "In the leg or arm", items: [
+          "Swelling",
+          "Pain or tenderness",
+          "Warmth",
+          "Redness or discoloration"
+        ] },
+        { label: "In the lung", items: [
+          "Difficulty breathing",
+          "Faster than normal or irregular heartbeat",
+          "Chest pain or discomfort, which usually worsens with a deep breath or coughing",
+          "Cough or coughing up blood",
+          "Very low blood pressure, lightheadedness, or fainting"
+        ] }
+      ],
+      url: "https://www.cdc.gov/blood-clots/about/",
+      reviewed: "CDC page dated 5 March 2025, retrieved 21 November 2026"
+    }
+  };
+
+  /* Wording for the red message when it shows a condition list. */
+  var LIST_TEXT = {
+    headlineStart: "Your concerns represent a possible ",
+    recommends: "Heard recommends:",
+    homeNote: "Do not wait for a reply here.",
+    source: "Source: CDC. This does not imply endorsement of Heard by CDC or the United States Government."
+  };
+
+  var api = { VERSION: VERSION, RULES: RULES, MESSAGE: MESSAGE, MESSAGE_AMBER: MESSAGE_AMBER, MESSAGES: MESSAGES, LISTS: LISTS, LIST_TEXT: LIST_TEXT, COMBOS: COMBOS, check: check, normalize: normalize };
   root.HeardRedFlags = api;
 })(typeof globalThis !== "undefined" ? globalThis : this);
