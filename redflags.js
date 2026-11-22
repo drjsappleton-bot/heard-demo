@@ -522,7 +522,9 @@
     crisis: "If you are thinking about harming yourself, call or text 988.",
     saved: "Your words were saved for your care team to see at their next visit.",
     button: "I understand",
-    standing: "Heard is not monitored. Need help now? In the hospital, press your call button. At home, call 911."
+    /* The line under the microphone on every capture screen. Wording chosen by the
+       physician owner on 22 November 2026: the same words the intro film speaks. */
+    standing: "This tool is for recording your questions. It is not real time communication with your care team. For anything urgent or emergent: use your call light in the hospital, call your doctor's office, or call 911."
   };
 
   /* The amber message. Wording approved by the product's physician on 21 November

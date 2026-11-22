@@ -216,7 +216,7 @@
   .rftag { display: block; margin-top: 6px; border: 1px solid #e6b0ac; background: var(--red-lt); color: var(--red); font-weight: 700;
     border-radius: 8px; padding: 6px 9px; font-size: 12.5px; cursor: pointer; font-family: inherit; text-align: left; width: 100%; }
   .rfnote { display: block; margin-top: 4px; font-size: 12px; font-weight: 700; color: var(--red); }
-  .safeline { margin-top: 12px; border: 1px solid #e6b0ac; background: var(--red-lt); color: var(--ink); border-radius: 10px; padding: 9px 12px; font-size: 13.5px; line-height: 1.35; text-align: center; font-weight: 600; }
+  .safeline { margin-top: 12px; border: 1px solid #e6b0ac; background: var(--red-lt); color: var(--ink); border-radius: 10px; padding: 11px 14px; font-size: 15.5px; line-height: 1.4; text-align: center; font-weight: 600; }
   .provtag { display: inline-block; background: var(--blue-lt); color: var(--blue); border-radius: 8px; padding: 4px 10px; font-size: 13px; font-weight: 600; margin: 2px 4px 2px 0; }
 </style>
 </head>
@@ -994,7 +994,7 @@ const RF_DIAL_LINK = false;
    has answered whether naming a possible condition is acceptable. While off, a
    flagged entry gets the plain red or amber message and no list is recorded. */
 const RF_CONDITION_LISTS = false;
-const SAFE_LINE_FALLBACK = "Heard is not monitored. Need help now? In the hospital, press your call button. At home, call 911.";
+const SAFE_LINE_FALLBACK = "This tool is for recording your questions. It is not real time communication with your care team. For anything urgent or emergent: use your call light in the hospital, call your doctor's office, or call 911.";
 function safeLineHTML(){ return '<div class="safeline">' + esc(RF ? RF.MESSAGE.standing : SAFE_LINE_FALLBACK) + '</div>'; }
 function rfCheck(text){
   try { return RF ? RF.check(text) : { hit: false, ids: [] }; } catch (e) { return { hit: false, ids: [] }; }

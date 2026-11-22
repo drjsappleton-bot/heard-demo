@@ -292,7 +292,7 @@ const RF_AMBER = (RFX && RFX.MESSAGES && RFX.MESSAGES.amber) || {
   homeAction: "Call your surgeon's office now.", homeNote: "Do not wait for a reply here.",
   escalate: "If it is severe or getting worse: in the hospital, press your call button. At home, call 911.",
   saved: "Your words were saved for your care team to see at their next visit.", button: "I understand" };
-const RF_STANDING = (RFX && RFX.MESSAGE && RFX.MESSAGE.standing) || "Heard is not monitored. Need help now? In the hospital, press your call button. At home, call 911.";
+const RF_STANDING = (RFX && RFX.MESSAGE && RFX.MESSAGE.standing) || "This tool is for recording your questions. It is not real time communication with your care team. For anything urgent or emergent: use your call light in the hospital, call your doctor's office, or call 911.";
 const escT = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const safeLine = () => '<div class="safeline">' + escT(RF_STANDING) + '</div>';
 const safetyCard = () => { const M = RF_AMBER; return '<div class="rfc" id="rfc">' +
