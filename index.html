@@ -242,22 +242,6 @@
 
   <div id="app"></div>
 
-  <!-- PIN modal -->
-  <div id="pinOverlay" class="pin-overlay hidden">
-    <div class="pin-card" id="pinCard">
-      <h3>Provider access</h3>
-      <div class="sub">Enter your 4-digit provider PIN <span id="pinHint">(demo default: 1111)</span></div>
-      <div class="pin-dots"><span id="d0"></span><span id="d1"></span><span id="d2"></span><span id="d3"></span></div>
-      <div class="pin-pad">
-        <button onclick="pinKey('1')">1</button><button onclick="pinKey('2')">2</button><button onclick="pinKey('3')">3</button>
-        <button onclick="pinKey('4')">4</button><button onclick="pinKey('5')">5</button><button onclick="pinKey('6')">6</button>
-        <button onclick="pinKey('7')">7</button><button onclick="pinKey('8')">8</button><button onclick="pinKey('9')">9</button>
-        <button class="aux" onclick="pinCancel()">Cancel</button><button onclick="pinKey('0')">0</button><button class="aux" onclick="pinBack()">&#9003;</button>
-      </div>
-      <div class="pin-err" id="pinErr"></div>
-    </div>
-  </div>
-
   <!-- Red-flag safety message. Filled in by showSafetyMessage(). -->
   <div id="rfOverlay" class="rf-overlay hidden" role="alertdialog" aria-modal="true" aria-labelledby="rfTitle" aria-describedby="rfBody"></div>
 
@@ -269,12 +253,11 @@
 /* ================= config / storage ================= */
 const KV = "/api/store/";
 const LS = {
-  bucket: "heard_bucket_v2", pin: "heard_pin", key: "heard_apikey",
+  bucket: "heard_bucket_v2", key: "heard_apikey",
   myPatient: "heard_my_patient", localdb: "heard_localdb", cgPrefix: "heard_cg_", prov: "heard_prov_"
 };
 let bucket = null;       // current site id ("local" = single-device mode)
 let route = {};          // parsed hash
-let pinAfter = null;     // route to go to after PIN success
 
 function baseURL(){ return location.origin === "null" ? location.href.split("#")[0] : location.origin + location.pathname; }
 function link(path){ return baseURL() + "#/b/" + bucket + path; }
@@ -367,7 +350,12 @@ function esc(s){ return String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt
    no role are physicians, approved. */
 function isPhysician(p){ return !p || !p.role || p.role === "Physician"; }
 function provKey(){ return LS.prov + bucket; }
-function provIdent(){ try { return JSON.parse(localStorage.getItem(provKey()) || "null"); } catch (e) { return null; } }
+/* Who is using the provider side. On a shared site that is the signed-in account. In
+   single-device mode there is no server, so it is still the name typed on this device. */
+function provIdent(){
+  if (bucket !== "local") return (AUTH && AUTH.signedIn) ? { name: AUTH.account.name } : null;
+  try { return JSON.parse(localStorage.getItem(provKey()) || "null"); } catch (e) { return null; }
+}
 function setProvIdent(o){ if (o) localStorage.setItem(provKey(), JSON.stringify(o)); else localStorage.removeItem(provKey()); }
 function provRecOf(provs, name){ const h = findProvider(provs || [], name || ""); return h ? h.p : null; }
 function teamLeadName(p){ return !p ? null : (isPhysician(p) ? p.name : (p.lead || null)); }
@@ -403,7 +391,7 @@ function mergeEntries(a, b, deleted){
       const t = seen[k];
       if (e.heard) t.heard = true;
       if (e.addressed) t.addressed = true;
-      if ((e.addressedAt || 0) > (t.addressedAt || 0)) t.addressedAt = e.addressedAt;
+      if ((e.addressedAt || 0) > (t.addressedAt || 0)) { t.addressedAt = e.addressedAt; if (e.addressedBy) t.addressedBy = e.addressedBy; }
       if ((e.bouncedAt || 0) > (t.bouncedAt || 0)) t.bouncedAt = e.bouncedAt;
       /* the safety-message trail must survive a merge in either direction */
       if (e.rf && !t.rf) { t.rf = e.rf; t.rfVer = e.rfVer; t.rfShownAt = e.rfShownAt; if (e.rfTier) t.rfTier = e.rfTier; if (e.rfLists) t.rfLists = e.rfLists; }
@@ -455,34 +443,158 @@ function parseHash(){
 function goHome(){ location.hash = bucket ? "#/b/" + bucket : "#/"; }
 window.addEventListener("hashchange", render);
 
-/* ================= PIN ================= */
-let pinBuf = "";
-function getPin(){ return localStorage.getItem(LS.pin) || "1111"; }
-function unlocked(){ return sessionStorage.getItem("heard_unlocked") === "1"; }
-function requirePin(nextRoute){
-  pinAfter = nextRoute; pinBuf = "";
-  renderPinDots();
-  document.getElementById("pinErr").textContent = "";
-  document.getElementById("pinHint").style.display = (getPin() === "1111") ? "inline" : "none";
-  document.getElementById("pinOverlay").classList.remove("hidden");
+/* ================= provider sign-in =================
+   Steve, 22 November 2026: the username is an email address; his own account is the
+   administrator and approves every new account before it sees a patient; a device
+   stays signed in for 14 days. The rules are on the server (netlify/lib/auth-core.mjs).
+
+   This is identity, not a security boundary: every phone still downloads the one shared
+   document. It decides who the provider screens let in and whose name goes on an action.
+   Single-device mode has no server, so it has no sign-in. */
+let AUTH = null;
+async function authApi(action, body){
+  const r = await fetch("/api/auth/" + action, body === undefined
+    ? { credentials: "same-origin", cache: "no-store" }
+    : { method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+  let j = null; try { j = await r.json(); } catch (e) {}
+  if (!r.ok) throw new Error((j && j.error) || ("Sign-in service error " + r.status));
+  return j || {};
 }
-function renderPinDots(){ for (let i=0;i<4;i++) document.getElementById("d"+i).classList.toggle("fill", i < pinBuf.length); }
-function pinKey(k){ if (pinBuf.length >= 4) return; pinBuf += k; renderPinDots(); if (pinBuf.length === 4) setTimeout(checkPin, 120); }
-function pinBack(){ pinBuf = pinBuf.slice(0,-1); renderPinDots(); document.getElementById("pinErr").textContent = ""; }
-function pinCancel(){ document.getElementById("pinOverlay").classList.add("hidden"); goHome(); }
-function checkPin(){
-  if (pinBuf === getPin()) {
-    sessionStorage.setItem("heard_unlocked", "1");
-    document.getElementById("pinOverlay").classList.add("hidden");
-    render();
-  } else {
-    const c = document.getElementById("pinCard");
-    c.classList.remove("shake"); void c.offsetWidth; c.classList.add("shake");
-    document.getElementById("pinErr").textContent = "Incorrect PIN";
-    pinBuf = ""; renderPinDots();
+async function loadAuth(fresh){
+  if (bucket === "local") { AUTH = { local: true, signedIn: true, account: { email: "", name: "", role: "Physician", status: "approved", admin: false } }; return AUTH; }
+  if (AUTH && !fresh && !AUTH.error) return AUTH;
+  try { AUTH = await authApi("me"); } catch (e) { AUTH = { signedIn: false, error: e.message }; }
+  return AUTH;
+}
+function providerOK(){ return !!(AUTH && AUTH.signedIn && AUTH.account && AUTH.account.status === "approved"); }
+async function signOut(){
+  if (bucket !== "local") { try { await authApi("logout", {}); } catch (e) {} }
+  AUTH = null; goHome();
+}
+/* The provider directory in the shared document keeps one entry per signed-in account,
+   under the account's exact name, so "my patients" and the care team follow the account. */
+async function syncProviderRecord(doc, provs){
+  const a = AUTH.account, want = { role: a.role, lead: a.role === "Physician" ? null : (a.lead || null), approved: true, linked: true, account: true };
+  const hit = findProvider(provs, a.name);
+  let rec = hit && hit.how === "exact" ? hit.p : null, changed = false;
+  if (!rec) { rec = { name: a.name, created: Date.now() }; provs.push(rec); changed = true; }
+  for (const k in want) if (rec[k] !== want[k]) { rec[k] = want[k]; changed = true; }
+  if (changed && doc) { doc.providers = provs; try { await saveDoc(doc); } catch (e) {} }
+  return rec;
+}
+
+const SI_LBL = 'style="display:block;font-size:13px;font-weight:600;color:var(--mut);margin:10px 0 4px"';
+function siField(id, label, type, auto, extra){
+  return '<label for="' + id + '" ' + SI_LBL + '>' + label + '</label><input class="txt" id="' + id + '" type="' + type + '" autocomplete="' + auto + '" ' + (extra || "") + '>';
+}
+function siLink(view, text){ return '<button type="button" class="btn sub" style="margin-top:10px" onclick="renderSignIn(\'' + view + '\')">' + text + '</button>'; }
+const SI_ROLES = ["Physician", "APP (PA or NP)", "Nurse", "MA", "Other"];
+async function renderSignIn(view, message){
+  document.getElementById("tagline").textContent = "Provider sign-in";
+  const A = AUTH || {};
+  const note = '<div class="note" style="margin-top:12px">Demo. Sign-in identifies providers. Do not enter real patient information.</div>';
+  const msg = '<div class="note err" id="siMsg" role="alert" style="text-align:left;min-height:18px">' + (message ? esc(message) : "") + '</div>';
+  const back = '<button type="button" class="btn sub" style="margin-top:10px" onclick="goHome()">Back to Heard</button>';
+  if (A.error) {
+    app().innerHTML = '<div class="card"><h2 class="sec">Provider sign-in</h2><div class="warnbox">The sign-in service could not be reached: ' + esc(A.error) + '</div>' +
+      '<button class="btn teal" style="margin-top:10px" onclick="AUTH=null;render()">Try again</button>' + back + '</div>';
+    return;
   }
+  /* signed in, not yet approved */
+  if (A.signedIn && A.account && A.account.status !== "approved") {
+    app().innerHTML = '<div class="card"><h2 class="sec">Waiting for approval</h2>' +
+      '<div class="warnbox"><b>' + esc(A.account.name) + '</b>, your request has gone to the administrator. You will see patients once it is approved.</div>' +
+      '<button class="btn teal" style="margin-top:10px" onclick="AUTH=null;render()">Check again</button>' +
+      '<button class="btn sub" onclick="signOut()">Sign out</button></div>';
+    return;
+  }
+  view = view || "in";
+  let h = "";
+  if (view === "in") {
+    h = '<h2 class="sec">Provider sign-in</h2><form onsubmit="return siSubmit(event,\'login\')">' +
+      siField("siEmail", "Email", "email", "username", 'inputmode="email" autocapitalize="none"') +
+      siField("siPass", "Password", "password", "current-password") + msg +
+      '<button class="btn teal" type="submit">Sign in</button></form>' +
+      siLink("request", "New here? Request access") + siLink("reset", "I have a reset code") +
+      (A.adminClaimed ? "" : siLink("setup", "First-time administrator setup")) + back;
+  } else if (view === "request") {
+    let docs = []; try { docs = (await authApi("physicians")).physicians || []; } catch (e) {}
+    h = '<h2 class="sec">Request access</h2>' +
+      '<p style="font-size:14px;color:var(--mut)">The administrator approves each new account. You will see no patients until then.</p>' +
+      '<form onsubmit="return siSubmit(event,\'register\')">' +
+      siField("siName", "Your name, as it should appear", "text", "name", 'placeholder="e.g. Katy Neary, PA"') +
+      '<label for="siRole" ' + SI_LBL + '>Your role</label><select class="txt" id="siRole" onchange="document.getElementById(\'siLeadWrap\').style.display = this.value === \'Physician\' ? \'none\' : \'\'">' +
+      SI_ROLES.map(r => '<option>' + r + '</option>').join("") + '</select>' +
+      '<div id="siLeadWrap" style="display:none"><label for="siLead" ' + SI_LBL + '>The physician you work with</label><select class="txt" id="siLead"><option value="">Choose</option>' +
+      docs.map(d => '<option>' + esc(d) + '</option>').join("") + '</select></div>' +
+      siField("siEmail", "Email (this is your sign-in name)", "email", "username", 'inputmode="email" autocapitalize="none"') +
+      siField("siPass", "Choose a password (10 characters or more)", "password", "new-password") + msg +
+      '<button class="btn teal" type="submit">Request access</button></form>' + siLink("in", "I already have an account");
+  } else if (view === "setup") {
+    h = '<h2 class="sec">First-time administrator setup</h2>' +
+      '<p style="font-size:14px;color:var(--mut)">For the site owner only. The email and the setup code must match the two settings on the server. The code works once.</p>' +
+      (A.adminConfigured ? "" : '<div class="warnbox">The server settings are not in place yet: HEARD_ADMIN_EMAIL and HEARD_SETUP_CODE.</div>') +
+      '<form onsubmit="return siSubmit(event,\'setup\')">' +
+      siField("siEmail", "Administrator email", "email", "username", 'inputmode="email" autocapitalize="none"') +
+      siField("siCode", "Setup code", "password", "off") +
+      siField("siName", "Your name, as it should appear", "text", "name") +
+      siField("siPass", "Choose a password (10 characters or more)", "password", "new-password") + msg +
+      '<button class="btn teal" type="submit">Set up the administrator</button></form>' + siLink("in", "Back to sign-in");
+  } else {
+    h = '<h2 class="sec">Reset your password</h2>' +
+      '<p style="font-size:14px;color:var(--mut)">Ask the administrator for a one-time reset code. It lasts 24 hours.</p>' +
+      '<form onsubmit="return siSubmit(event,\'reset\')">' +
+      siField("siEmail", "Email", "email", "username", 'inputmode="email" autocapitalize="none"') +
+      siField("siCode", "Reset code", "text", "off", 'autocapitalize="characters"') +
+      siField("siPass", "Choose a new password (10 characters or more)", "password", "new-password") + msg +
+      '<button class="btn teal" type="submit">Set the new password</button></form>' + siLink("in", "Back to sign-in");
+  }
+  app().innerHTML = '<div class="card">' + h + note + '</div>';
 }
-function lockProvider(){ sessionStorage.removeItem("heard_unlocked"); goHome(); }
+function siSubmit(ev, action){
+  ev.preventDefault();
+  const v = id => { const el = document.getElementById(id); return el ? el.value : ""; };
+  const body = { email: v("siEmail").trim(), password: v("siPass") };
+  if (action === "register") { body.name = v("siName"); body.role = v("siRole"); body.lead = v("siLead"); }
+  if (action === "setup") { body.name = v("siName"); body.code = v("siCode"); }
+  if (action === "reset") body.code = v("siCode");
+  const m = document.getElementById("siMsg"), btn = ev.target.querySelector('button[type="submit"]');
+  if (btn) btn.disabled = true;
+  authApi(action, body).then(() => { AUTH = null; render(); })
+    .catch(e => { if (m) m.textContent = e.message; if (btn) btn.disabled = false; });
+  return false;
+}
+
+/* ---- administrator: approve, decline, turn off, reset ---- */
+let lastResetCode = null;
+async function adminCardHTML(){
+  let list = [];
+  try { list = (await authApi("accounts")).accounts || []; } catch (e) { return '<div class="card"><div class="warnbox">Could not load the accounts: ' + esc(e.message) + '</div></div>'; }
+  const pending = list.filter(a => a.status === "pending"), rest = list.filter(a => a.status !== "pending");
+  const who = a => '<b>' + esc(a.name) + '</b> &middot; ' + esc(a.role) + (a.lead ? ' with ' + esc(a.lead) : '') + '<div style="font-size:12px;color:var(--mut)">' + esc(a.email) + '</div>';
+  const btn = (a, action, label, cls) => '<button class="btn ' + cls + '" style="flex:1;margin-top:0" data-e="' + esc(a.email) + '" onclick="decideAccount(this.dataset.e,\'' + action + '\')">' + label + '</button>';
+  let h = '<div class="card"><h2 class="sec">Access requests' + (pending.length ? ' (' + pending.length + ')' : '') + '</h2>' +
+    (pending.length ? pending.map(a => '<div class="warnbox" style="margin-top:6px">' + who(a) + ' asks for access.' +
+        '<div style="display:flex;gap:8px;margin-top:8px">' + btn(a, "approve", "Approve", "teal") + btn(a, "decline", "Decline", "sub") + '</div></div>').join("")
+      : '<div class="empty">No one is waiting for approval.</div>') +
+    (lastResetCode ? '<div class="warnbox" style="margin-top:10px">Reset code for <b>' + esc(lastResetCode.email) + '</b>: <b style="font-size:18px;letter-spacing:1px">' + esc(lastResetCode.code) + '</b><br>Give it to them directly. It works once, for ' + lastResetCode.hours + ' hours, and is not shown again.</div>' : '') +
+    '<details style="margin-top:10px"><summary style="cursor:pointer;font-size:13px;color:var(--mut)">All accounts (' + list.length + ')</summary>' +
+    rest.map(a => '<div style="border-top:1px solid var(--line);padding:8px 0">' + who(a) +
+      '<div style="font-size:12px;margin-top:2px">' + (a.admin ? 'Administrator' : a.status === "disabled" ? 'Turned off' : 'Approved') + '</div>' +
+      (a.admin ? '' : '<div style="display:flex;gap:8px;margin-top:6px">' +
+        (a.status === "disabled" ? btn(a, "enable", "Turn on", "sub") : btn(a, "disable", "Turn off", "sub")) +
+        btn(a, "reset-code", "Reset code", "sub") + '</div>') + '</div>').join("") +
+    '</details></div>';
+  lastResetCode = null;
+  return h;
+}
+async function decideAccount(email, action){
+  try {
+    if (action === "reset-code") { const r = await authApi("reset-code", { email }); lastResetCode = { email, code: r.code, hours: r.hours }; }
+    else await authApi("decide", { email, action });
+    renderDrHome();
+  } catch (e) { alert("Could not do that: " + e.message); }
+}
 
 /* ================= render ================= */
 const app = () => document.getElementById("app");
@@ -490,7 +602,11 @@ async function render(){
   stopUI(true);
   document.getElementById("hdr").classList.remove("hidden");
   route = parseHash();
-  if ((route.v === "drHome" || route.v === "drPatient") && !unlocked()) { app().innerHTML = '<div class="card"><div class="empty">Provider access requires PIN.</div></div>'; requirePin(route); return; }
+  if (route.v === "drHome" || route.v === "drPatient") {
+    /* The provider side opens only for a signed-in account the administrator has approved. */
+    await loadAuth(route.v === "drHome");
+    if (!providerOK()) return renderSignIn();
+  }
   if (route.v === "setup") return renderSetup();
   if (route.v === "landing") return renderLanding();
   if (route.v === "patient") return renderPatient();
@@ -1275,14 +1391,24 @@ async function renderDrHome(){
   catch (e) { app().innerHTML = '<div class="card"><div class="empty err">Could not load: ' + esc(e.message) + '</div></div>'; return; }
 
   const ident = provIdent();
-  const me = ident ? provRecOf(provs, ident.name) : null;
-  if (ident && !me) setProvIdent(null);
+  let me = ident ? provRecOf(provs, ident.name) : null;
+  const onServer = bucket !== "local";
+  if (onServer) me = await syncProviderRecord(doc, provs);
+  else if (ident && !me) setProvIdent(null);
   const roles = ["Physician", "APP (PA or NP)", "Nurse", "MA", "Other"];
   const docsList = provs.filter(isPhysician).slice().sort((a, b) => String(a.name).localeCompare(String(b.name)));
 
   /* who am I: one button, like the patient side */
   let whoCard;
-  if (!me) {
+  if (onServer) {
+    const a = AUTH.account, lead = teamLeadName(me);
+    whoCard =
+      '<div class="card"><h2 class="sec">Signed in</h2>' +
+      '<div style="font-size:15px;font-weight:700">' + esc(a.name) + '</div>' +
+      '<div class="note" style="text-align:left;margin-top:4px">' + esc(a.role) +
+      (a.role === "Physician" ? ' &middot; team lead' : ' &middot; care team of ' + esc(lead || "?")) + (a.admin ? ' &middot; administrator' : '') + '</div>' +
+      '<div class="note" style="text-align:left;margin-top:4px">' + esc(a.email) + ' &middot; this device stays signed in for ' + (AUTH.sessionDays || 14) + ' days.</div></div>';
+  } else if (!me) {
     whoCard =
       '<div class="card"><h2 class="sec">Who are you?</h2>' +
       '<p style="font-size:14px;color:var(--mut);margin-bottom:10px">Pick your role. If you are not the physician, choose whose care team you belong to; they approve you from their own page.</p>' +
@@ -1305,7 +1431,8 @@ async function renderDrHome(){
 
   /* the physician sees join requests and approves from their own page */
   let reqCard = "";
-  if (me && isPhysician(me)) {
+  if (onServer) reqCard = AUTH.account.admin ? await adminCardHTML() : "";
+  else if (me && isPhysician(me)) {
     const pending = provs.filter(q => !isPhysician(q) && !q.approved && q.lead && nameMatch(q.lead, me.name) !== "none");
     if (pending.length) reqCard =
       '<div class="card"><h2 class="sec">Care team requests</h2>' +
@@ -1353,14 +1480,14 @@ async function renderDrHome(){
 
   let topbar, listCard;
   if (me && !canSee) {
-    topbar = '<div class="topbar"><span style="font-size:13px;font-weight:600;color:var(--blue)">Provider</span><button onclick="lockProvider()">&#128274; Lock</button></div>';
+    topbar = '<div class="topbar"><span style="font-size:13px;font-weight:600;color:var(--blue)">Provider</span><button onclick="signOut()">Sign out</button></div>';
     listCard = '<div class="card"><div class="warnbox">Waiting for <b>' + esc(leadName || "the physician") + '</b> to approve you. They approve care team requests from this same provider page.</div></div>';
   } else if (me) {
     topbar =
       '<div class="topbar"><select class="txt" id="myPts" onchange="if (this.value) location.hash = \'#/b/\' + bucket + \'/dr/\' + this.value">' +
       '<option value="">My patients (' + mine.length + ')</option>' +
       ordered(mine).map(q => '<option value="' + q.id + '">' + esc(q.last) + ', ' + esc(q.first) + esc(optTag(q)) + '</option>').join("") +
-      '</select><button onclick="lockProvider()">&#128274; Lock</button></div>';
+      '</select><button onclick="signOut()">Sign out</button></div>';
     const others = idx.filter(q => !mine.some(mq => mq.id === q.id));
     listCard =
       '<div class="card" id="ptList">' +
@@ -1372,7 +1499,7 @@ async function renderDrHome(){
         : '') +
       '</div>';
   } else {
-    topbar = '<div class="topbar"><span style="font-size:13px;font-weight:600;color:var(--blue)">Patient list</span><button onclick="lockProvider()">&#128274; Lock</button></div>';
+    topbar = '<div class="topbar"><span style="font-size:13px;font-weight:600;color:var(--blue)">Patient list</span><button onclick="signOut()">Sign out</button></div>';
     listCard = '<div class="card" id="ptList">' + (idx.length
       ? legend + ordered(idx).map(q => ptRow(q, false)).join("")
       : '<div class="empty">No patients have signed in yet. New patients sign in from the landing page.</div>') + '</div>';
@@ -1530,7 +1657,7 @@ async function renderDrPatient(again){
   if (!drRec) { app().innerHTML = '<div class="card"><div class="empty">Patient not found (demo data may have expired).</div><button class="btn sub" onclick="location.hash=\'#/b/\'+bucket+\'/dr\'">Back to list</button></div>'; return; }
   normRec(drRec);
   app().innerHTML =
-    '<div class="topbar"><a href="#/b/' + bucket + '/dr">&#8249; All patients</a><button onclick="lockProvider()">&#128274; Lock</button></div>' +
+    '<div class="topbar"><a href="#/b/' + bucket + '/dr">&#8249; All patients</a><button onclick="signOut()">Sign out</button></div>' +
     '<div class="card"><h2 class="sec">Patient</h2><div class="nm" style="font-size:17px;font-weight:700">' + esc(drRec.last) + ', ' + esc(drRec.first) + '</div>' +
     '<div class="dt" style="font-size:12px;color:var(--mut)">' + drRec.entries.length + ' captured item(s) &middot; signed in ' + new Date(drRec.created).toLocaleString() + (drRec.doctor ? ' &middot; Doctor: ' + esc(drRec.doctor) : '') + '</div>' +
     (LR ? '<div class="dt" id="drLastRead" style="font-size:12px;color:var(--mut);margin-top:4px">' + esc(LR.providerLine(drRec.reads, Date.now())) + ' The patient is not shown this.</div>' : '') +
@@ -1546,11 +1673,9 @@ async function renderDrPatient(again){
 /* forPatient adds the one destructive control, kept out of the way of the list.
    It used to sit directly under the main button at the same size. */
 function settingsHTML(forPatient){
-  return '<div class="card"><details class="settings"><summary>Settings: AI mode, PIN' + (forPatient ? ', clear this patient&rsquo;s items' : '') + '</summary>' +
+  return '<div class="card"><details class="settings"><summary>Settings: AI mode' + (forPatient ? ', clear this patient&rsquo;s items' : '') + '</summary>' +
     '<input id="apiKey" type="password" placeholder="Anthropic API key (sk-ant-...) — blank = offline keyword mode">' +
     '<div class="row"><button onclick="saveKey()">Save key</button><button onclick="clearKey()">Remove key</button></div><div id="keyStatus"></div>' +
-    '<input id="newPin" type="tel" inputmode="numeric" maxlength="4" placeholder="New 4-digit provider PIN (this device)">' +
-    '<div class="row"><button onclick="changePin()">Change PIN</button></div><div id="pinStatus"></div>' +
     (forPatient
       ? '<div class="note" style="text-align:left;margin-top:12px">Clearing removes every captured item for this patient, including the record of which safety messages were shown. It cannot be undone.</div>' +
         '<div class="row"><button class="danger" onclick="clearPatientItems()">Clear ALL items for this patient</button></div>'
@@ -1573,13 +1698,6 @@ function clearKey(){
   if (document.getElementById("apiKey")) document.getElementById("apiKey").value = "";
   document.getElementById("keyStatus").innerHTML = '<span class="ok">Key removed. Offline keyword mode.</span>';
   updateModeNote();
-}
-function changePin(){
-  const np = document.getElementById("newPin").value.trim();
-  if (!/^\d{4}$/.test(np)) { document.getElementById("pinStatus").innerHTML = '<span class="err">PIN must be exactly 4 digits.</span>'; return; }
-  localStorage.setItem(LS.pin, np);
-  document.getElementById("newPin").value = "";
-  document.getElementById("pinStatus").innerHTML = '<span class="ok">PIN updated for this device.</span>';
 }
 function updateModeNote(){
   const n = document.getElementById("modeNote"); if (!n) return;
@@ -1752,7 +1870,10 @@ async function completeItem(bucket, idx){
   if (!item) return;
   item.addressed = true;
   const matches = entriesForItem(item);
-  matches.forEach(e => { e.addressed = true; e.addressedAt = Date.now(); });
+  /* The provider's name goes on the record, for the provider side and a later audit
+     trail. The patient side does not show it. */
+  const who = (provIdent() || {}).name || "";
+  matches.forEach(e => { e.addressed = true; e.addressedAt = Date.now(); if (who) e.addressedBy = who; });
   renderSummaryHTML();
   if (!matches.length) return;
   try {
@@ -1795,7 +1916,9 @@ function addressedHTML(){
       ? (st.heard ? '<span class="addrstat done">&#9745; Patient confirmed heard</span>'
                   : '<span class="addrstat wait">&#9744; Awaiting patient</span>')
       : '<span class="addrstat wait">&#9744; Not linked to a captured item</span>';
-    return '<li>' + stat + '&#10003; ' + esc(i.text) + itemAuthorTag(i) + (q && q !== i.text ? '<q>“' + esc(q) + '”</q>' : '') + capHTML(i) + '</li>';
+    const by = entriesForItem(i).map(e => e.addressedBy).filter(Boolean)[0];
+    return '<li>' + stat + '&#10003; ' + esc(i.text) + itemAuthorTag(i) + (q && q !== i.text ? '<q>“' + esc(q) + '”</q>' : '') + capHTML(i) +
+      (by ? '<div class="cap" style="font-size:12px;color:var(--mut)">Addressed by ' + esc(by) + '</div>' : '') + '</li>';
   }).join("");
   return '<div class="bucket"><h3 style="background:var(--green)">Addressed (' + rows.length + ')</h3>' +
     '<ul class="addrlist">' + lis + '</ul></div>';
