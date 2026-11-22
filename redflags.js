@@ -33,12 +33,11 @@
 (function (root) {
   "use strict";
 
-  var VERSION = "2026-11-21.3";
+  var VERSION = "2026-11-21.4";
 
   /* Review status at this version (21 November 2026 review):
-     - revised and tiered: chest, breathing, bleeding, bleeding_other, clot, heart,
-       faint, dizzy, fall, near_fall
-     - tier changed only, phrases still first draft: wound (amber), dislocation (red)
+     - revised and tiered: chest, breathing, bleeding, bleeding_other, black_stool,
+       clot, heart, faint, dizzy, bp_drop, fall, near_fall, wound, dislocation, fever
      - still the first draft: neuro, allergic, overdose, severe_pain, self_harm */
 
   /* One rule can hold several patterns. Any one of them matching is a match. */
@@ -55,6 +54,14 @@
      and "hard" does not count in "hard to", so "can I have more ice" and "hard to
      sleep" do not turn plain swelling into a match. */
   var SWELL_QUALIFIER = "\\b(?:worse|worsening|more (?:swollen|swelling)|(?:swollen|swelling|swells|swelled) more|sudden|suddenly|both|red|redder|redness|hot|hotter|hard(?! to)|harder(?! to)|tight|tighter|painful)\\b";
+
+  /* Things that "fell" without a person falling: bedside objects, wound closures,
+     and readings. "My pillow fell" shows nothing. "My blood pressure fell" is the
+     amber bp_drop rule. */
+  var FELL_NOT_A_PERSON = "pillow|pillows|phone|blanket|blankets|remote|glasses|book|cup|tray|pen|tablet|ipad|charger|cane|walker|crutch|crutches|it|staple|staples|stitch|stitches|suture|sutures|pressure|bp|sugar|level|levels|count|numbers";
+
+  /* Words for the surgical wound. */
+  var W = "(?:wound|incision|stitch|stitches|staple|staples|suture|sutures|surgical site)";
 
   /* Each rule: an id for the audit trail, a tier ("red" or "amber"), and one pattern
      (see any() above). Text is lower-cased and curly apostrophes are straightened
@@ -110,7 +117,7 @@
     ]) },
 
     /* ---- bleeding_other (amber): any other bleeding, a dressing that is soaked or
-       leaking, nosebleed, black stool. Reviewed 21 Nov 2026 ---- */
+       leaking, nosebleed. Reviewed 21 Nov 2026 ---- */
     { id: "bleeding_other", tier: "amber", rx: any([
       /\bbleeding\b/,
       /\bbled\b/,
@@ -124,8 +131,12 @@
       /\b(dressing|bandage|bandages|gauze)\b.{0,25}\b(soaked|soaking|saturated|drenched|dripping|leak\w*|coming through|not holding|won't hold|wont hold|isn't holding|isnt holding)\b/,
       /\b(leak\w*|seep\w*|drain\w*|dripping|coming)\b.{0,6}\b(through|out of|from|under|around|past)\b.{0,12}\b(dressing|bandage|bandages|gauze)\b/,
       /* nosebleed */
-      /\bnose ?bleeds?\b/,
-      /* black or tarry stool, either order */
+      /\bnose ?bleeds?\b/
+    ]) },
+
+    /* ---- black_stool (amber): black or tarry stool, either order. With dizzy or
+       lightheaded in the same entry it becomes red (see COMBOS). Reviewed 21 Nov 2026 ---- */
+    { id: "black_stool", tier: "amber", rx: any([
       /\b(black|tarry)\b.{0,15}\b(stool|stools|poop|bowel movement|bowel movements)\b/,
       /\b(stool|stools|poop|bowel movement|bowel movements)\b.{0,20}\b(black|tarry)\b/
     ]) },
@@ -181,11 +192,16 @@
       /\blight[ -]?headed\w*/
     ]) },
 
+    /* ---- bp_drop (amber): blood pressure fell or dropped. Reviewed 21 Nov 2026 ---- */
+    { id: "bp_drop", tier: "amber", rx: any([
+      /\b(pressure|bp)\b.{0,10}\b(fell|dropped)\b/
+    ]) },
+
     /* ---- fall (red): a fall that happened. Reviewed 21 Nov 2026 ---- */
     { id: "fall", tier: "red", rx: any([
-      /* "fell" or "fallen", unless the word before is almost or nearly, and not
-         "fell asleep" and the like */
-      /(?:^|(?:^|\s)(?!almost\s|nearly\s)\S+\s)(fell|fallen)\b(?!\s+(asleep|behind|in love|short|through|apart))/,
+      /* "fell" or "fallen", unless the word before is almost, nearly, or one of the
+         FELL_NOT_A_PERSON words, and not "fell asleep" and the like */
+      new RegExp("(?:^|(?:^|\\s)(?!(?:almost|nearly|" + FELL_NOT_A_PERSON + ")\\s)\\S+\\s)(fell|fallen)\\b(?!\\s+(asleep|behind|in love|short|through|apart))"),
       /* "had a fall", "took a bad fall"; not "have a fall risk bracelet" */
       /\b(had|took|taken|have|having)\b.{0,12}\bfall\b(?! (risk|precaution|precautions|alarm|prevention))/,
       /\bkeep\w* falling\b/,
@@ -199,14 +215,48 @@
       /\b(almost|nearly)\b.{0,6}\b(fell|fall|fallen|slipped|tripped)\b/
     ]) },
 
-    /* ---- wound (amber): tier set 21 Nov 2026, phrases still first draft. The amber
-       message adds the wound line when this rule matches. ---- */
-    { id: "wound", tier: "amber",
-      rx: /\b(wound|incision|stitches|staples|sutures)\b.{0,30}\b(open\w*|split\w*|gap\w*|burst\w*|came apart|coming apart|pus|ooz\w*)\b|\bpus\b/ },
+    /* ---- wound (amber). The amber message adds the wound line when this rule
+       matches. Reviewed 21 Nov 2026 ---- */
+    { id: "wound", tier: "amber", rx: any([
+      /* opening up; "open to air" passes */
+      new RegExp("\\b" + W + "\\b.{0,30}\\b(open(?! to (the )?air)\\w*|split\\w*|gap\\w*|burst\\w*|came apart|coming apart|pus|ooz\\w*)\\b"),
+      /\bpus\b/,
+      /\boozing\b/,
+      /* drainage or leaking, either order. "drain" alone is the surgical drain and passes */
+      new RegExp("\\b" + W + "\\b.{0,30}\\b(drainage|draining|drained|leak\\w*|ooz\\w*|weep\\w*|seep\\w*)\\b"),
+      new RegExp("\\b(drainage|draining|leak\\w*|ooz\\w*|weep\\w*|seep\\w*)\\b.{0,25}\\b" + W + "\\b"),
+      /* discharge from the wound, not discharge from the hospital */
+      new RegExp("\\b(yellow|green|bloody|cloudy|thick|smelly|foul)\\b.{0,10}\\b(discharge|drainage|fluid)\\b"),
+      new RegExp("\\bdischarge\\b.{0,6}\\b(from|coming|out of)\\b.{0,15}\\b" + W + "\\b"),
+      /* infected, or a stated infection; "how do I prevent infection" passes */
+      /\binfected\b/,
+      /\b(have|has|having|got|getting|looks like|look like|think it's|think its|might be|could be|is it|is this)\b.{0,15}\binfection\b/,
+      /* heat, spreading redness, streaks, getting worse; plain "a little red" passes */
+      new RegExp("\\b" + W + "\\b.{0,30}\\b(hot|warm|spreading|streak\\w*|redder|more red|red and swollen|swollen and red|worse)\\b"),
+      /\bred streak\w*/,
+      /\b(red|redness)\b.{0,15}\bspreading\b/,
+      /\bspreading\b.{0,10}\b(red|redness)\b/,
+      /* smell */
+      new RegExp("\\b" + W + "\\b.{0,30}\\b(smell\\w*|odor|stink\\w*|foul)\\b"),
+      new RegExp("\\b(smell\\w*|odor|foul)\\b.{0,25}\\b" + W + "\\b"),
+      /* a staple or stitch that came out or broke; "when do the staples come out" passes */
+      new RegExp("\\b" + W + "\\b.{0,20}\\b(came out|coming out|fell out|popped out|popped|broke|broken|came loose)\\b")
+    ]) },
 
-    /* ---- dislocation (red): split out of wound 21 Nov 2026, phrases still first draft ---- */
-    { id: "dislocation", tier: "red",
-      rx: /\bdislocat\w*|\bpopped out\b/ },
+    /* ---- dislocation (amber): a stated dislocation; "dislocation precautions"
+       passes. Reviewed 21 Nov 2026 ---- */
+    { id: "dislocation", tier: "amber", rx: any([
+      /\bdislocated\b/,
+      /\b(hip|knee|shoulder|joint|leg)\b.{0,20}\b(popped out|out of (the |its )?(socket|joint|place)|came out|slipped out)\b/,
+      /\b(have|had|is|it's|its|think|feels like)\b.{0,15}\bdislocation\b(?! precaution)/
+    ]) },
+
+    /* ---- fever (amber): fever, chills. Reviewed 21 Nov 2026 ---- */
+    { id: "fever", tier: "amber", rx: any([
+      /\bfever\w*/,
+      /\bchills\b/,
+      /\b(temp|temperature)\b.{0,12}\b10[0-9](\.\d)?\b/
+    ]) },
 
     { id: "allergic", tier: "red",
       rx: /\b(throat|tongue|lips|face)\b.{0,20}\b(swell\w*|swollen|clos\w*|tight\w*)\b|\ballergic reaction\b|\banaphyla\w*/ },
@@ -221,6 +271,12 @@
       rx: /\bsuicid\w*|\bkill myself\b|\bend my life\b|\b(hurt|harm) myself\b|\b(don't|dont|do not) want to (live|be here|go on)\b|\bwant to die\b|\bbetter off dead\b/ }
   ];
 
+  /* Two amber rules that together are red. Each combo has its own id for the audit
+     trail. Decided 21 Nov 2026: black stool with dizzy or lightheaded. */
+  var COMBOS = [
+    { id: "black_stool_with_dizzy", all: ["black_stool", "dizzy"], tier: "red" }
+  ];
+
   function normalize(text) {
     return String(text == null ? "" : text)
       .toLowerCase()
@@ -231,7 +287,7 @@
 
   /* Returns { hit, ids, tier, version }. ids lists every rule that matched, for the
      audit trail. It is never shown to the patient. tier is "red" if any red rule
-     matched, otherwise "amber" if any amber rule matched, otherwise null. */
+     or red combo matched, otherwise "amber" if any amber rule matched, otherwise null. */
   function check(text) {
     var t = normalize(text);
     var ids = [];
@@ -243,6 +299,13 @@
           if (RULES[i].tier === "red") tier = "red";
           else if (!tier) tier = "amber";
         }
+      }
+      for (var c = 0; c < COMBOS.length; c++) {
+        var all = true;
+        for (var k = 0; k < COMBOS[c].all.length; k++) {
+          if (ids.indexOf(COMBOS[c].all[k]) === -1) all = false;
+        }
+        if (all) { ids.push(COMBOS[c].id); if (COMBOS[c].tier === "red") tier = "red"; }
       }
     }
     return { hit: ids.length > 0, ids: ids, tier: tier, version: VERSION };
@@ -264,8 +327,8 @@
     standing: "Heard is not monitored. Need help now? In the hospital, press your call button. At home, call 911."
   };
 
-  /* The amber message. DRAFT WORDING, 21 November 2026, awaiting the physician's
-     approval. No condition is named. The wound line is added only when the wound
+  /* The amber message. Wording approved by the product's physician on 21 November
+     2026. No condition is named. The wound line is added only when the wound
      rule matched. The escalate line is always shown. */
   var MESSAGE_AMBER = {
     title: "Tell your care team about this",
@@ -283,6 +346,6 @@
 
   var MESSAGES = { red: MESSAGE, amber: MESSAGE_AMBER };
 
-  var api = { VERSION: VERSION, RULES: RULES, MESSAGE: MESSAGE, MESSAGE_AMBER: MESSAGE_AMBER, MESSAGES: MESSAGES, check: check, normalize: normalize };
+  var api = { VERSION: VERSION, RULES: RULES, MESSAGE: MESSAGE, MESSAGE_AMBER: MESSAGE_AMBER, MESSAGES: MESSAGES, COMBOS: COMBOS, check: check, normalize: normalize };
   root.HeardRedFlags = api;
 })(typeof globalThis !== "undefined" ? globalThis : this);

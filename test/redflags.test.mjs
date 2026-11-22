@@ -71,8 +71,12 @@ const MUST_FLAG = [
   ["fluid is coming through the dressing", "bleeding_other", A],
   ["the dressing is not holding", "bleeding_other", A],
   ["I have a nosebleed", "bleeding_other", A],
-  ["my stool is black", "bleeding_other", A],
-  ["black tarry stools", "bleeding_other", A],
+
+  // ---- black_stool (amber), red together with dizzy or lightheaded ----
+  ["my stool is black", "black_stool", A],
+  ["black tarry stools", "black_stool", A],
+  ["my stool is black and I am lightheaded", "black_stool_with_dizzy", R],
+  ["I feel dizzy and my poop is black", "black_stool_with_dizzy", R],
 
   // ---- clot (red) ----
   ["my calf hurts and it is swollen", "clot", R],
@@ -126,19 +130,43 @@ const MUST_FLAG = [
   ["I keep falling", "fall", R],
   ["I slipped in the shower", "fall", R],
   ["I tripped on the rug", "fall", R],
-  ["my pillow fell on the floor", "fall", R], // known false alarm
+  ["dad has fallen and can't get up", "fall", R],
+
+  // ---- bp_drop (amber) ----
+  ["my blood pressure fell", "bp_drop", A],
+  ["my blood pressure dropped", "bp_drop", A],
 
   // ---- near_fall (amber) ----
   ["I almost fell", "near_fall", A],
   ["I nearly slipped", "near_fall", A],
   ["I almost fell and then I fell", "fall", R], // red wins
 
-  // ---- wound (amber, phrases first draft) ----
+  // ---- wound (amber, adds the wound line) ----
   ["my incision opened up", "wound", A],
   ["there is pus coming out", "wound", A],
+  ["it is oozing", "wound", A],
+  ["there is drainage from my incision", "wound", A],
+  ["my wound is leaking", "wound", A],
+  ["the surgical site is draining", "wound", A],
+  ["yellow discharge from the incision", "wound", A],
+  ["I think my incision is infected", "wound", A],
+  ["I think it's an infection", "wound", A],
+  ["my incision is red and hot", "wound", A],
+  ["the wound is red and swollen", "wound", A],
+  ["red streaks from the incision", "wound", A],
+  ["the incision smells bad", "wound", A],
+  ["a staple came out", "wound", A],
+  ["a staple fell out", "wound", A],
+  ["a stitch popped out", "wound", A],
 
-  // ---- dislocation (red, first draft) ----
-  ["I think my hip dislocated", "dislocation", R],
+  // ---- dislocation (amber) ----
+  ["I think my hip dislocated", "dislocation", A],
+  ["it feels like my hip popped out", "dislocation", A],
+
+  // ---- fever (amber) ----
+  ["I have a fever", "fever", A],
+  ["I have chills", "fever", A],
+  ["my temp is 101.4", "fever", A],
 
   // ---- allergic, overdose, severe_pain, self_harm (red, first draft) ----
   ["my throat is closing", "allergic", R],
@@ -182,6 +210,16 @@ const MUST_NOT_FLAG = [
   "the dressing slipped off",
   "I'm not responding to the pain medicine",
   "my husband tripped the alarm",
+  "my pillow fell on the floor",             // an object fell, not a person
+  "my phone fell under the bed",
+  "what are my dislocation precautions",
+  "can I leave my incision open to air",
+  "when do the staples come out",
+  "when does the drain come out of my incision",
+  "will my staples be out before discharge",
+  "how do I prevent infection",
+  "my incision is a little red",
+  "my temperature is 98.6",
   "",
   "   "
 ];
@@ -210,6 +248,9 @@ test("every rule has a tier, and red wins over amber", () => {
   const r = RF.check("I feel dizzy and I have chest pain");
   assert.deepEqual(r.ids.sort(), ["chest", "dizzy"]);
   assert.equal(r.tier, "red");
+  for (const combo of RF.COMBOS) {
+    for (const id of combo.all) assert.ok(RF.RULES.some(x => x.id === id), "combo " + combo.id + " names an unknown rule: " + id);
+  }
 });
 
 test("check never throws on odd input and always reports a version", () => {
