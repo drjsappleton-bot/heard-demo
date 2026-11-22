@@ -64,6 +64,13 @@
   .linkline { font-size: 11px; color: var(--accent); word-break: break-all; margin-top: 8px; }
 
   /* provider */
+  .rnd { border-top: 1px solid var(--line); padding: 12px 4px; }
+  .rndhead { display: flex; justify-content: space-between; align-items: center; cursor: pointer; }
+  .rndlist { list-style: none; margin: 8px 0 0; padding: 0; }
+  .rndlist li { padding: 9px 0; border-top: 1px dashed var(--line); font-size: 15px; line-height: 1.4; overflow: hidden; }
+  .rndlist .cap { font-size: 12px; color: var(--mut); margin-top: 2px; }
+  .rndchk { float: right; margin-left: 10px; font-size: 13px; color: var(--mut); white-space: nowrap; cursor: pointer; }
+  .rndchk input { width: 20px; height: 20px; vertical-align: -5px; margin-right: 4px; }
   .ptrow { display: flex; justify-content: space-between; align-items: center; padding: 12px 4px; border-top: 1px solid var(--line); cursor: pointer; }
   .ptrow:first-of-type { border-top: 0; }
   .ptrow .nm { font-weight: 600; font-size: 15px; }
@@ -256,6 +263,10 @@ const LS = {
   bucket: "heard_bucket_v2", key: "heard_apikey",
   myPatient: "heard_my_patient", localdb: "heard_localdb", cgPrefix: "heard_cg_", prov: "heard_prov_"
 };
+/* The bare address, imheard.com, opens this one shared site for everyone (Steve,
+   22 November 2026). A link that carries a site code still opens that site, and
+   #/b/local is single-device mode. #/setup makes a separate demo site. */
+const DEFAULT_SITE = "606cf5a50a874fb1";
 let bucket = null;       // current site id ("local" = single-device mode)
 let route = {};          // parsed hash
 
@@ -437,8 +448,9 @@ function parseHash(){
     if (p[2] === "c" && p[3]) return { v: "care", code: String(p[3]).toUpperCase() };
     return { v: "landing" };
   }
-  bucket = localStorage.getItem(LS.bucket);
-  return { v: bucket ? "landing" : "setup" };
+  if (p[0] === "setup") { bucket = null; return { v: "setup" }; }
+  bucket = DEFAULT_SITE;
+  return { v: "landing" };
 }
 function goHome(){ location.hash = bucket ? "#/b/" + bucket : "#/"; }
 window.addEventListener("hashchange", render);
@@ -698,7 +710,11 @@ async function renderLanding(){
   const mine = localStorage.getItem(LS.myPatient);
   let provs = [];
   try { const doc = await loadDoc(); provs = doc && doc.providers ? doc.providers : []; } catch (e) {}
-  const known = provs.filter(isPhysician).slice().sort((a, b) => String(a.name).localeCompare(String(b.name)));
+  let known = provs.filter(isPhysician).slice().sort((a, b) => String(a.name).localeCompare(String(b.name)));
+  /* On a shared site the list is the physicians with an approved account, so a patient
+     who picks one is on that physician's list by exact name. */
+  const approved = await physicianNames();
+  if (approved.length) known = approved.map(n => ({ name: n }));
   const hideFree = known.length ? ' style="display:none"' : '';
   const docOptions =
     (known.length
@@ -709,7 +725,7 @@ async function renderLanding(){
       : '') +
     '<input class="txt" id="npDocOther"' + hideFree + ' placeholder="Your doctor\'s name">' +
     '<input class="txt" id="npTeam"' + hideFree + ' placeholder="Practice or care team (optional)">' +
-    '<div class="note" id="npDocNote"' + hideFree + '>A name typed here joins this demo\'s list, so the next patient can pick it. It does not notify anyone.</div>';
+    '<div class="note" id="npDocNote"' + hideFree + '>A name typed here goes to the practice, which links you to your doctor. It does not notify anyone.</div>';
   app().innerHTML =
     '<div class="hero">' +
     '<img class="markimg" src="' + ICON_URL + '" alt="Heard icon" onerror="iconFallback(this)">' +
@@ -1479,24 +1495,62 @@ async function renderDrHome(){
     '</div>';
 
   let topbar, listCard;
+  const roundShown = [];   /* patients whose open questions are put on screen */
   if (me && !canSee) {
     topbar = '<div class="topbar"><span style="font-size:13px;font-weight:600;color:var(--blue)">Provider</span><button onclick="signOut()">Sign out</button></div>';
     listCard = '<div class="card"><div class="warnbox">Waiting for <b>' + esc(leadName || "the physician") + '</b> to approve you. They approve care team requests from this same provider page.</div></div>';
   } else if (me) {
+    /* Whose patients are on screen. The default is the signed-in provider's own team:
+       a physician sees his own patients, and a team member sees the same list. Any
+       approved provider can choose another physician, for example when rounding for a
+       partner. Patients are matched to a physician by exact name. */
+    const names = (await physicianNames()).concat(onServer ? [] : docsList.map(p => p.name));
+    const exact = (x, y) => !!x && !!y && nameMatch(x, y) === "exact";
+    const physNames = names.filter((n, i) => names.findIndex(m => exact(m, n)) === i);
+    if (leadName && !physNames.some(n => exact(n, leadName))) physNames.unshift(leadName);
+    const assigned = (q) => physNames.some(n => exact(q.doctor, n));
+    if (viewing !== "__all" && viewing !== "__none" && !physNames.some(n => exact(n, viewing))) viewing = leadName || "__all";
+    const ownList = !!leadName && exact(viewing, leadName);
+    const shown = viewing === "__all" ? idx
+      : viewing === "__none" ? idx.filter(q => !assigned(q))
+      : idx.filter(q => exact(q.doctor, viewing) && !(ownList && hidden.has(q.id)));
+    const unassignedN = idx.filter(q => !assigned(q)).length;
     topbar =
-      '<div class="topbar"><select class="txt" id="myPts" onchange="if (this.value) location.hash = \'#/b/\' + bucket + \'/dr/\' + this.value">' +
-      '<option value="">My patients (' + mine.length + ')</option>' +
-      ordered(mine).map(q => '<option value="' + q.id + '">' + esc(q.last) + ', ' + esc(q.first) + esc(optTag(q)) + '</option>').join("") +
+      '<div class="topbar"><select class="txt" id="viewSel" aria-label="Whose patients to show" onchange="setViewing(this.value)">' +
+      physNames.map(n => '<option value="' + esc(n) + '"' + (exact(n, viewing) ? ' selected' : '') + '>' + (exact(n, leadName) ? 'My team: ' : 'Patients of ') + esc(n) + '</option>').join("") +
+      '<option value="__none"' + (viewing === "__none" ? ' selected' : '') + '>Not linked to a physician (' + unassignedN + ')</option>' +
+      '<option value="__all"' + (viewing === "__all" ? ' selected' : '') + '>All patients (' + idx.length + ')</option>' +
       '</select><button onclick="signOut()">Sign out</button></div>';
-    const others = idx.filter(q => !mine.some(mq => mq.id === q.id));
+    const canAssign = viewing === "__none" && (!onServer || AUTH.account.admin);
+    /* Each patient with their open questions on the one screen, so a round does not need
+       a tap per patient. Marked entries first, then newest first. */
+    const roundRow = (q) => {
+      const rec = doc && doc.pts ? doc.pts[q.id] : null;
+      const tier = (e) => ROWS ? ROWS.tierOf(e, RF ? RF.check : null) : null;
+      const rk = (e) => { const t = tier(e); return t === "red" ? 0 : t === "amber" ? 1 : 2; };
+      const open = (rec && Array.isArray(rec.entries) ? rec.entries : []).filter(e => e && !e.addressed)
+        .sort((x, y) => rk(x) - rk(y) || (y.ts || 0) - (x.ts || 0));
+      if (open.length) roundShown.push(q.id);
+      const li = (e) => {
+        const t = tier(e), bounced = (e.bouncedAt || 0) > (e.addressedAt || 0);
+        return '<li><label class="rndchk"><input type="checkbox" data-p="' + esc(q.id) + '" data-k="' + esc(entryKey(e)) + '" onchange="addressEntry(this.dataset.p, this.dataset.k)"> Addressed</label>' +
+          (t && ROWS ? '<span class="chip ' + t + '">' + esc(ROWS.TEXT[t]) + '</span> ' : '') + esc(e.text) +
+          (e.by === "caregiver" ? ' <span class="cgtag">Caregiver' + (e.byName ? " &mdash; " + esc(e.byName) : "") + '</span>' : '') +
+          '<div class="cap">' + esc(ROWS ? ROWS.capturedText(e.ts, now) : new Date(e.ts).toLocaleString()) + (bounced ? ' &middot; Not heard: the patient sent this back' : '') + '</div></li>';
+      };
+      return '<div class="rnd"><div class="rndhead" onclick="location.hash=\'#/b/\'+bucket+\'/dr/' + q.id + '\'">' +
+        '<div><div class="nm">' + esc(q.last) + ', ' + esc(q.first) + '</div>' + chipsHTML(q) + '</div><span class="arrow">&#8250;</span></div>' +
+        (open.length ? '<ul class="rndlist">' + open.map(li).join("") + '</ul>' : '') +
+        (viewing === "__none" ? '<div class="dt" style="margin-top:6px">Doctor as typed: ' + (q.doctor ? esc(q.doctor) : 'none') + '</div>' : '') +
+        (canAssign ? '<select class="txt" style="margin-top:6px" data-p="' + esc(q.id) + '" aria-label="Link this patient to a physician" onchange="assignDoctor(this.dataset.p, this.value)"><option value="">Link to a physician</option>' +
+          physNames.map(n => '<option>' + esc(n) + '</option>').join("") + '</select>' : '') +
+        '</div>';
+    };
+    const rows = ordered(shown);
     listCard =
       '<div class="card" id="ptList">' +
-      (mine.length ? legend + ordered(mine).map(q => ptRow(q, true)).join("")
-                   : '<div class="empty">No patients on your list yet. Patients who pick ' + esc(leadName || "your team") + ' at sign-in appear here.</div>') +
-      (others.length
-        ? '<details style="margin-top:10px"><summary style="cursor:pointer;font-size:13px;color:var(--mut)">Show all patients on this demo site (' + others.length + ' more)</summary>' +
-          ordered(others).map(q => ptRow(q, false)).join("") + '</details>'
-        : '') +
+      (rows.length ? legend + rows.map(roundRow).join("")
+                   : '<div class="empty">' + (viewing === "__none" ? 'Every patient is linked to a physician.' : viewing === "__all" ? 'No patients have signed in yet.' : 'No patients here yet. Patients who choose ' + esc(viewing) + ' at sign-in appear here.') + '</div>') +
       '</div>';
   } else {
     topbar = '<div class="topbar"><span style="font-size:13px;font-weight:600;color:var(--blue)">Patient list</span><button onclick="signOut()">Sign out</button></div>';
@@ -1522,11 +1576,18 @@ async function renderDrHome(){
     '<div id="provList" class="' + (provs.length ? '' : 'empty') + '">' +
     (provs.length ? provs.map(provTag).join(" ") : 'No providers registered yet. Sign on above.') + dupeHTML + '</div></div>';
 
-  app().innerHTML = topbar + whoCard + reqCard + listCard +
+  /* Requests that are waiting go above the list. Everything else goes below it, so the
+     patients and their questions are the first thing on the screen. */
+  const waiting = /Access requests \(|Care team requests/.test(reqCard);
+  app().innerHTML = topbar + (waiting ? reqCard : "") + listCard + whoCard + (waiting ? "" : reqCard) +
     '<div class="card"><h2 class="sec">Open by patient code</h2>' +
     '<div class="typebox"><input id="ptCode" placeholder="6-character code (e.g. from QR link)"><button onclick="openByCode()">Open</button></div></div>' +
     dirCard + settingsHTML();
   wireSettings();
+  /* Steve, 22 November 2026: when a patient's questions are shown on this screen, that is
+     recorded as an open of that patient's list, the same as opening the patient. A patient
+     with nothing open is not recorded. The patient is never shown this. */
+  if (roundShown.length) recordRoundOpens(roundShown);
 }
 async function joinCareTeam(){
   const name = (document.getElementById("tmName").value || "").trim();
@@ -1564,6 +1625,55 @@ async function approveTeam(nJSON, ok){
     if (!hit) return;
     if (ok) { hit.p.approved = true; hit.p.approvedAt = Date.now(); }
     else { doc.providers = doc.providers.filter(q => q !== hit.p); }
+    await saveDoc(doc);
+    renderDrHome();
+  } catch (e) { alert("Could not save: " + e.message); }
+}
+/* ---------- the rounding view ---------- */
+let viewing = null;                 /* whose patients are shown: a physician's name, "__none" or "__all" */
+function setViewing(v){ viewing = v; renderDrHome(); }
+/* The physicians with an approved account. A public list: it is what a patient chooses from. */
+async function physicianNames(){
+  if (bucket === "local") return [];
+  try { const r = await fetch("/api/auth/physicians", { cache: "no-store" }); if (!r.ok) return []; return ((await r.json()).physicians || []).slice().sort((a, b) => String(a).localeCompare(String(b))); }
+  catch (e) { return []; }
+}
+const roundSeen = new Set();
+async function recordRoundOpens(ids){
+  if (!LR) return;
+  const fresh = ids.filter(id => !roundSeen.has(id)); if (!fresh.length) return;
+  fresh.forEach(id => roundSeen.add(id));
+  try {
+    const doc = await loadDoc(); if (!doc) return;
+    const ident = provIdent(), me = ident ? provRecOf(doc.providers, ident.name) : null, role = me ? (me.role || "Physician") : "";
+    let changed = false;
+    for (const id of fresh) {
+      const rec = normRec(doc.pts[id]); if (!rec) continue;
+      const next = LR.recordRead(rec.reads, role, Date.now());
+      if (next !== rec.reads) { rec.reads = next; doc.pts[id] = rec; changed = true; }
+    }
+    if (changed) await saveDoc(doc);
+  } catch (e) { try { console.warn("Heard: could not record that the lists were opened.", e); } catch (x) {} }
+}
+/* Marks one entry addressed from the rounding view. Nothing is deleted. */
+async function addressEntry(pid, key){
+  try {
+    const doc = (await loadDoc()) || EMPTY_DOC();
+    const rec = normRec(doc.pts[pid]); if (!rec) return;
+    const who = (provIdent() || {}).name || "";
+    rec.entries.forEach(e => { if (entryKey(e) === key) { e.addressed = true; e.addressedAt = Date.now(); if (who) e.addressedBy = who; } });
+    doc.pts[pid] = rec;
+    await saveDoc(doc);
+    renderDrHome();
+  } catch (e) { alert("Could not save: " + e.message); }
+}
+/* Links a patient whose doctor was typed, or left blank, to a physician. */
+async function assignDoctor(pid, name){
+  if (!name) return;
+  try {
+    const doc = (await loadDoc()) || EMPTY_DOC();
+    if (doc.pts[pid]) doc.pts[pid].doctor = name;
+    (doc.idx || []).forEach(q => { if (q.id === pid) q.doctor = name; });
     await saveDoc(doc);
     renderDrHome();
   } catch (e) { alert("Could not save: " + e.message); }
