@@ -27,7 +27,7 @@ const MUST_FLAG = [
   ["it hurts to breathe", "chest", R],
   ["sharp pain when I take a deep breath", "chest", R],
   ["pain when I cough", "chest", R],
-  ["my dad had a heart attack last year", "chest", R], // accepted false alarm
+  ["I think I'm having a heart attack", "chest", R],
 
   // ---- breathing (red) ----
   ["I can't breathe", "breathing", R],
@@ -55,9 +55,8 @@ const MUST_FLAG = [
   ["blood everywhere", "bleeding", R],
   ["blood all over the sheets", "bleeding", R],
   ["I am coughing up blood", "bleeding", R],
-  ["there was blood in my stool", "bleeding", R],
   ["my urine has blood in it", "bleeding", R],
-  ["bloody stool", "bleeding", R],
+  ["I am vomiting a lot of blood", "bleeding", R],
 
   // ---- bleeding_other (amber): other bleeding, soaked or leaking dressing, nosebleed, black stool ----
   ["the dressing is soaked and it is bleeding", "bleeding_other", A],
@@ -72,28 +71,34 @@ const MUST_FLAG = [
   ["the dressing is not holding", "bleeding_other", A],
   ["I have a nosebleed", "bleeding_other", A],
 
-  // ---- black_stool (amber), red together with dizzy or lightheaded ----
-  ["my stool is black", "black_stool", A],
-  ["black tarry stools", "black_stool", A],
-  ["my stool is black and I am lightheaded", "black_stool_with_dizzy", R],
-  ["I feel dizzy and my poop is black", "black_stool_with_dizzy", R],
+  // ---- gi_bleed (amber, shows the GI bleeding list), red with dizzy or lightheaded ----
+  ["my stool is black", "gi_bleed", A],
+  ["black tarry stools", "gi_bleed", A],
+  ["there was blood in my stool", "gi_bleed", A],
+  ["bloody stool", "gi_bleed", A],
+  ["I am vomiting blood", "gi_bleed", A],
+  ["vomit looks like coffee grounds", "gi_bleed", A],
+  ["my stool is black and I am lightheaded", "gi_bleed_with_dizzy", R],
+  ["I feel dizzy and my poop is black", "gi_bleed_with_dizzy", R],
+  ["I am vomiting blood and I feel dizzy", "gi_bleed_with_dizzy", R],
 
-  // ---- clot (red) ----
-  ["my calf hurts and it is swollen", "clot", R],
-  ["there is a cramp in my calf", "clot", R],
-  ["I think it's a blood clot", "clot", R],
-  ["I have a swollen calf", "clot", R],
-  ["sore calf", "clot", R],
-  ["my calf is tight", "clot", R],
-  ["the back of my lower leg hurts", "clot", R],
-  ["pain in the back of my leg", "clot", R],
-  ["my whole leg is swollen and red", "clot", R],
-  ["my leg is more swollen today", "clot", R],
-  ["both legs are swollen", "clot", R],
-  ["the swelling in my foot is getting worse", "clot", R],
-  ["my ankle and foot are swelling and getting worse", "clot", R],
-  ["do I have a clot", "clot", R],
-  ["is this a clot", "clot", R],
+  // ---- clot (amber, shows the blood clot list): leg signs ----
+  ["my calf hurts and it is swollen", "clot", A],
+  ["there is a cramp in my calf", "clot", A],
+  ["I think it's a blood clot", "clot", A],
+  ["I have a swollen calf", "clot", A],
+  ["sore calf", "clot", A],
+  ["my calf is tight", "clot", A],
+  ["the back of my lower leg hurts", "clot", A],
+  ["pain in the back of my leg", "clot", A],
+  ["my whole leg is swollen and red", "clot", A],
+  ["my leg is more swollen today", "clot", A],
+  ["both legs are swollen", "clot", A],
+  ["the swelling in my foot is getting worse", "clot", A],
+  ["my ankle and foot are swelling and getting worse", "clot", A],
+  ["do I have a clot", "clot", A],
+  ["is this a clot", "clot", A],
+  ["my chest hurts and my calf is swollen", "clot", R], // red wins
 
   // ---- heart (amber) ----
   ["my heart is racing", "heart", A],
@@ -109,7 +114,8 @@ const MUST_FLAG = [
   ["my arm is weak", "stroke_signs", R],
   ["double vision", "stroke_signs", R],
   ["worst headache of my life", "stroke_signs", R],
-  ["my dad had a stroke, is surgery safe", "stroke_signs", R], // accepted false alarm
+  ["I think I am having a stroke", "stroke_signs", R],
+  ["is this a stroke", "stroke_signs", R],
 
   // ---- numb_stroke (red, stroke list): numb face, arm, hand or one side ----
   ["my arm is numb", "numb_stroke", R],
@@ -211,7 +217,9 @@ const MUST_FLAG = [
   // ---- overdose (red) ----
   ["I took too many pain pills", "overdose", R],
   ["he took too much oxycodone", "overdose", R],
-  ["can I overdose on tylenol", "overdose", R], // open question
+  ["I think I overdosed", "overdose", R],
+  ["he overdosed", "overdose", R],
+  ["could this be an overdose", "overdose_word", R],
 
   // ---- overdose_other (amber) ----
   ["I took a double dose", "overdose_other", A],
@@ -240,8 +248,7 @@ const MUST_FLAG = [
   ["no reason to live", "self_harm", R],
   ["I don't want to go on", "self_harm", R],
   ["I want to hurt myself", "self_harm", R],
-  ["thoughts of harming myself", "self_harm", R],
-  ["I don't want to be here anymore, when can I go home", "self_harm", R] // open question
+  ["thoughts of harming myself", "self_harm", R]
 ];
 
 const MUST_NOT_FLAG = [
@@ -304,6 +311,12 @@ const MUST_NOT_FLAG = [
   "I don't want to go on a walker",
   "I am afraid I will hurt myself doing therapy",
   "I don't want to hurt myself getting out of bed",
+  // decided 21 Nov 2026: history, hypothetical questions, and "don't want to be here"
+  "my dad had a heart attack last year",
+  "my dad had a stroke, is surgery safe",
+  "can I overdose on tylenol",
+  "what if I overdose",
+  "I don't want to be here anymore, when can I go home",
   "",
   "   "
 ];
@@ -337,24 +350,25 @@ test("every rule has a tier, and red wins over amber", () => {
   }
 });
 
-test("condition lists come only with the red message and only from rules that carry one", () => {
+test("condition lists follow the rule that matched, and every list names its source", () => {
   assert.deepEqual(RF.check("my speech is slurred").lists, ["stroke"]);
   assert.deepEqual(RF.check("I have chest pain").lists, ["heart_attack"]);
-  assert.deepEqual(RF.check("my calf hurts and it is swollen").lists, ["clot"]);
+  assert.deepEqual(RF.check("I can't catch my breath").lists, ["heart_attack", "pe"]);
+  assert.deepEqual(RF.check("my calf hurts and it is swollen").lists, ["clot"]);   // amber, with a list
+  assert.deepEqual(RF.check("my stool is black").lists, ["gi_bleed"]);             // amber, with a list
   assert.deepEqual(RF.check("my chest hurts and my calf is swollen").lists, ["heart_attack", "clot"]);
-  assert.deepEqual(RF.check("I fell").lists, []);            // red, no list
-  assert.deepEqual(RF.check("I am lightheaded").lists, []);  // amber
+  assert.deepEqual(RF.check("I fell").lists, []);
+  assert.deepEqual(RF.check("I am lightheaded").lists, []);
   for (const rule of RF.RULES) {
-    if (!rule.list) continue;
-    assert.equal(rule.tier, "red", "rule " + rule.id + " shows a list, so it must be red");
-    assert.ok(RF.LISTS[rule.list], "rule " + rule.id + " names an unknown list: " + rule.list);
+    for (const key of rule.lists || []) assert.ok(RF.LISTS[key], "rule " + rule.id + " names an unknown list: " + key);
   }
   for (const [key, L] of Object.entries(RF.LISTS)) {
-    assert.ok(L.name && L.heading && L.url.startsWith("https://www.cdc.gov/") && L.reviewed, "list " + key + " needs a name, heading, CDC link and review date");
+    assert.ok(L.name && L.heading && L.source && L.reviewed, "list " + key + " needs a name, heading, source and review date");
+    assert.ok(/^https:\/\/www\.(cdc|niddk\.nih)\.gov\//.test(L.url), "list " + key + " must link to its CDC or NIDDK page");
     for (const g of L.groups) assert.ok(g.items.length > 0);
   }
-  assert.ok(RF.LIST_TEXT.source.includes("Source: CDC"));
-  assert.ok(RF.LIST_TEXT.source.includes("does not imply endorsement"));
+  assert.ok(RF.LIST_TEXT.sourceStart.includes("Source"));
+  assert.ok(RF.LIST_TEXT.sourceEnd.includes("does not imply endorsement"));
 });
 
 test("check never throws on odd input and always reports a version", () => {

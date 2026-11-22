@@ -9,11 +9,17 @@
             getting worse.
    If an entry matches both tiers, the red message is shown.
 
-   Some red rules also carry a condition list (stroke, heart attack, blood clot).
-   When one matches, the red message says the concern represents a possible
-   condition, shows the public CDC list of its signs word for word with the source,
-   and gives the same red instruction. There is one button, to acknowledge. The
-   patient is not asked to answer anything. Decided 21 November 2026.
+   Some rules also carry condition lists (stroke, heart attack, blood clot, GI
+   bleeding). When one matches, the message says the concern represents a possible
+   condition, shows the public list of its signs from CDC or NIH with the source,
+   and gives the usual instruction for its tier. There is one button, to
+   acknowledge. The patient is not asked to answer anything. The page can switch
+   the lists off (RF_CONDITION_LISTS in index.html). Decided 21 November 2026.
+
+   How a tier is chosen, decided 21 November 2026: follow the source. Where the
+   source says to see a doctor as soon as possible, the phrase is amber. Where it
+   says to get help immediately or call 911, the phrase is red. GI bleeding is the
+   physician's exception: amber by default, red with dizziness or fainting.
 
    What this is not: triage of the patient. It does not score anything, ask the
    patient questions, or notify anyone. Which message appears depends only on which
@@ -40,7 +46,7 @@
 (function (root) {
   "use strict";
 
-  var VERSION = "2026-11-21.5";
+  var VERSION = "2026-11-21.6";
 
   /* Review status at this version (21 November 2026 review): every group has been
      revised. Open points are listed in the project's START-HERE. */
@@ -74,11 +80,11 @@
 
   /* Each rule: an id for the audit trail, a tier ("red" or "amber"), and one pattern
      (see any() above). Optional: "unless", a pattern that cancels the rule when it
-     is found anywhere in the entry; "list", the condition list a red rule shows. Text is lower-cased and curly apostrophes are straightened
+     is found anywhere in the entry; "lists", the condition lists the rule shows. Text is lower-cased and curly apostrophes are straightened
      before matching. */
   var RULES = [
     /* ---- chest: reviewed 21 Nov 2026 ---- */
-    { id: "chest", tier: "red", list: "heart_attack", rx: any([
+    { id: "chest", tier: "red", lists: ["heart_attack"], rx: any([
       /* "chest", then a symptom word */
       /\bchest\b.{0,30}\b(pain|pains|painful|hurt|hurts|hurting|pressure|tight|tightness|heavy|heaviness|sore|soreness|ache|aches|aching|discomfort|burning|sharp|stabbing|squeez\w*|crush\w*)\b/,
       /* a symptom word, then "chest", with any words between */
@@ -86,11 +92,14 @@
       /* pain with breathing or coughing: "it hurts when I breathe", "pain when I take
          a deep breath"; "pain pill" and "pain medicine" do not count as pain here */
       /\b(hurt|hurts|hurting|pain|pains|painful)\b(?! (pill|pills|med|meds|medicine|medication|medications|killer|killers|reliever))\b.{0,12}\b(when|whenever|to|if|as|while|with|on|every time|each time)\b.{0,20}\b(breath\w*|cough\w*)/,
-      /\bheart attack\b/
+      /* "heart attack" only when it is about now; "my dad had a heart attack" passes */
+      /\bhaving a heart attack\b/,
+      /\b(is|was) (this|that|it) a heart attack\b/,
+      /\b(think|thinks|thought|might be|could be|may be|looks like|feels like)\b.{0,25}\bheart attack\b/
     ]) },
 
     /* ---- breathing: reviewed 21 Nov 2026 ---- */
-    { id: "breathing", tier: "red", rx: any([
+    { id: "breathing", tier: "red", lists: ["heart_attack", "pe"], rx: any([
       /\b(can't|cant|cannot|can not|couldn't|hard to|trouble|difficulty|difficult to|struggling to|unable to)\b.{0,25}\bbreath\w*/,
       /\bbreathing\b.{0,20}\b(hard|harder|difficult|labored|laboured|fast|faster|worse)\b/,
       /\bshort(ness)? of breath\b/,
@@ -118,12 +127,12 @@
       /\b(gush\w*|pour\w*|spurt\w*|squirt\w*)\b.{0,15}\bblood\b/,
       /\bblood\b.{0,15}\b(gush\w*|pour\w*|spurt\w*|squirt\w*)\b/,
       /\bblood (is )?(everywhere|all over)\b/,
-      /* coughing or vomiting blood */
-      /\b(cough\w*|vomit\w*|throw\w* up|threw up|spit\w*)\b.{0,15}\bblood\b/,
-      /* blood in the stool, urine or vomit, either order; not "blood test" and the like */
-      /\bblood\b.{0,20}\b(stool|urine|pee|poop|vomit|toilet)\b/,
-      /\b(stool|stools|urine|pee|poop|vomit)\b.{0,20}\bblood\b(?! (test|tests|work|draw|pressure|sugar|thinner|thinners|count|clot|clots))/,
-      /\bbloody (stool|stools|urine|pee|poop|vomit|diarrhea)\b/
+      /* coughing or spitting blood */
+      /\b(cough\w*|spit\w*)\b.{0,15}\bblood\b/,
+      /* blood in the urine, either order; not "blood test" and the like */
+      /\bblood\b.{0,20}\b(urine|pee)\b/,
+      /\b(urine|pee)\b.{0,20}\bblood\b(?! (test|tests|work|draw|pressure|sugar|thinner|thinners|count|clot|clots))/,
+      /\bbloody (urine|pee)\b/
     ]) },
 
     /* ---- bleeding_other (amber): any other bleeding, a dressing that is soaked or
@@ -144,15 +153,26 @@
       /\bnose ?bleeds?\b/
     ]) },
 
-    /* ---- black_stool (amber): black or tarry stool, either order. With dizzy or
-       lightheaded in the same entry it becomes red (see COMBOS). Reviewed 21 Nov 2026 ---- */
-    { id: "black_stool", tier: "amber", rx: any([
+    /* ---- gi_bleed (amber, shows the GI bleeding list): black or tarry stool, blood
+       in the stool, vomiting blood. With dizzy or lightheaded in the same entry it
+       becomes red (see COMBOS). Reviewed 21 Nov 2026 ---- */
+    { id: "gi_bleed", tier: "amber", lists: ["gi_bleed"], rx: any([
       /\b(black|tarry)\b.{0,15}\b(stool|stools|poop|bowel movement|bowel movements)\b/,
-      /\b(stool|stools|poop|bowel movement|bowel movements)\b.{0,20}\b(black|tarry)\b/
+      /\b(stool|stools|poop|bowel movement|bowel movements)\b.{0,20}\b(black|tarry)\b/,
+      /* blood in the stool, either order; not "blood test" and the like */
+      /\bblood\b.{0,20}\b(stool|stools|poop|bowel movement|toilet)\b/,
+      /\b(stool|stools|poop|bowel movement)\b.{0,20}\bblood\b(?! (test|tests|work|draw|pressure|sugar|thinner|thinners|count|clot|clots))/,
+      /\bbloody (stool|stools|poop|diarrhea|vomit)\b/,
+      /* vomiting blood */
+      /\b(vomit\w*|throw\w* up|threw up)\b.{0,15}\bblood\b/,
+      /\bblood\b.{0,20}\bvomit\b/,
+      /\bcoffee grounds?\b/
     ]) },
 
-    /* ---- clot: reviewed 21 Nov 2026 ---- */
-    { id: "clot", tier: "red", list: "clot", rx: any([
+    /* ---- clot (amber, shows the blood clot list): leg signs. The source says to see
+       a doctor as soon as possible. Chest and breathing signs are their own red
+       rules. Reviewed 21 Nov 2026 ---- */
+    { id: "clot", tier: "amber", lists: ["clot"], rx: any([
       /* calf and a symptom word, either order */
       /\b(calf|calves)\b.{0,30}\b(pain|pains|painful|hurt\w*|sore|swollen|swelling|swell\w*|cramp\w*|tender|red|hot|warm|hard|tight)\b/,
       /\b(pain|pains|painful|hurt\w*|sore|soreness|swollen|swelling|cramp\w*|tender|tenderness|tight|tightness)\b.{0,20}\b(calf|calves)\b/,
@@ -177,7 +197,7 @@
     ]) },
 
     /* ---- stroke_signs (red, shows the stroke list). Reviewed 21 Nov 2026 ---- */
-    { id: "stroke_signs", tier: "red", list: "stroke", rx: any([
+    { id: "stroke_signs", tier: "red", lists: ["stroke"], rx: any([
       /\bslurr\w*/,
       /* trouble speaking; "can't talk to the doctor" passes */
       /\b(trouble|difficulty|hard time|problem|problems)\b.{0,10}\b(speaking|talking|getting (the |my |his |her )?words)\b/,
@@ -196,12 +216,15 @@
       /* headache */
       /\b(worst|sudden)\b.{0,12}\bheadache\b/,
       /\bparaly\w*/,
-      /\bstroke\b/
+      /* "stroke" only when it is about now; "my dad had a stroke" passes */
+      /\bhaving a stroke\b/,
+      /\b(is|was) (this|that|it) a stroke\b/,
+      /\b(think|thinks|thought|might be|could be|may be|looks like|feels like)\b.{0,25}\bstroke\b/
     ]) },
 
     /* ---- numb_stroke (red, shows the stroke list): numb face, arm, hand or one
        side, unless a nerve block is mentioned. Reviewed 21 Nov 2026 ---- */
-    { id: "numb_stroke", tier: "red", list: "stroke", unless: BLOCK_WORDS, rx: any([
+    { id: "numb_stroke", tier: "red", lists: ["stroke"], unless: BLOCK_WORDS, rx: any([
       /\b(arm|arms|hand|hands|face|one side|left side|right side)\b.{0,20}\bnumb\w*/,
       /\bnumb\w*\b.{0,20}\b(arm|arms|hand|hands|face|one side|left side|right side)\b/
     ]) },
@@ -355,11 +378,20 @@
 
     /* ---- overdose (red). Reviewed 21 Nov 2026 ---- */
     { id: "overdose", tier: "red", rx: any([
-      /\boverdos\w*/,
+      /\boverdosed\b/,
+      /\boverdosing\b/,
+      /\b(think|thinks|thought|took|taken|had|having|is this|is it|was it)\b.{0,20}\boverdose\b/,
       /* "took too much out of me" passes */
       /\btook too (many|much)\b(?! out of)/,
       /\btoo many pills\b/
     ]) },
+
+    /* ---- overdose_word (red): the word "overdose" in any other statement. A
+       hypothetical question ("can I overdose on Tylenol", "what if I overdose")
+       shows nothing. Reviewed 21 Nov 2026 ---- */
+    { id: "overdose_word", tier: "red",
+      unless: /\b(can|could|would|will|might|may|should) (i|you|he|she|we|they|someone|anyone|a person|one)\b.{0,25}\boverdos\w*|\b(is it possible|what if|what happens if|how much|how many)\b.{0,30}\boverdos\w*/,
+      rx: /\boverdos\w*/ },
 
     /* ---- overdose_other (amber): double dose, took it twice, took extra, took the
        wrong pill, took something by mistake. Reviewed 21 Nov 2026 ---- */
@@ -390,7 +422,7 @@
     ]) },
 
     /* ---- self_harm (red, adds the 988 line). Reviewed 21 Nov 2026, except
-       "don't want to be here", which is still an open question ---- */
+       "don't want to be here", dropped on the physician's decision ---- */
     { id: "self_harm", tier: "red", rx: any([
       /\bsuicid\w*/,
       /\bkill (myself|himself|herself|themselves|themself)\b/,
@@ -404,8 +436,6 @@
       /\b(don't|dont|do not|doesn't|doesnt|does not) want to live\b/,
       /* "don't want to go on", but not "go on the blood thinner" or "go on a walker" */
       /\b(don't|dont|do not|doesn't|doesnt|does not) want to go on\b(?! (the|a|an|my|any|this|that|blood|oxygen|more|with the|to)\b)/,
-      /* open question: this also fires for "I don't want to be here, when can I go home" */
-      /\b(don't|dont|do not) want to be here\b/,
       /* hurting oneself, only with intent; "afraid I will hurt myself in therapy" passes */
       /(?:^|(?:^|\s)(?!don't\s|dont\s|not\s|never\s|didn't\s|didnt\s)\S+\s)(want|wants|wanted) to (hurt|harm) (myself|himself|herself|themselves)\b/,
       /\b(going to|thinking about|thinking of|thought about|thoughts of|might|plan to|planning to|tried to|trying to|feel like)\b.{0,6}\b(hurt|harm|hurting|harming) (myself|himself|herself|themselves)\b/
@@ -413,9 +443,9 @@
   ];
 
   /* Two amber rules that together are red. Each combo has its own id for the audit
-     trail. Decided 21 Nov 2026: black stool with dizzy or lightheaded. */
+     trail. Decided 21 Nov 2026: a GI bleeding sign with dizzy or lightheaded. */
   var COMBOS = [
-    { id: "black_stool_with_dizzy", all: ["black_stool", "dizzy"], tier: "red" }
+    { id: "gi_bleed_with_dizzy", all: ["gi_bleed", "dizzy"], tier: "red" }
   ];
 
   function normalize(text) {
@@ -427,7 +457,7 @@
   }
 
   /* Returns { hit, ids, tier, lists, version }. lists names the condition lists to
-     show with the red message; it is empty unless the tier is red. ids lists every rule that matched, for the
+     show with the message, in the order the rules matched. ids lists every rule that matched, for the
      audit trail. It is never shown to the patient. tier is "red" if any red rule
      or red combo matched, otherwise "amber" if any amber rule matched, otherwise null. */
   function check(text) {
@@ -439,7 +469,8 @@
       for (var i = 0; i < RULES.length; i++) {
         if (RULES[i].rx.test(t) && !(RULES[i].unless && RULES[i].unless.test(t))) {
           ids.push(RULES[i].id);
-          if (RULES[i].list && lists.indexOf(RULES[i].list) === -1) lists.push(RULES[i].list);
+          var rl = RULES[i].lists || [];
+          for (var j = 0; j < rl.length; j++) { if (lists.indexOf(rl[j]) === -1) lists.push(rl[j]); }
           if (RULES[i].tier === "red") tier = "red";
           else if (!tier) tier = "amber";
         }
@@ -452,7 +483,7 @@
         if (all) { ids.push(COMBOS[c].id); if (COMBOS[c].tier === "red") tier = "red"; }
       }
     }
-    return { hit: ids.length > 0, ids: ids, tier: tier, lists: tier === "red" ? lists : [], version: VERSION };
+    return { hit: ids.length > 0, ids: ids, tier: tier, lists: lists, version: VERSION };
   }
 
   /* The red message. No condition is named and nothing is tailored to the patient,
@@ -490,15 +521,24 @@
 
   var MESSAGES = { red: MESSAGE, amber: MESSAGE_AMBER };
 
-  /* Condition lists shown with the red message. The items are CDC's public signs
-     pages, word for word; CDC's reuse terms require the source credit, the
-     no-endorsement note, and unchanged substance, so do not reword an item. Check
-     each list against its page before every release and update "reviewed".
-     The stroke and clot lists are complete. The heart attack list uses the opening
-     sentence of each CDC bullet. */
+  /* Condition lists. The items are the public signs pages of CDC and NIDDK (NIH),
+     word for word. CDC's reuse terms require the source credit, a no-endorsement
+     note, and unchanged substance, so do not reword an item. NIDDK's reuse terms
+     have not been confirmed yet. Check each list against its page before every
+     release and update "reviewed".
+     The heart attack list uses the opening sentence of each CDC bullet. A group's
+     "note" is Heard's wording, not the source's. */
+  var CALL_NOW = "With any of these: in the hospital, press your call button. At home, call 911.";
+  var CLOT_LUNG = [
+    "Difficulty breathing",
+    "Faster than normal or irregular heartbeat",
+    "Chest pain or discomfort, which usually worsens with a deep breath or coughing",
+    "Cough or coughing up blood",
+    "Very low blood pressure, lightheadedness, or fainting"
+  ];
   var LISTS = {
     stroke: {
-      name: "stroke",
+      name: "stroke", article: "a ",
       heading: "Signs of stroke",
       groups: [ { label: "", items: [
         "Sudden numbness or weakness in the face, arm, or leg, especially on one side of the body.",
@@ -507,11 +547,12 @@
         "Sudden trouble walking, dizziness, loss of balance, or lack of coordination.",
         "Sudden severe headache with no known cause."
       ] } ],
+      source: "CDC",
       url: "https://www.cdc.gov/stroke/signs-symptoms/",
       reviewed: "CDC page dated 19 May 2026, retrieved 21 November 2026"
     },
     heart_attack: {
-      name: "heart attack",
+      name: "heart attack", article: "a ",
       heading: "Major symptoms of a heart attack",
       groups: [ { label: "", items: [
         "Chest pain or discomfort.",
@@ -520,11 +561,20 @@
         "Pain or discomfort in one or both arms or shoulders.",
         "Shortness of breath."
       ] } ],
+      source: "CDC",
       url: "https://www.cdc.gov/heart-disease/about/heart-attack.html",
       reviewed: "CDC page dated 24 October 2024, retrieved 21 November 2026"
     },
+    pe: {
+      name: "blood clot in the lung", article: "a ",
+      heading: "Signs of a blood clot in the lung",
+      groups: [ { label: "", items: CLOT_LUNG } ],
+      source: "CDC",
+      url: "https://www.cdc.gov/blood-clots/about/",
+      reviewed: "CDC page dated 5 March 2025, retrieved 21 November 2026"
+    },
     clot: {
-      name: "blood clot",
+      name: "blood clot", article: "a ",
       heading: "Signs of a blood clot",
       groups: [
         { label: "In the leg or arm", items: [
@@ -533,25 +583,50 @@
           "Warmth",
           "Redness or discoloration"
         ] },
-        { label: "In the lung", items: [
-          "Difficulty breathing",
-          "Faster than normal or irregular heartbeat",
-          "Chest pain or discomfort, which usually worsens with a deep breath or coughing",
-          "Cough or coughing up blood",
-          "Very low blood pressure, lightheadedness, or fainting"
-        ] }
+        { label: "In the lung", items: CLOT_LUNG, note: CALL_NOW }
       ],
+      source: "CDC",
       url: "https://www.cdc.gov/blood-clots/about/",
       reviewed: "CDC page dated 5 March 2025, retrieved 21 November 2026"
+    },
+    gi_bleed: {
+      name: "bleeding in the stomach or bowel", article: "",
+      heading: "Signs of bleeding in the stomach or bowel",
+      groups: [
+        { label: "", items: [
+          "black or tarry stool",
+          "dark or bright red blood mixed with stool",
+          "bright red blood in vomit",
+          "vomit that looks like coffee grounds"
+        ] },
+        { label: "Other symptoms", items: [
+          "having cramps or pain in your abdomen",
+          "fainting or feeling lightheaded or dizzy",
+          "feeling tired",
+          "having shortness of breath"
+        ] },
+        { label: "Signs of shock", items: [
+          "confusion or unconsciousness",
+          "fast heart rate",
+          "pale skin",
+          "cold hands and feet",
+          "sweating"
+        ], note: CALL_NOW }
+      ],
+      source: "NIDDK, National Institutes of Health",
+      url: "https://www.niddk.nih.gov/health-information/digestive-diseases/gastrointestinal-bleeding/symptoms-causes",
+      reviewed: "NIDDK page reviewed July 2024, retrieved 21 November 2026"
     }
   };
 
-  /* Wording for the red message when it shows a condition list. */
+  /* Wording for a message that shows a condition list. */
   var LIST_TEXT = {
-    headlineStart: "Your concerns represent a possible ",
+    headlineStart: "Your concerns represent ",
+    possible: "possible ",
     recommends: "Heard recommends:",
     homeNote: "Do not wait for a reply here.",
-    source: "Source: CDC. This does not imply endorsement of Heard by CDC or the United States Government."
+    sourceStart: "Source: ",
+    sourceEnd: ". This does not imply endorsement of Heard by the source or the United States Government."
   };
 
   var api = { VERSION: VERSION, RULES: RULES, MESSAGE: MESSAGE, MESSAGE_AMBER: MESSAGE_AMBER, MESSAGES: MESSAGES, LISTS: LISTS, LIST_TEXT: LIST_TEXT, COMBOS: COMBOS, check: check, normalize: normalize };
