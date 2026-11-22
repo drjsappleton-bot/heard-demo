@@ -376,6 +376,8 @@ test("condition lists follow the rule that matched, and every list names its sou
   }
   assert.ok(RF.LIST_TEXT.sourceStart.includes("Source"));
   assert.ok(RF.LIST_TEXT.sourceEnd.includes("does not imply endorsement"));
+  // CDC's fourth reuse requirement: say the material is free on the agency website.
+  assert.ok(RF.LIST_TEXT.sourceEnd.includes("at no charge"));
 });
 
 // The condition lists, item by item, as each source page read in a browser on

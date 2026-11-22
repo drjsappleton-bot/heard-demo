@@ -532,9 +532,11 @@
   var MESSAGES = { red: MESSAGE, amber: MESSAGE_AMBER };
 
   /* Condition lists. The items are the public signs pages of CDC and NIDDK (NIH),
-     word for word, in the order the page gives them. CDC's reuse terms require the
-     source credit, a no-endorsement note, and unchanged substance, so do not reword
-     an item. NIDDK's terms (https://www.niddk.nih.gov/copyright, read 21 November
+     word for word, in the order the page gives them. CDC's reuse terms
+     (https://www.cdc.gov/other/agencymaterials.html, read 21 November 2026) require
+     four things: the source credit, a prominent no-endorsement note, unchanged
+     substance, and a statement that the material is available on the agency website
+     at no charge. So do not reword an item, and keep all of LIST_TEXT's source line. NIDDK's terms (https://www.niddk.nih.gov/copyright, read 21 November
      2026) ask for NIDDK to be named as the source of unchanged content, and say its
      content must not be used to imply endorsement or "to recommend specific medical
      advice, treatments, or referrals". That last clause is a question for counsel.
@@ -643,7 +645,7 @@
     recommends: "Heard recommends:",
     homeNote: "Do not wait for a reply here.",
     sourceStart: "Source: ",
-    sourceEnd: ". This does not imply endorsement of Heard by the source or the United States Government."
+    sourceEnd: ". This material is available on the source's website at no charge. This does not imply endorsement of Heard by the source or the United States Government."
   };
 
   var api = { VERSION: VERSION, RULES: RULES, MESSAGE: MESSAGE, MESSAGE_AMBER: MESSAGE_AMBER, MESSAGES: MESSAGES, LISTS: LISTS, LIST_TEXT: LIST_TEXT, COMBOS: COMBOS, check: check, normalize: normalize };
