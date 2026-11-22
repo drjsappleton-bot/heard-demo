@@ -1,19 +1,27 @@
 /* Heard red-flag safety check.
 
-   What this is: a fixed list of phrases. When something a patient or caregiver
-   captures matches one, the page shows one fixed safety message telling them to
-   contact their nurse (in the hospital) or call 911 (at home).
+   What this is: a fixed list of phrases, each in one of two tiers. When something a
+   patient or caregiver captures matches the list, the page shows one of two fixed
+   messages.
+   - red:   in the hospital, contact your nurse immediately; at home, call 911.
+   - amber: in the hospital, tell your nurse now; at home, call your surgeon's
+            office now. It always carries a line on what to do if it is severe or
+            getting worse.
+   If an entry matches both tiers, the red message is shown.
 
-   What this is not: triage. It does not name a condition, score urgency, give a
-   recommendation specific to the patient, or notify anyone. The message is the
-   same every time. Keep it that way; changing any of those is a regulatory
-   question, not a code change.
+   What this is not: triage of the patient. It does not name a condition, give a
+   recommendation specific to the patient, or notify anyone. Which message appears
+   depends only on which listed phrase was matched. The two-message design was a
+   deliberate decision by the product's physician on 21 November 2026; it replaced
+   the single message. The tier of a phrase, the wording of either message, and any
+   move toward naming a condition or notifying someone are regulatory questions, not
+   code changes.
 
    Rules for editing this list:
    - It is clinical content. The physician who owns the product reviews every change.
    - It is deliberately plain pattern matching, not AI, so the same words always
      produce the same result and the list can be read and audited.
-   - It errs toward showing the message. It does not try to understand "no chest
+   - It errs toward showing a message. It does not try to understand "no chest
      pain"; that still shows the message.
    - It only catches symptoms that are stated. It cannot catch a worry that is
      phrased as a question ("is my blood thinner working?"), a mis-heard word, or
@@ -25,11 +33,13 @@
 (function (root) {
   "use strict";
 
-  var VERSION = "2026-11-21.2";
+  var VERSION = "2026-11-21.3";
 
-  /* Review status at this version: chest, breathing, bleeding and clot were revised
-     in the 21 November 2026 review. The groups from neuro onward are still the
-     first draft. */
+  /* Review status at this version (21 November 2026 review):
+     - revised and tiered: chest, breathing, bleeding, bleeding_other, clot, heart,
+       faint, dizzy, fall, near_fall
+     - tier changed only, phrases still first draft: wound (amber), dislocation (red)
+     - still the first draft: neuro, allergic, overdose, severe_pain, self_harm */
 
   /* One rule can hold several patterns. Any one of them matching is a match. */
   function any(list) {
@@ -46,11 +56,12 @@
      sleep" do not turn plain swelling into a match. */
   var SWELL_QUALIFIER = "\\b(?:worse|worsening|more (?:swollen|swelling)|(?:swollen|swelling|swells|swelled) more|sudden|suddenly|both|red|redder|redness|hot|hotter|hard(?! to)|harder(?! to)|tight|tighter|painful)\\b";
 
-  /* Each rule: an id for the audit trail, and one pattern (see any() above). Text is lower-cased
-     and curly apostrophes are straightened before matching. */
+  /* Each rule: an id for the audit trail, a tier ("red" or "amber"), and one pattern
+     (see any() above). Text is lower-cased and curly apostrophes are straightened
+     before matching. */
   var RULES = [
     /* ---- chest: reviewed 21 Nov 2026 ---- */
-    { id: "chest", rx: any([
+    { id: "chest", tier: "red", rx: any([
       /* "chest", then a symptom word */
       /\bchest\b.{0,30}\b(pain|pains|painful|hurt|hurts|hurting|pressure|tight|tightness|heavy|heaviness|sore|soreness|ache|aches|aching|discomfort|burning|sharp|stabbing|squeez\w*|crush\w*)\b/,
       /* a symptom word, then "chest", with any words between */
@@ -62,7 +73,7 @@
     ]) },
 
     /* ---- breathing: reviewed 21 Nov 2026 ---- */
-    { id: "breathing", rx: any([
+    { id: "breathing", tier: "red", rx: any([
       /\b(can't|cant|cannot|can not|couldn't|hard to|trouble|difficulty|difficult to|struggling to|unable to)\b.{0,25}\bbreath\w*/,
       /\bbreathing\b.{0,20}\b(hard|harder|difficult|labored|laboured|fast|faster|worse)\b/,
       /\bshort(ness)? of breath\b/,
@@ -80,26 +91,47 @@
       /\bturn(s|ed|ing)? blue\b/
     ]) },
 
-    /* ---- bleeding: reviewed 21 Nov 2026 ---- */
-    { id: "bleeding", rx: any([
+    /* ---- bleeding (red): heavy or internal bleeding. Reviewed 21 Nov 2026 ---- */
+    { id: "bleeding", tier: "red", rx: any([
+      /\bhemorrhag\w*/,
+      /* bleeding that is heavy or will not stop */
+      /\bbleed\w*\b.{0,20}\b(a lot|won't stop|wont stop|will not stop|everywhere|heavily|badly)\b/,
+      /\b(won't|wont|will not|can't|cant|cannot|not)\b.{0,10}\bstop\w*\b.{0,10}\bbleed\w*/,
+      /\b(heavy|heavily|a lot of|lots of|so much|too much)\b.{0,10}\b(bleeding|blood)\b/,
+      /\b(gush\w*|pour\w*|spurt\w*|squirt\w*)\b.{0,15}\bblood\b/,
+      /\bblood\b.{0,15}\b(gush\w*|pour\w*|spurt\w*|squirt\w*)\b/,
+      /\bblood (is )?(everywhere|all over)\b/,
+      /* coughing or vomiting blood */
+      /\b(cough\w*|vomit\w*|throw\w* up|threw up|spit\w*)\b.{0,15}\bblood\b/,
+      /* blood in the stool, urine or vomit, either order; not "blood test" and the like */
+      /\bblood\b.{0,20}\b(stool|urine|pee|poop|vomit|toilet)\b/,
+      /\b(stool|stools|urine|pee|poop|vomit)\b.{0,20}\bblood\b(?! (test|tests|work|draw|pressure|sugar|thinner|thinners|count|clot|clots))/,
+      /\bbloody (stool|stools|urine|pee|poop|vomit|diarrhea)\b/
+    ]) },
+
+    /* ---- bleeding_other (amber): any other bleeding, a dressing that is soaked or
+       leaking, nosebleed, black stool. Reviewed 21 Nov 2026 ---- */
+    { id: "bleeding_other", tier: "amber", rx: any([
       /\bbleeding\b/,
       /\bbled\b/,
-      /\bhemorrhag\w*/,
-      /\bbleed\w*\b.{0,20}\b(through|a lot|won't stop|wont stop|everywhere)\b/,
-      /\b(cough\w*|vomit\w*|throw\w* up|threw up|spit\w*)\b.{0,15}\bblood\b/,
-      /\bblood\b.{0,20}\b(stool|urine|pee|poop|vomit|toilet)\b/,
-      /* the same in the other order, but not "blood test", "blood thinner" and the like */
-      /\b(stool|stools|urine|pee|poop|vomit)\b.{0,20}\bblood\b(?! (test|tests|work|draw|pressure|sugar|thinner|thinners|count|clot|clots))/,
+      /\bbleed\w*\b.{0,20}\bthrough\b/,
       /\bbloody\b/,
-      /* blood on, through or all over the dressing, sheets or incision */
+      /* blood on, through or under the dressing, sheets or incision */
       /\bblood\b.{0,15}\b(on|through|all over|under|around|from|in)\b.{0,12}\b(dressing|bandage|bandages|gauze|sheet|sheets|incision)\b/,
-      /\bblood (is )?(everywhere|all over)\b/,
-      /* "soaked" or "soaking", not "soak", so a question about soaking in a bath passes */
-      /\b(soaked|soaking)\b.{0,25}\b(dressing|bandage|gauze|sheet|sheets)\b/
+      /* a dressing that is soaked, leaking or not holding, in either word order.
+         "soaked" or "soaking", not "soak", so a question about soaking in a bath passes */
+      /\b(soaked|soaking)\b.{0,25}\b(dressing|bandage|bandages|gauze|sheet|sheets)\b/,
+      /\b(dressing|bandage|bandages|gauze)\b.{0,25}\b(soaked|soaking|saturated|drenched|dripping|leak\w*|coming through|not holding|won't hold|wont hold|isn't holding|isnt holding)\b/,
+      /\b(leak\w*|seep\w*|drain\w*|dripping|coming)\b.{0,6}\b(through|out of|from|under|around|past)\b.{0,12}\b(dressing|bandage|bandages|gauze)\b/,
+      /* nosebleed */
+      /\bnose ?bleeds?\b/,
+      /* black or tarry stool, either order */
+      /\b(black|tarry)\b.{0,15}\b(stool|stools|poop|bowel movement|bowel movements)\b/,
+      /\b(stool|stools|poop|bowel movement|bowel movements)\b.{0,20}\b(black|tarry)\b/
     ]) },
 
     /* ---- clot: reviewed 21 Nov 2026 ---- */
-    { id: "clot", rx: any([
+    { id: "clot", tier: "red", rx: any([
       /* calf and a symptom word, either order */
       /\b(calf|calves)\b.{0,30}\b(pain|pains|painful|hurt\w*|sore|swollen|swelling|swell\w*|cramp\w*|tender|red|hot|warm|hard|tight)\b/,
       /\b(pain|pains|painful|hurt\w*|sore|soreness|swollen|swelling|cramp\w*|tender|tenderness|tight|tightness)\b.{0,20}\b(calf|calves)\b/,
@@ -117,28 +149,75 @@
       /\b(this|that|it|there) is\b.{0,15}\b(blood )?clot\b/
     ]) },
 
-    { id: "neuro",
+    /* ---- heart (amber): racing, pounding, palpitations. Reviewed 21 Nov 2026 ---- */
+    { id: "heart", tier: "amber", rx: any([
+      /\bheart\b.{0,20}\b(racing|races|raced|pounding|pounds|pounded|fluttering|flutters|beating (so |very |really |too )?(fast|hard))\b/,
+      /\bpalpitation\w*/
+    ]) },
+
+    { id: "neuro", tier: "red",
       rx: /\bslurr\w*|\bface\b.{0,15}\bdroop\w*|\bdroop\w*\b.{0,15}\bface\b|\b(can't|cant|cannot) (feel|move)\b.{0,20}\b(arm|arms|leg|legs|foot|feet|toes|hand|hands|fingers|side)\b|\bnumb\w*|\bworst headache\b|\bconfus(ed|ion)\b(?!\s+(about|by|on|as to|why|what|when|which|how|with))|\bdisoriented\b|\bseizure\w*|\bconvuls\w*|\bstroke\b|\b(lost|losing|loss of)\b.{0,10}\b(vision|sight)\b|\bparaly\w*/ },
 
-    { id: "faint",
-      rx: /\bpass(ed|ing)? out\b|\bfaint\w*|\bblack(ed|ing)? out\b|\bcollaps\w*|\bunresponsive\b|\bunconscious\b|\b(won't|wont|can't|cant|cannot)\b.{0,10}\bwake\b/ },
+    /* ---- faint (red). Reviewed 21 Nov 2026 ---- */
+    { id: "faint", tier: "red", rx: any([
+      /\bpass(ed|ing)? out\b/,
+      /\bfaint\w*/,
+      /\bblack(ed|ing)? out\b/,
+      /\bcollaps\w*/,
+      /\bunresponsive\b/,
+      /\bunconscious\b/,
+      /\b(won't|wont|can't|cant|cannot)\b.{0,10}\bwake\b/,
+      /\bhard to (wake|rouse|arouse)\b/,
+      /\bnot waking\b/,
+      /* a person who is not responding. The word before must not be nurse, doctor,
+         staff, office, button, light, pain, it, they, I, we or you, so "the nurse is
+         not responding" and "I'm not responding to the medicine" pass */
+      /(?:^|\s)(?!nurse\s|nurses\s|doctor\s|doctors\s|dr\s|staff\s|office\s|button\s|light\s|pain\s|it\s|they\s|i\s|i'm\s|im\s|we\s|you\s|is\s|was\s|are\s|has\s)\S+\s(?:is |was |are |has )?(?:not|isn't|isnt|won't|wont|doesn't|doesnt|wasn't|wasnt|stopped)\s(?:been )?respond\w*/
+    ]) },
 
-    { id: "fall",
-      rx: /\b(fell|fallen)\b(?!\s+(asleep|behind|in love|short|through|apart))/ },
+    /* ---- dizzy (amber): dizzy, lightheaded. Reviewed 21 Nov 2026 ---- */
+    { id: "dizzy", tier: "amber", rx: any([
+      /\bdizz\w*/,
+      /\blight[ -]?headed\w*/
+    ]) },
 
-    { id: "wound",
-      rx: /\b(wound|incision|stitches|staples|sutures)\b.{0,30}\b(open\w*|split\w*|gap\w*|burst\w*|came apart|coming apart|pus|ooz\w*)\b|\bpus\b|\bdislocat\w*|\bpopped out\b/ },
+    /* ---- fall (red): a fall that happened. Reviewed 21 Nov 2026 ---- */
+    { id: "fall", tier: "red", rx: any([
+      /* "fell" or "fallen", unless the word before is almost or nearly, and not
+         "fell asleep" and the like */
+      /(?:^|(?:^|\s)(?!almost\s|nearly\s)\S+\s)(fell|fallen)\b(?!\s+(asleep|behind|in love|short|through|apart))/,
+      /* "had a fall", "took a bad fall"; not "have a fall risk bracelet" */
+      /\b(had|took|taken|have|having)\b.{0,12}\bfall\b(?! (risk|precaution|precautions|alarm|prevention))/,
+      /\bkeep\w* falling\b/,
+      /\bfalling down\b/,
+      /* a person slipping or tripping, not "the dressing slipped" or "tripped the alarm" */
+      /\b(i|he|she|we|mom|mother|dad|father|husband|wife)(?: just| have| has| had)? (slipped|tripped)\b(?! (the|a|an|me|him|her|it|my)\b)/
+    ]) },
 
-    { id: "allergic",
+    /* ---- near_fall (amber): almost fell. Reviewed 21 Nov 2026 ---- */
+    { id: "near_fall", tier: "amber", rx: any([
+      /\b(almost|nearly)\b.{0,6}\b(fell|fall|fallen|slipped|tripped)\b/
+    ]) },
+
+    /* ---- wound (amber): tier set 21 Nov 2026, phrases still first draft. The amber
+       message adds the wound line when this rule matches. ---- */
+    { id: "wound", tier: "amber",
+      rx: /\b(wound|incision|stitches|staples|sutures)\b.{0,30}\b(open\w*|split\w*|gap\w*|burst\w*|came apart|coming apart|pus|ooz\w*)\b|\bpus\b/ },
+
+    /* ---- dislocation (red): split out of wound 21 Nov 2026, phrases still first draft ---- */
+    { id: "dislocation", tier: "red",
+      rx: /\bdislocat\w*|\bpopped out\b/ },
+
+    { id: "allergic", tier: "red",
       rx: /\b(throat|tongue|lips|face)\b.{0,20}\b(swell\w*|swollen|clos\w*|tight\w*)\b|\ballergic reaction\b|\banaphyla\w*/ },
 
-    { id: "overdose",
+    { id: "overdose", tier: "red",
       rx: /\boverdos\w*|\btook too (many|much)\b|\btoo many pills\b/ },
 
-    { id: "severe_pain",
+    { id: "severe_pain", tier: "red",
       rx: /\bunbearable\b|\bexcruciating\b|\bworst pain\b|\bpain\b.{0,15}\b(10|ten) out of (10|ten)\b|\b(can't|cant|cannot) (stand|take) (the|this) pain\b/ },
 
-    { id: "self_harm",
+    { id: "self_harm", tier: "red",
       rx: /\bsuicid\w*|\bkill myself\b|\bend my life\b|\b(hurt|harm) myself\b|\b(don't|dont|do not) want to (live|be here|go on)\b|\bwant to die\b|\bbetter off dead\b/ }
   ];
 
@@ -150,21 +229,27 @@
       .trim();
   }
 
-  /* Returns { hit, ids, version }. ids lists every rule that matched, for the
-     audit trail. It is never shown to the patient. */
+  /* Returns { hit, ids, tier, version }. ids lists every rule that matched, for the
+     audit trail. It is never shown to the patient. tier is "red" if any red rule
+     matched, otherwise "amber" if any amber rule matched, otherwise null. */
   function check(text) {
     var t = normalize(text);
     var ids = [];
+    var tier = null;
     if (t) {
       for (var i = 0; i < RULES.length; i++) {
-        if (RULES[i].rx.test(t)) ids.push(RULES[i].id);
+        if (RULES[i].rx.test(t)) {
+          ids.push(RULES[i].id);
+          if (RULES[i].tier === "red") tier = "red";
+          else if (!tier) tier = "amber";
+        }
       }
     }
-    return { hit: ids.length > 0, ids: ids, version: VERSION };
+    return { hit: ids.length > 0, ids: ids, tier: tier, version: VERSION };
   }
 
-  /* The one fixed message. No condition is named and nothing is tailored to the
-     patient, apart from the crisis-line sentence for the self_harm rule. */
+  /* The red message. No condition is named and nothing is tailored to the patient,
+     apart from the crisis-line sentence for the self_harm rule. */
   var MESSAGE = {
     title: "This may need help right now",
     notMonitored: "Heard is not monitored. No one is reading this right now.",
@@ -179,6 +264,25 @@
     standing: "Heard is not monitored. Need help now? In the hospital, press your call button. At home, call 911."
   };
 
-  var api = { VERSION: VERSION, RULES: RULES, MESSAGE: MESSAGE, check: check, normalize: normalize };
+  /* The amber message. DRAFT WORDING, 21 November 2026, awaiting the physician's
+     approval. No condition is named. The wound line is added only when the wound
+     rule matched. The escalate line is always shown. */
+  var MESSAGE_AMBER = {
+    title: "Tell your care team about this",
+    notMonitored: MESSAGE.notMonitored,
+    hospitalLabel: "In the hospital",
+    hospitalAction: "Tell your nurse now.",
+    homeLabel: "At home",
+    homeAction: "Call your surgeon's office now.",
+    homeNote: "Do not wait for a reply here.",
+    wound: "For a wound concern, call your surgeon's office first, before you go to an emergency room or urgent care.",
+    escalate: "If it is severe or getting worse: in the hospital, press your call button. At home, call 911.",
+    saved: MESSAGE.saved,
+    button: MESSAGE.button
+  };
+
+  var MESSAGES = { red: MESSAGE, amber: MESSAGE_AMBER };
+
+  var api = { VERSION: VERSION, RULES: RULES, MESSAGE: MESSAGE, MESSAGE_AMBER: MESSAGE_AMBER, MESSAGES: MESSAGES, check: check, normalize: normalize };
   root.HeardRedFlags = api;
 })(typeof globalThis !== "undefined" ? globalThis : this);
