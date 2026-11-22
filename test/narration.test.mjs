@@ -15,7 +15,7 @@ function table(html, name) {
   return out;
 }
 const introIds = (html) => [...new Set([...html.matchAll(/(?:my,\s*|voice\(|holdFor\([^,]+,\s*)"(\d\d)"\)/g)].map((m) => m[1]))].sort();
-const tourIds = (html) => [...new Set([...html.matchAll(/(?:cap:\[[^\]]*?|caption\([^)]*?),\s*"(\d\d)"\s*[\])]/g)].map((m) => m[1]))].sort();
+const tourIds = (html) => [...new Set([...html.matchAll(/(?:cap:\[[^\]]*?|caption\([^)]*?),\s*"(\d\d)"\s*[\])]|voice\("(\d\d)"\)/g)].map((m) => m[1] || m[2]))].sort();
 
 for (const [film, prefix, tableName, ids] of [["intro.html", "vo-", "DUR", introIds], ["tour.html", "tvo-", "DUR_T", tourIds]]) {
   test(film + ": every spoken line has a clip and a length, and nothing is left over", () => {
@@ -35,4 +35,20 @@ test("the intro speaks its closing line, Be heard.", () => {
   // Steve, 22 November 2026: the closing line is "Be heard."
   const html = page("intro.html");
   assert.match(html, /tag\.textContent = "Be heard\.";\s*st\.appendChild\(tag\); on\(tag\);\s*voice\("27"\);/);
+});
+
+test("the walkthrough also closes on Be heard., in the same take as the intro", () => {
+  // Steve, 22 November 2026, 1:43 PM: "Be heard." also closes the walkthrough.
+  const html = page("tour.html");
+  assert.match(html, /<div class="behrd" id="behrd">Be heard\.<\/div>/);
+  // It comes after the last caption has finished, and is spoken as it appears.
+  assert.match(html, /await capWait\(4500\); guard\(my\);[\s\S]{0,160}classList\.add\("on"\);\s*voice\("24"\);/);
+  // The line before it is unchanged.
+  assert.ok(html.includes("Ask when it occurs to you. Your team will hear you. You both know you've been heard."));
+  // One recording, two films: the clip is a copy of the intro's closing line.
+  assert.ok(readFileSync(new URL("tvo-24.mp3", root)).equals(readFileSync(new URL("vo-27.mp3", root))));
+  assert.equal(table(html, "DUR_T")["24"], table(page("intro.html"), "DUR")["27"]);
+  // The closing card says addressed, not answered (rule of 21 November 2026).
+  assert.ok(!/question was answered/i.test(html));
+  assert.ok(html.includes("Your care team knows your question was addressed."));
 });
