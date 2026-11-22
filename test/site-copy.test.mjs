@@ -66,3 +66,20 @@ test("the standing statement under the microphone is the wording chosen on 22 No
     assert.ok(!html.includes("Need help now? In the hospital, press your call button. At home, call 911."), name + " still carries the old standing line");
   }
 });
+
+test("the patient and caregiver pages say what does not belong in Heard", () => {
+  // Demo recommendation 8 (physician owner agreed, 22 November 2026). Bathroom help, pain
+  // medicine and nausea are call-light needs, not questions for the next visit.
+  const html = page("index.html");
+  const line = html.match(/const CALL_LIGHT_LINE = "([^"]+)";/)[1];
+  for (const need of ["call light", "bathroom", "pain medicine", "nausea"]) assert.ok(line.includes(need), "the line no longer names: " + need);
+  assert.ok(line.includes("questions that can wait until your care team's next visit"));
+  // It sits under the standing statement on both capture screens, and nowhere else.
+  assert.equal((html.match(/safeLineHTML\(\) \+ callLightHTML\(\)/g) || []).length, 2);
+  // It promises no reply and no listener (rule of 21 November 2026), and uses neither "urgent" nor "triage".
+  assert.ok(!/urgent|triage|reply|listening|we will|someone will/i.test(line));
+  // It is fixed text. The safety list did not grow to match these needs (rule of 22 November 2026).
+  for (const q of ["I need help getting to the bathroom", "Can I have my pain medicine", "I feel nauseous"]) {
+    assert.equal(RF.check(q).hit, false, "the safety list now matches: " + q);
+  }
+});

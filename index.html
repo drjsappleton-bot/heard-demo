@@ -242,6 +242,7 @@
     border-radius: 8px; padding: 6px 9px; font-size: 14px; cursor: pointer; font-family: inherit; text-align: left; width: 100%; }
   .rfnote { display: block; margin-top: 4px; font-size: 14px; font-weight: 700; color: var(--red); }
   .safeline { margin-top: 12px; border: 1px solid #e6b0ac; background: var(--red-lt); color: var(--ink); border-radius: 10px; padding: 11px 14px; font-size: 15.5px; line-height: 1.4; text-align: center; font-weight: 600; }
+  .calllight { margin-top: 10px; border: 1px solid #c9d9ea; background: var(--blue-lt); color: var(--ink); border-radius: 10px; padding: 11px 14px; font-size: 15px; line-height: 1.4; text-align: left; }
   .provtag { display: inline-block; background: var(--blue-lt); color: var(--blue); border-radius: 8px; padding: 4px 10px; font-size: 14px; font-weight: 600; margin: 2px 4px 2px 0; }
 </style>
 </head>
@@ -868,7 +869,7 @@ async function renderPatient(){
       ) + (IS_IOS_NON_SAFARI ? ' Opening this page in Safari lets you speak with one tap instead.' : '') + '</div>' +
     '<div id="liveText"></div>' +
     '<div class="typebox"><input id="typeInput" type="text" aria-label="Type a question or concern" placeholder="Or type a question / concern&hellip;" onkeydown="if(event.key===\'Enter\')addTyped()"><button onclick="addTyped()">Add</button></div>' +
-    '<div id="capMsg" class="note"></div>' + safeLineHTML() + '</div>' +
+    '<div id="capMsg" class="note"></div>' + safeLineHTML() + callLightHTML() + '</div>' +
     '<div class="card" id="shareCard"><h2 class="sec">Include your caregiver</h2><div id="shareBox"></div></div>' +
     '<div class="toprow" style="margin:0 0 12px">' +
     '<button class="bm" onclick="toggleBookmarkHelp()"><b>&#128278; Bookmark my site</b><small>so you can come back</small></button>' +
@@ -982,7 +983,7 @@ function drawCaregiver(name){
       ) + (IS_IOS_NON_SAFARI ? ' Opening this page in Safari lets you speak with one tap instead.' : '') + '</div>' +
     '<div id="liveText"></div>' +
     '<div class="typebox"><input id="typeInput" type="text" aria-label="Type a question or concern" placeholder="Or type a question / concern&hellip;" onkeydown="if(event.key===\'Enter\')addTyped()"><button onclick="addTyped()">Add</button></div>' +
-    '<div id="capMsg" class="note"></div>' + safeLineHTML() + '</div>' +
+    '<div id="capMsg" class="note"></div>' + safeLineHTML() + callLightHTML() + '</div>' +
     '<div class="card"><h2 class="sec">Captured so far (<span id="count">0</span>)</h2><div id="entries"></div></div>' +
     '<div class="card" id="closedCard" style="display:none"><h2 class="sec">Heard by your care team (<span id="closedCount">0</span>)</h2>' +
     '<div class="note" style="margin-bottom:6px">' + esc(LOOP.TEXT.closedNoteCaregiver(ptRec.first)) + '</div>' +
@@ -1161,6 +1162,13 @@ const RF_DIAL_LINK = false;
 const RF_CONDITION_LISTS = false;
 const SAFE_LINE_FALLBACK = "This tool is for recording your questions. It is not real time communication with your care team. For anything urgent or emergent: use your call light in the hospital, call your doctor's office, or call 911.";
 function safeLineHTML(){ return '<div class="safeline">' + esc(RF ? RF.MESSAGE.standing : SAFE_LINE_FALLBACK) + '</div>'; }
+/* What does not belong in Heard (demo recommendation 8, 22 November 2026, from the
+   bedside nurse's seat on the panel). These are needs for now, not questions for the
+   next visit. It is one fixed line of text. Nothing is matched against it and no
+   phrase was added to the safety list. */
+const CALL_LIGHT_LEAD = "Some things should not wait.";
+const CALL_LIGHT_LINE = "In the hospital, press your call light if you need help getting to the bathroom, pain medicine, or something for nausea. Heard is for questions that can wait until your care team's next visit.";
+function callLightHTML(){ return '<div class="calllight"><b>' + esc(CALL_LIGHT_LEAD) + '</b> ' + esc(CALL_LIGHT_LINE) + '</div>'; }
 function rfCheck(text){
   try { return RF ? RF.check(text) : { hit: false, ids: [] }; } catch (e) { return { hit: false, ids: [] }; }
 }
