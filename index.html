@@ -10,6 +10,7 @@
 <script src="lastread.js"></script>
 <script src="rows.js"></script>
 <script src="loop.js"></script>
+<script src="deleted.js"></script>
 <style>
   :root {
     --blue: #1f4e79; --blue-lt: #eaf1f8; --accent: #2e75b6;
@@ -55,6 +56,17 @@
   .recbtn .mic { font-size: 28px; display: block; margin-bottom: 3px; }
   #liveText { min-height: 40px; margin-top: 12px; font-size: 16px; background: var(--blue-lt); border-radius: 10px; padding: 10px 12px; display: none; }
   #liveText.show { display: block; }
+  /* Review before saving: what the big button heard, for the patient to check. */
+  .review { margin-top: 12px; border: 2px solid var(--accent); background: #fff; border-radius: 12px; padding: 12px; text-align: left; }
+  .review label { display: block; font-size: 15px; font-weight: 600; color: var(--ink); margin-bottom: 6px; }
+  .review textarea { width: 100%; min-height: 84px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; font-size: 17px; line-height: 1.4; font-family: inherit; color: var(--ink); resize: vertical; }
+  .reviewrow { display: flex; gap: 10px; margin-top: 10px; }
+  .reviewrow .btn { flex: 1; margin-top: 0; }
+  .review .note { text-align: left; }
+  /* Delete, on the patient's own questions. */
+  .entrytop { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .delx { border: 0; background: none; color: var(--mut); font-size: 14px; font-family: inherit; text-decoration: underline; cursor: pointer; min-height: 44px; padding: 0 4px; flex: none; }
+  .b-removed h3 { background: #4a5560; }
   .typebox { display: flex; gap: 8px; margin-top: 12px; }
   .typebox input { flex: 1; min-width: 0; padding: 11px 12px; border: 1px solid var(--line); border-radius: 10px; font-size: 16px; }
   .typebox button { padding: 0 16px; min-height: 44px; border: 0; border-radius: 10px; background: var(--accent); color: #fff; font-weight: 600; font-size: 16px; font-family: inherit; cursor: pointer; }
@@ -384,12 +396,14 @@ function teamLeadName(p){ return !p ? null : (isPhysician(p) ? p.name : (p.lead 
 
 const EMPTY_DOC = () => ({ idx: [], pts: {}, providers: [] });
 function normDoc(d){ if (!d || typeof d !== "object") return null; if (!Array.isArray(d.idx)) d.idx = []; if (!d.pts || typeof d.pts !== "object") d.pts = {}; if (!Array.isArray(d.providers)) d.providers = []; return d; }
-function normRec(r){ if (r) { if (!Array.isArray(r.entries)) r.entries = []; if (!Array.isArray(r.deleted)) r.deleted = []; if (!Array.isArray(r.caregivers)) r.caregivers = []; if (!Array.isArray(r.reads)) r.reads = []; } return r; }
+function normRec(r){ if (r) { if (!Array.isArray(r.entries)) r.entries = []; if (!Array.isArray(r.deleted)) r.deleted = []; if (!Array.isArray(r.caregivers)) r.caregivers = []; if (!Array.isArray(r.reads)) r.reads = []; if (!Array.isArray(r.removed)) r.removed = []; } return r; }
 /* Invite codes are read aloud and typed by hand, so the alphabet drops
    characters that get confused: O/0, I/1/L, and lower case entirely. */
 function rndCode(n){ let s = ""; const c = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"; for (let i=0;i<n;i++) s += c[Math.floor(Math.random()*c.length)]; return s; }
 /* The loop on one question: the lock on "I was heard", and its wording (loop.js). */
 const LOOP = window.HeardLoop;
+/* A patient deleting their own question, and what the provider side keeps (deleted.js). */
+const DEL = window.HeardDeleted || null;
 /* Who is writing right now. Set by the view before anything is captured. */
 let AUTHOR = { by: "patient", name: "" };
 function authorLabel(e){
@@ -855,6 +869,8 @@ async function renderPatient(){
   if (cached) {
     ptRec.deleted = [...new Set(ptRec.deleted.concat(cached.deleted))];
     ptRec.entries = mergeEntries(ptRec.entries, cached.entries, ptRec.deleted);
+    /* never shown here; kept so a save from this device cannot erase the provider-side record */
+    if (DEL) { ptRec.removedClearedAt = Math.max(ptRec.removedClearedAt || 0, cached.removedClearedAt || 0); ptRec.removed = DEL.merge(ptRec.removed, cached.removed, ptRec.removedClearedAt); }
   }
   localStorage.setItem(LS.myPatient, route.id);
   AUTHOR = { by: "patient", name: "" };
@@ -867,7 +883,7 @@ async function renderPatient(){
       ? 'Tap, say your question or concern, tap again to stop. Your care team will see it at their next visit.'
       : 'On this browser, tap the box below and use the microphone key on your keyboard to speak. Your care team will see it at their next visit.'
       ) + (IS_IOS_NON_SAFARI ? ' Opening this page in Safari lets you speak with one tap instead.' : '') + '</div>' +
-    '<div id="liveText"></div>' +
+    '<div id="liveText"></div>' + reviewBoxHTML() +
     '<div class="typebox"><input id="typeInput" type="text" aria-label="Type a question or concern" placeholder="Or type a question / concern&hellip;" onkeydown="if(event.key===\'Enter\')addTyped()"><button onclick="addTyped()">Add</button></div>' +
     '<div id="capMsg" class="note"></div>' + safeLineHTML() + callLightHTML() + '</div>' +
     '<div class="card" id="shareCard"><h2 class="sec">Include your caregiver</h2><div id="shareBox"></div></div>' +
@@ -981,7 +997,7 @@ function drawCaregiver(name){
       ? 'Tap, say the question, tap again to stop.'
       : 'On this browser, tap the box below and use the microphone key on your keyboard to speak.'
       ) + (IS_IOS_NON_SAFARI ? ' Opening this page in Safari lets you speak with one tap instead.' : '') + '</div>' +
-    '<div id="liveText"></div>' +
+    '<div id="liveText"></div>' + reviewBoxHTML() +
     '<div class="typebox"><input id="typeInput" type="text" aria-label="Type a question or concern" placeholder="Or type a question / concern&hellip;" onkeydown="if(event.key===\'Enter\')addTyped()"><button onclick="addTyped()">Add</button></div>' +
     '<div id="capMsg" class="note"></div>' + safeLineHTML() + callLightHTML() + '</div>' +
     '<div class="card"><h2 class="sec">Captured so far (<span id="count">0</span>)</h2><div id="entries"></div></div>' +
@@ -1051,7 +1067,8 @@ function entryHTML(e, i, closed, readOnly){
     : '';
   const note = (readOnly || closed) ? '' : '<div class="loopnote">' + esc(addressed ? T.ready : T.locked) + '</div>';
   return '<div class="entry' + (closed ? ' closed' : (addressed ? ' addressed' : '')) + '">' +
-    '<time>' + new Date(e.ts).toLocaleString() + (who ? ' &middot; <b>' + esc(who) + '</b>' : '') + '</time>' + esc(e.text) +
+    '<div class="entrytop"><time>' + new Date(e.ts).toLocaleString() + (who ? ' &middot; <b>' + esc(who) + '</b>' : '') + '</time>' +
+    ((!readOnly && DEL) ? '<button class="delx" onclick="deleteEntry(' + i + ')">' + esc(DEL.TEXT.button) + '</button>' : '') + '</div>' + esc(e.text) +
     (e.rf && e.rf.length ? '<button class="rftag" onclick="reshowSafetyMessage(' + i + ')">&#9888; ' + (rfTierOf(e) === "amber" ? 'Your care team needs to know about this.' : 'Need help now?') + ' Do not wait for a reply here. Tap to read the safety message again.</button>' : '') +
     '<div class="entryfoot">' + control + bounce + badge + note + '</div></div>';
 }
@@ -1118,6 +1135,21 @@ function markHeard(i, v){
   if (!LOOP.markHeard(e, v, Date.now())) { renderEntries(); return; }
   renderEntries(); saveRecord();
 }
+/* The patient deletes one of their questions (demo recommendation 9, deleted.js).
+   A question that showed a safety message leaves this list and is kept for the
+   provider side; the patient is told so before it is deleted. */
+function deleteEntry(i){
+  const e = ptRec && ptRec.entries[i];
+  if (!e || RENDER_READONLY || !DEL) return;
+  if (!confirm(DEL.isFlagged(e) ? DEL.TEXT.confirmFlagged : DEL.TEXT.confirm)) return;
+  const k = entryKey(e);
+  DEL.remove(ptRec, i, Date.now(), LOOP.isAddressed(e));
+  if (rfPendingKey === k) {
+    rfPendingKey = null;
+    const o = document.getElementById("rfOverlay"); if (o) { o.classList.add("hidden"); o.innerHTML = ""; }
+  }
+  renderEntries(); saveRecord();
+}
 /* The red X: the patient disagrees that this was addressed. The question goes
    back to the open list on both sides, until the team addresses it again. */
 function bounceHeard(i){
@@ -1129,21 +1161,24 @@ async function saveRecord(){
   // Always write the FULL local list merged with the server's (minus tombstoned
   // deletions), so a stale read can never erase earlier entries.
   const m = document.getElementById("capMsg");
-  localStorage.setItem("heard_cache_" + route.id, JSON.stringify(ptRec));
+  /* The save belongs to the page it was called from. If the patient moves to another
+     page while it is in flight, it must still write this record under this code. */
+  const id = route.id, rec = ptRec;
+  localStorage.setItem("heard_cache_" + id, JSON.stringify(rec));
   try {
     const doc = (await loadDoc()) || EMPTY_DOC();
-    const srv = normRec(doc.pts[route.id]) || ptRec;
-    ptRec.deleted = [...new Set((srv.deleted || []).concat(ptRec.deleted || []))];
-    ptRec.entries = mergeEntries(srv.entries, ptRec.entries, ptRec.deleted);
+    const srv = normRec(doc.pts[id]) || rec;
+    rec.deleted = [...new Set((srv.deleted || []).concat(rec.deleted || []))];
+    rec.entries = mergeEntries(srv.entries, rec.entries, rec.deleted);
     /* never shown here; merged so a save from this device cannot erase the provider-side record */
-    if (LR) ptRec.reads = LR.mergeReads(srv.reads, ptRec.reads);
-    doc.pts[route.id] = ptRec;
+    if (LR) rec.reads = LR.mergeReads(srv.reads, rec.reads);
+    if (DEL) { rec.removedClearedAt = Math.max(srv.removedClearedAt || 0, rec.removedClearedAt || 0); rec.removed = DEL.merge(srv.removed, rec.removed, rec.removedClearedAt); }
+    doc.pts[id] = rec;
     await saveDoc(doc);
-    localStorage.setItem("heard_cache_" + route.id, JSON.stringify(ptRec));
-    renderEntries();
-    if (m) m.textContent = "";
+    localStorage.setItem("heard_cache_" + id, JSON.stringify(rec));
+    if (ptRec === rec) { renderEntries(); if (m) m.textContent = ""; }
   }
-  catch (e) { if (m) m.innerHTML = '<span class="err">Could not sync to server; kept on this device for now.</span>'; }
+  catch (e) { if (m && ptRec === rec) m.innerHTML = '<span class="err">Could not sync to server; kept on this device for now.</span>'; }
 }
 /* ---------- red-flag safety message ----------
    The list and the wording live in redflags.js. This shows one of two fixed
@@ -1372,6 +1407,7 @@ function startRec(){
   /* A capture that was stopped a moment ago and has not been saved yet is saved now, so a
      quick second tap cannot throw it away. */
   clearTimeout(endTimer);
+  if (reviewOpen) commitReview();     /* words still waiting in the review box are saved first */
   const pending = (finalBuf + " " + interimBuf).replace(/\s+/g, " ").trim();
   if (pending && pending !== lastSaved) persistEntry(pending);
   finalBuf = ""; interimBuf = ""; lastSaved = ""; restarts = 0; lastRecError = "";
@@ -1482,9 +1518,90 @@ function finishCapture(){
   if (t === lastSaved) return;
   lastSaved = t;
   emptyTries = 0; markRecorded();
-  showLive("Captured: " + t);
+  /* Shown for the patient to check before it is saved. The safety check comes after the save. */
+  openReview(t);
+}
+
+/* ---- review before saving (demo recommendation 9, 22 November 2026) ----
+   What the big button heard is shown before it is saved. The patient can fix the
+   words, save them, or discard them. If the patient does nothing, the words save by
+   themselves after REVIEW_SECONDS, because a question that is spoken and then lost is
+   worse than one saved with a wrong word. Touching the words stops the clock.
+   Steve, 22 November 2026: the safety check runs after the save, not while the words
+   are on screen. So nothing in this box is checked, and a discarded capture is neither
+   checked nor kept.
+   Typed questions are not held here: the patient has already seen what they typed. */
+const REVIEW_SECONDS = 10;   /* 0 = never saves by itself; the patient must tap Save */
+const REVIEW_TEXT = {
+  label: "Check your words. Tap them to fix anything.",
+  save: "Save",
+  discard: "Discard",
+  timer: (n) => "Saves by itself in " + n + (n === 1 ? " second." : " seconds."),
+  waiting: "Tap Save when it is right.",
+  saved: "Saved to your list.",
+  discarded: "Discarded. Nothing was saved."
+};
+let reviewOpen = false, reviewLeft = 0, reviewTimer = null;
+function reviewBoxHTML(){
+  return '<div id="reviewBox" class="review" style="display:none">' +
+    '<label for="reviewText">' + esc(REVIEW_TEXT.label) + '</label>' +
+    '<textarea id="reviewText" rows="3" oninput="holdReview()" onfocus="holdReview()"></textarea>' +
+    '<div class="reviewrow"><button class="btn" onclick="commitReview()">' + esc(REVIEW_TEXT.save) + '</button>' +
+    '<button class="btn sub" onclick="discardReview()">' + esc(REVIEW_TEXT.discard) + '</button></div>' +
+    '<div class="note" id="reviewNote" aria-live="polite"></div></div>';
+}
+function openReview(t){
+  const box = document.getElementById("reviewBox"), ta = document.getElementById("reviewText");
+  if (!box || !ta) { persistEntry(t); return; }     /* no review box on this screen: save, as before */
+  clearTimeout(hideTimer);
+  const lt = document.getElementById("liveText"); if (lt) { lt.classList.remove("show"); lt.textContent = ""; }
+  ta.value = t;
+  box.style.display = "block";
+  reviewOpen = true;
+  reviewLeft = REVIEW_SECONDS;
+  tickReview();
+}
+function tickReview(){
+  clearTimeout(reviewTimer);
+  if (!reviewOpen) return;
+  const n = document.getElementById("reviewNote");
+  if (!REVIEW_SECONDS || reviewLeft < 0) { if (n) n.textContent = REVIEW_TEXT.waiting; return; }
+  if (reviewLeft === 0) { commitReview(); return; }
+  if (n) n.textContent = REVIEW_TEXT.timer(reviewLeft);
+  reviewLeft--;
+  reviewTimer = setTimeout(tickReview, 1000);
+}
+/* The patient touched the words: the clock stops and waits for Save. */
+function holdReview(){
+  if (!reviewOpen) return;
+  reviewLeft = -1;
+  tickReview();
+}
+function closeReview(){
+  clearTimeout(reviewTimer);
+  reviewOpen = false;
+  const box = document.getElementById("reviewBox"), ta = document.getElementById("reviewText");
+  const t = ta ? ta.value.replace(/\s+/g, " ").trim() : "";
+  if (ta) ta.value = "";
+  if (box) box.style.display = "none";
+  return t;
+}
+/* Saves what is in the box. The safety check runs inside persistEntry, after the save. */
+function commitReview(){
+  if (!reviewOpen) return;
+  const t = closeReview();
+  if (!t) { showLive(REVIEW_TEXT.discarded); return; }
+  showLive(REVIEW_TEXT.saved);
   persistEntry(t);
 }
+function discardReview(){
+  if (!reviewOpen) return;
+  closeReview();
+  showLive(REVIEW_TEXT.discarded);
+}
+/* Leaving the page inside the review window saves the words; they are not thrown away. */
+addEventListener("pagehide", () => { if (reviewOpen) commitReview(); });
+
 
 function recUI(on){
   const b = document.getElementById("recBtn");
@@ -1498,8 +1615,10 @@ function recUI(on){
   if (on) showLive("Listening…", true);
 }
 
-/* Silent teardown used by the router on every navigation. Never saves. */
+/* Silent teardown used by the router on every navigation. It never saves what the
+   microphone is still hearing. Words already waiting in the review box are saved. */
 function stopUI(silent){
+  if (reviewOpen) commitReview();
   wantRec = false; recording = false;
   clearTimeout(endTimer); clearTimeout(hideTimer);
   finalBuf = ""; interimBuf = "";
@@ -1650,6 +1769,7 @@ async function renderDrHome(){
       return '<div class="rnd"><div class="rndhead" data-p="' + esc(q.id) + '" onclick="location.hash=\'#/b/\'+bucket+\'/dr/\'+this.dataset.p">' +
         '<div><div class="nm">' + esc(q.last) + ', ' + esc(q.first) + '</div>' + chipsHTML(q) + '</div><span class="arrow">&#8250;</span></div>' +
         (open.length ? '<ul class="rndlist">' + open.map(li).join("") + '</ul>' : '') +
+        (removedList(rec).length ? '<div class="dt" style="margin-top:6px">' + esc(DEL.TEXT.homeLine(removedList(rec).length)) + '</div>' : '') +
         (viewing === "__none" ? '<div class="dt" style="margin-top:6px">Doctor as typed: ' + (q.doctor ? esc(q.doctor) : 'none') + '</div>' : '') +
         (canAssign ? '<select class="txt" style="margin-top:6px" data-p="' + esc(q.id) + '" aria-label="Link this patient to a physician" onchange="assignDoctor(this.dataset.p, this.value)"><option value="">Link to a physician</option>' +
           physNames.map(n => '<option>' + esc(n) + '</option>').join("") + '</select>' : '') +
@@ -1982,7 +2102,7 @@ function orderReview(s){
 /* Shown the moment a patient is opened: the keyword sorter, on this device. */
 function showList(){
   const res = document.getElementById("results"); if (!res || !drRec) return;
-  if (!drRec.entries.length) { lastSummary = null; res.innerHTML = '<div class="card"><div class="empty">This patient has not captured any items yet.</div></div>'; return; }
+  if (!drRec.entries.length) { lastSummary = null; res.innerHTML = '<div class="card"><div class="empty">' + (removedList(drRec).length ? 'This patient has no questions on their list.' : 'This patient has not captured any items yet.') + '</div></div>' + removedHTML(); return; }
   lastSummary = orderReview(pinRedFlags(mockSummarize(drRec.entries), drRec.entries));
   renderSummaryHTML();
 }
@@ -2025,8 +2145,8 @@ function renderSummaryHTML(failNote){
   html += bucketHTML("Other / comfort", "b-other", "other", s.other);
   html += addressedHTML();
   html += '<div class="exportrow"><button onclick="exportMD(false)">Download .md</button><button onclick="exportMD(true)">Share summary</button></div>';
-  html += '<div class="note">Sorted by keyword, not AI. Marking an item addressed moves it to the Addressed list below. Nothing is deleted.</div></div>';
-  res.innerHTML = html;
+  html += '<div class="note">Sorted by keyword, not AI. Marking an item addressed moves it to the Addressed list below. Marking deletes nothing. A patient can delete their own questions.</div></div>';
+  res.innerHTML = html + removedHTML();
 }
 /* Marks an item addressed. It is NOT deleted: it moves to the Addressed list
    here, and stays on the patient's page badged "Heard by care team". */
@@ -2060,11 +2180,34 @@ async function clearPatientItems(){
     if (rec) {
       rec.deleted = [...new Set(rec.deleted.concat(rec.entries.map(entryKey)))];
       rec.entries = [];
+      if (DEL) DEL.clearAll(rec, Date.now());   /* the kept record of deleted questions goes too, as the warning says */
       await saveDoc(doc);
       drRec = rec; lastSummary = null;
     }
     renderDrPatient(true);
   } catch (e) { alert("Could not clear items: " + e.message); }
+}
+/* Provider side only: questions the patient deleted that had shown a safety message
+   (Steve, 22 November 2026: a separate section, at least for now; counsel question 26).
+   The patient's list does not show them. */
+function removedList(rec){ return (DEL && rec) ? DEL.merge(rec.removed, [], rec.removedClearedAt) : []; }
+function removedHTML(){
+  const list = removedList(drRec);
+  if (!list.length) return '';
+  const li = (r) => {
+    const amber = r.rfTier === "amber";
+    return '<li>' + (ROWS ? '<span class="chip ' + (amber ? 'amber' : 'red') + '">' + esc(amber ? ROWS.TEXT.amber : ROWS.TEXT.red) + '</span>' : '') + esc(r.text) +
+      (r.by === "caregiver" ? ' <span class="cgtag">Caregiver' + (r.byName ? " &mdash; " + esc(r.byName) : "") + '</span>' : '') +
+      '<span class="cap">Captured ' + esc(new Date(r.ts).toLocaleString()) + '</span>' +
+      '<span class="rfnote">' + (amber ? 'Amber message (tell your nurse, call the surgeon\'s office)' : 'Red message (call button, 911)') +
+      ' shown to the patient ' + esc(new Date(r.rfShownAt || r.ts).toLocaleTimeString()) +
+      (r.rfAckAt ? ', dismissed ' + esc(new Date(r.rfAckAt).toLocaleTimeString()) : ', not dismissed') + '.</span>' +
+      '<span class="cap">Deleted by the patient ' + esc(new Date(r.deletedAt).toLocaleString()) + '. ' +
+      (r.addressed ? 'It had been marked addressed' + (r.addressedBy ? ' by ' + esc(r.addressedBy) : '') + '.' : 'It had not been marked addressed.') + '</span></li>';
+  };
+  return '<div class="card" id="removedCard"><div class="bucket b-removed" style="margin-top:0"><h3>' + esc(DEL.TEXT.providerHeading) + ' (' + list.length + ')</h3>' +
+    '<ul>' + list.map(li).join("") + '</ul></div>' +
+    '<div class="note" style="text-align:left">' + esc(DEL.TEXT.providerNote) + '</div></div>';
 }
 function cleanQuote(q){ return String(q || "").replace(/^["“”'\s]+|["“”'\s]+$/g, ""); }
 function addressedHTML(){
@@ -2128,6 +2271,7 @@ function summaryMD(){
   const sec = (t, items) => "## " + t + "\n" + (items.length ? items.map(i => { const q = cleanQuote(i.quote); return "- " + i.text + (q && q !== i.text ? "\n  - patient's words: \"" + q + "\"" : ""); }).join("\n") : "- none") + "\n\n";
   return "# Patient Concern Summary — " + drRec.last + ", " + drRec.first + " (Heard demo)\nGenerated: " + new Date().toLocaleString() + "\n\n" +
     sec("Review first", s.urgent) + sec("Physician / APP", s.md) + sec("Nursing", s.rn) + sec("Other / comfort", s.other) +
+    (removedList(drRec).length ? "## " + DEL.TEXT.providerHeading + "\n" + removedList(drRec).map(r => "- \"" + r.text + "\" (" + (r.rfTier === "amber" ? "amber" : "red") + " message shown " + new Date(r.rfShownAt || r.ts).toLocaleString() + "; deleted " + new Date(r.deletedAt).toLocaleString() + ")").join("\n") + "\n\n" : "") +
     "---\nPrototype demo. Not a medical record. Not for clinical use.\n";
 }
 async function exportMD(share){
