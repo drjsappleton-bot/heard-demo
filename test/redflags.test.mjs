@@ -46,6 +46,16 @@ const MUST_FLAG = [
   ["he is turning blue", "breathing", R],
   ["I can't breathe through my nose", "breathing", R],           // accepted false alarm
   ["having trouble with the breathing machine", "breathing", R], // accepted false alarm
+  // Physician, 21 Nov 2026: breathing heavily is the same as trouble breathing, so red.
+  ["I am breathing heavily", "breathing", R],
+  ["my breathing is heavy", "breathing", R],
+  ["heavy breathing", "breathing", R],
+  ["labored breathing", "breathing", R],
+  // His example of a possible clot in the lung: swelling, a new cough and heavy breathing.
+  // It is red through the breathing words. Swelling with a new cough and no breathing
+  // words shows nothing today; that case is open with the physician.
+  ["I have swelling and a new cough and I am breathing heavily", "breathing", R],
+  ["I was breathing heavily after therapy", "breathing", R],     // false alarm, same kind as "winded"
 
   // ---- bleeding (red): heavy or internal ----
   ["it won't stop bleeding", "bleeding", R],
@@ -258,6 +268,8 @@ const MUST_FLAG = [
 ];
 
 const MUST_NOT_FLAG = [
+  "the heavy blanket makes breathing easier",
+  "I can do the hard breathing exercises",
   "when can I drive",
   "my pain pill wore off early",
   "can I take a shower with the dressing on",

@@ -47,7 +47,7 @@
 (function (root) {
   "use strict";
 
-  var VERSION = "2026-11-21.8";
+  var VERSION = "2026-11-21.9";
 
   /* Review status at this version (21 November 2026 review): every group has been
      revised. Open points are listed in the project's START-HERE. */
@@ -102,7 +102,10 @@
     /* ---- breathing: reviewed 21 Nov 2026 ---- */
     { id: "breathing", tier: "red", lists: ["heart_attack", "pe"], rx: any([
       /\b(can't|cant|cannot|can not|couldn't|hard to|trouble|difficulty|difficult to|struggling to|unable to)\b.{0,25}\bbreath\w*/,
-      /\bbreathing\b.{0,20}\b(hard|harder|difficult|labored|laboured|fast|faster|worse)\b/,
+      /\bbreathing\b.{0,20}\b(hard|harder|heavy|heavily|heavier|difficult|labored|laboured|fast|faster|worse)\b/,
+      /* the same words before "breathing": "heavy breathing", "labored breathing".
+         Breathing heavily is trouble breathing (physician, 21 Nov 2026) */
+      /\b(heavy|heavier|labored|laboured|fast|faster)\b.{0,6}\bbreathing\b/,
       /\bshort(ness)? of breath\b/,
       /\bout of breath\b/,
       /\bcatch (my|his|her|their) breath\b/,
