@@ -47,7 +47,7 @@
 (function (root) {
   "use strict";
 
-  var VERSION = "2026-11-21.7";
+  var VERSION = "2026-11-21.8";
 
   /* Review status at this version (21 November 2026 review): every group has been
      revised. Open points are listed in the project's START-HERE. */
@@ -532,12 +532,27 @@
   var MESSAGES = { red: MESSAGE, amber: MESSAGE_AMBER };
 
   /* Condition lists. The items are the public signs pages of CDC and NIDDK (NIH),
-     word for word. CDC's reuse terms require the source credit, a no-endorsement
-     note, and unchanged substance, so do not reword an item. NIDDK's reuse terms
-     have not been confirmed yet. Check each list against its page before every
-     release and update "reviewed".
-     The heart attack list uses the opening sentence of each CDC bullet. A group's
-     "note" is Heard's wording, not the source's. */
+     word for word, in the order the page gives them. CDC's reuse terms
+     (https://www.cdc.gov/other/agencymaterials.html, read 21 November 2026) require
+     four things: the source credit, a prominent no-endorsement note, unchanged
+     substance, and a statement that the material is available on the agency website
+     at no charge. So do not reword an item. The no-charge statement is not shown
+     on the message itself (physician's decision, 21 November 2026). It is kept in
+     LIST_TEXT.sourceFree and belongs on a sources page, which must exist before
+     the condition lists are switched on. NIDDK's terms (https://www.niddk.nih.gov/copyright, read 21 November
+     2026) ask for NIDDK to be named as the source of unchanged content, and say its
+     content must not be used to imply endorsement or "to recommend specific medical
+     advice, treatments, or referrals". That last clause is a question for counsel.
+     Check each list against its page before every release and update "reviewed".
+     Read the page itself in a browser: on 21 November 2026 a page-summarizing tool
+     returned a stroke line ("in one or both eyes") that is not on the CDC page.
+     The test file pins every item, so a change here must be made there too.
+     NIDDK is the National Institute of Diabetes and Digestive and Kidney Diseases,
+     one of the institutes of NIH. The source line gives the institute's full name,
+     not "National Institutes of Health" (physician's decision, 21 November 2026).
+     The heart attack list uses the opening sentence of each CDC bullet. A list's
+     heading, a group's "label" and a group's "note" are Heard's wording, not the
+     source's. */
   var CALL_NOW = "With any of these: in the hospital, press your call button. At home, call 911.";
   var CLOT_LUNG = [
     "Difficulty breathing",
@@ -551,15 +566,15 @@
       name: "stroke", article: "a ",
       heading: "Signs of stroke",
       groups: [ { label: "", items: [
+        "Sudden trouble walking, dizziness, loss of balance, or lack of coordination.",
+        "Sudden trouble seeing.",
         "Sudden numbness or weakness in the face, arm, or leg, especially on one side of the body.",
         "Sudden confusion, trouble speaking, or difficulty understanding speech.",
-        "Sudden trouble seeing in one or both eyes.",
-        "Sudden trouble walking, dizziness, loss of balance, or lack of coordination.",
         "Sudden severe headache with no known cause."
       ] } ],
       source: "CDC",
       url: "https://www.cdc.gov/stroke/signs-symptoms/",
-      reviewed: "CDC page dated 19 May 2026, retrieved 21 November 2026"
+      reviewed: "CDC page dated 19 May 2026, checked word for word 21 November 2026"
     },
     heart_attack: {
       name: "heart attack", article: "a ",
@@ -573,7 +588,7 @@
       ] } ],
       source: "CDC",
       url: "https://www.cdc.gov/heart-disease/about/heart-attack.html",
-      reviewed: "CDC page dated 24 October 2024, retrieved 21 November 2026"
+      reviewed: "CDC page dated 24 October 2024, checked word for word 21 November 2026"
     },
     pe: {
       name: "blood clot in the lung", article: "a ",
@@ -581,7 +596,7 @@
       groups: [ { label: "", items: CLOT_LUNG } ],
       source: "CDC",
       url: "https://www.cdc.gov/blood-clots/about/",
-      reviewed: "CDC page dated 5 March 2025, retrieved 21 November 2026"
+      reviewed: "CDC page dated 5 March 2025, checked word for word 21 November 2026"
     },
     clot: {
       name: "blood clot", article: "a ",
@@ -597,7 +612,7 @@
       ],
       source: "CDC",
       url: "https://www.cdc.gov/blood-clots/about/",
-      reviewed: "CDC page dated 5 March 2025, retrieved 21 November 2026"
+      reviewed: "CDC page dated 5 March 2025, checked word for word 21 November 2026"
     },
     gi_bleed: {
       name: "bleeding in the stomach or bowel", article: "",
@@ -623,9 +638,9 @@
           "sweating"
         ], note: CALL_NOW }
       ],
-      source: "NIDDK, National Institutes of Health",
+      source: "National Institute of Diabetes and Digestive and Kidney Diseases",
       url: "https://www.niddk.nih.gov/health-information/digestive-diseases/gastrointestinal-bleeding/symptoms-causes",
-      reviewed: "NIDDK page reviewed July 2024, retrieved 21 November 2026"
+      reviewed: "NIDDK page reviewed July 2024, checked word for word 21 November 2026"
     }
   };
 
@@ -636,7 +651,9 @@
     recommends: "Heard recommends:",
     homeNote: "Do not wait for a reply here.",
     sourceStart: "Source: ",
-    sourceEnd: ". This does not imply endorsement of Heard by the source or the United States Government."
+    sourceEnd: ". This does not imply endorsement of Heard by the source or the United States Government.",
+    /* Not shown on the message. For the sources page. */
+    sourceFree: "This material is available on the source's website at no charge."
   };
 
   var api = { VERSION: VERSION, RULES: RULES, MESSAGE: MESSAGE, MESSAGE_AMBER: MESSAGE_AMBER, MESSAGES: MESSAGES, LISTS: LISTS, LIST_TEXT: LIST_TEXT, COMBOS: COMBOS, check: check, normalize: normalize };
