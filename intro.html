@@ -183,7 +183,7 @@
 <div id="gate">
   <img src="heard-icon.png" alt="">
   <div class="gtitle">Heard, and why it exists</div>
-  <div class="gsub">A short story with narration, about two and a half minutes.</div>
+  <div class="gsub">A short story with narration, about three minutes.</div>
   <button id="gplay">&#9654;&#xFE0E;&nbsp; Play</button>
   <button id="gmute">Play without sound</button>
 </div>
@@ -204,13 +204,12 @@ let token = 0, idx = 0, paused = false, timer = null;
 /* ---- narration ----
    One reusable player, unlocked by the Play tap, reused for every clip so iOS
    keeps allowing it. Durations are baked in so pacing is right from the start. */
-const DUR = {"01":2.74,"02":3.26,"03":3.41,"04":2.02,"05":9.07,"06":1.9,"07":7.2,
-  "08":7.22,"09":5.18,"10":2.16,"11":4.78,"12":2.35,"13":6.26,"14":8.35,"15":4.08,
-  "16":1.39,"17":13.9,"18":1.39,"19":5.62,"20":5.04};
-/* 13 and 14 re-voiced 2026-09-01 with Steve's reworded lines; 21 is the HIPAA box. */
-DUR["13"] = 6.31; DUR["14"] = 7.66; DUR["21"] = 9.72; DUR["22"] = 11.59; DUR["23"] = 12.29;
-/* 24 to 26: the safety message scene, voiced 21 November 2026 (Kokoro af_heart, speed 0.95). */
-DUR["24"] = 2.78; DUR["25"] = 7.49; DUR["26"] = 6.62;
+/* Steve's own voice, recorded 22 November 2026 and levelled to the loudness of the
+   generated clips it replaced. 27 is the closing line, "Be heard." Lengths in seconds. */
+const DUR = {"01":2.76,"02":4.2,"03":4.01,"04":2.69,"05":10.03,"06":2.23,"07":7.49,"08":8.02,
+  "09":6.6,"10":2.64,"11":4.97,"12":2.66,"13":6.58,"14":8.52,"15":5.3,"16":1.44,
+  "17":14.5,"18":1.49,"19":5.74,"20":5.38,"21":10.66,"22":12.74,"23":13.1,"24":2.74,
+  "25":8.23,"26":7.42,"27":1.06};
 const player = new Audio(); player.preload = "auto";
 let audioOn = false, needVoice = false;
 player.onended = () => { needVoice = false; };
@@ -219,7 +218,7 @@ function voice(id){
   if (!audioOn || !id || !DUR[id]) return;   /* a line with no clip yet plays silently at reading pace */
   needVoice = true;
   try {
-    player.src = "vo-" + id + ".mp3?v=5";
+    player.src = "vo-" + id + ".mp3?v=6";
     const p = player.play();
     /* One scene once went entirely silent while its files served fine, so a
        rejected play gets one immediate reload-and-retry before the healer takes over. */
@@ -462,9 +461,9 @@ async function(my){
   ringTo(sc, "#iwh", 8);
   say(sc, "You will then have the ability to close the loop. Tap I was heard. Or, if your concern was not truly addressed, tap the red Not heard button, and the question goes right back on your list.");
   voice("23");
-  await sleep(5200, my);
+  await sleep(5600, my);   /* where "Or, if your concern" begins in clip 23 */
   ringTo(sc, "#nhx", 8);
-  await sleep(holdFor("x", "23") - 5200, my);
+  await sleep(holdFor("x", "23") - 5600, my);
   ringTo(sc, "#iwh", 8);
   await sleep(600, my);
   iwh.innerHTML = "&#9745; I was heard";
@@ -528,7 +527,8 @@ async function(my){
   const tag = document.createElement("div"); tag.className = "tagline";
   tag.textContent = "Be heard.";
   st.appendChild(tag); on(tag);
-  await sleep(1500, my);
+  voice("27");             /* the closing line is spoken as it appears */
+  await sleep(Math.max(1500, holdFor("Be heard.", "27")), my);
   const row = document.createElement("div"); row.className = "btnrow";
   row.innerHTML =
     '<button class="fbtn pri" onclick="show(0)">&#8635; Watch again</button>' +

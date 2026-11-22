@@ -209,7 +209,7 @@
 <div id="gate">
   <img src="heard-icon.png" alt="">
   <div class="gt">How Heard works</div>
-  <div class="gs">Plays straight through, with narration. Two to three minutes.</div>
+  <div class="gs">Plays straight through, with narration. A little over four minutes.</div>
   <button id="gstart">&#9654;&#xFE0E;&nbsp; Start</button>
   <button id="gmute">Start without sound</button>
 </div>
@@ -263,11 +263,10 @@ let token = 0, idx = 0, finished = false, firstCap = null, shift = 0;
 const CAP_GAP = 12, CAP_EDGE = 8, CAP_HOLD = 2200;
 
 /* ---- narration: the same voice as the intro film, one clip per caption ---- */
-const DUR_T = {"01":4.06,"02":5.47,"03":3.74,"04":3.22,"05":5.5,"06":3.89,"07":5.4,"08":4.49,
-  "09":5.93,"10":4.15,"11":4.46,"12":4.99,"13":4.99,"14":5.35,"15":5.04,"16":5.52,
-  "17":3.17,"18":10.03,"19":10.61,"20":10.78,"21":12.53};
-/* 22 and 23: the safety message screen, voiced 21 November 2026 (Kokoro af_heart, speed 0.95). */
-DUR_T["22"] = 8.14; DUR_T["23"] = 8.45;
+/* Steve's own voice, recorded 22 November 2026. Lengths in seconds. */
+const DUR_T = {"01":4.82,"02":6.22,"03":4.54,"04":3.77,"05":6.41,"06":4.63,"07":6.46,"08":5.04,
+  "09":7.01,"10":4.8,"11":5.26,"12":5.21,"13":5.45,"16":6.6,"17":3.53,"18":8.83,
+  "19":9.43,"20":10.37,"21":9.46,"22":9.34,"23":9.98};
 const player = new Audio(); player.preload = "auto";
 let audioOn = false, voiceUntil = 0, needVoice = false;
 player.onended = () => { needVoice = false; };
@@ -277,7 +276,7 @@ function voice(id){
   needVoice = true;
   voiceUntil = performance.now() + (DUR_T[id] || 0) * 1000;
   try {
-    player.src = "tvo-" + id + ".mp3?v=3";
+    player.src = "tvo-" + id + ".mp3?v=4";
     const p = player.play();
     if (p && p.catch) p.catch(() => { try { player.load(); player.play().catch(() => {}); } catch (e) {} });
   } catch (e) {}
