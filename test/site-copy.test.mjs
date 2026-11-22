@@ -54,3 +54,15 @@ test("the films' safety example shows the amber message, and the films read the 
     assert.ok(!/calf to feel tight/i.test(html), name + " still shows the calf question as an ordinary capture");
   }
 });
+
+test("the standing statement under the microphone is the wording chosen on 22 November 2026", () => {
+  // Steve, 22 Nov 2026: use the film's line. It says what the tool is for, that it is not real time
+  // communication, and where to turn. The app, both films and the intro film's spoken note share it.
+  const line = "This tool is for recording your questions. It is not real time communication with your care team. For anything urgent or emergent: use your call light in the hospital, call your doctor's office, or call 911.";
+  assert.equal(RF.MESSAGE.standing, line);
+  for (const name of ["index.html", "intro.html", "tour.html"]) {
+    const html = page(name);
+    assert.ok(html.includes(line), name + " does not carry the standing statement as its fallback");
+    assert.ok(!html.includes("Need help now? In the hospital, press your call button. At home, call 911."), name + " still carries the old standing line");
+  }
+});
