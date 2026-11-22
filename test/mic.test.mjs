@@ -25,22 +25,15 @@ test("a quick second tap saves the capture that was still pending, and an unknow
   assert.match(fnBody("finishCapture"), /The microphone stopped \(" \+ lastRecError \+ "\)\. /);
 });
 
-test("on an iPhone a capture that heard nothing sends the patient to the keyboard microphone", () => {
-  // WebKit bug 321436 (open, 22 November 2026): later listening sessions on iPhone Safari hear
-  // nothing and report no error. The page cannot fix that, so it must not leave the patient
-  // tapping a button that will not work.
-  const f = fnBody("finishCapture");
-  assert.match(f, /if \(IS_IOS && !IS_IOS_NON_SAFARI\) \{\s*useKeyboardDictation\(/);
-  assert.match(f, /setTimeout\(\(\) => \{ speechBlocked = false; \}, 120000\);/, "the button is tried again after two minutes");
-});
-
-test("on an iPhone, a tap inside two minutes of a spoken question shows the pop-up and does not listen", () => {
-  // Steve, 22 November 2026: a gate, not three failed attempts. The pop-up says there is a
-  // known fault in Safari and recommends the microphone key on the keyboard.
+test("on an iPhone the button is never blocked in advance; the pop-up follows a try that recorded nothing", () => {
+  // Steve, 22 November 2026, 1:13 PM: not an automatic pop-up. If a question was recorded in
+  // the last two minutes and the button is pressed on and off with no new question logged,
+  // then the pop-up. WebKit bug 321436 is why such a try records nothing.
   assert.match(html, /const MIC_GAP_MS = 120000;/);
-  assert.match(fnBody("toggleRec"), /if \(!wantRec && micGated\(\)\) \{ showMicNotice\(\); return; \}/);
-  assert.match(fnBody("micGated"), /if \(!IS_IOS \|\| IS_IOS_NON_SAFARI\) return false;/, "only iPhone Safari is gated");
-  assert.match(fnBody("finishCapture"), /markListened\(\);/);
-  assert.match(html, /why: "iPhone Safari has a known fault\./);
+  assert.ok(!/showMicNotice\(\)/.test(fnBody("toggleRec")), "a tap on the button always tries to listen");
+  const f = fnBody("finishCapture");
+  assert.match(f, /if \(IS_IOS && !IS_IOS_NON_SAFARI\) \{\s*emptyTries\+\+;\s*if \(recordedLately\(\) \|\| emptyTries >= 2\) \{ showMicNotice\(\); return; \}/);
+  assert.match(f, /emptyTries = 0; markRecorded\(\);/, "the two minutes run from a spoken question that was recorded");
+  assert.match(html, /What you just said was not recorded\./);
   assert.match(html, /what: "Heard recommends: tap the box below, then tap the microphone key on your keyboard and speak\."/);
 });

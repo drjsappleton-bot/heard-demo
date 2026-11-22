@@ -1263,23 +1263,26 @@ let endTimer = null, hideTimer = null, lastHeardAt = 0;
 const MAX_RESTARTS = 60;          // roughly five minutes of silence
 const SILENCE_LIMIT_MS = 90000;   // stop on our own after this much true silence
 
-/* ---- iPhone: the gap between spoken questions ----
+/* ---- iPhone: when the big button goes deaf ----
    Steve, 22 November 2026. iPhone Safari has a known fault (WebKit bug 321436): for a
-   minute or two after one spoken question, the big button cannot hear the next one. So
-   on an iPhone, a tap on the button inside that gap does not start listening. A pop-up
-   says why and sends the patient to the microphone key on the keyboard, which works. */
+   minute or two after one spoken question, the big button cannot hear the next one.
+   The button is never blocked in advance. The patient taps it and speaks as usual. If a
+   spoken question was recorded in the last two minutes and this try recorded nothing, a
+   pop-up says why and sends the patient to the microphone key on the keyboard, which
+   works. The pop-up also appears after two tries in a row that recorded nothing. */
 const MIC_GAP_MS = 120000;
 const MIC_NOTICE = {
   title: "Use the microphone on your keyboard",
-  why: "iPhone Safari has a known fault. For a minute or two after one spoken question, the big button cannot hear the next one.",
+  why: "iPhone Safari has a known fault. For a minute or two after one spoken question, the big button cannot hear the next one. What you just said was not recorded.",
   what: "Heard recommends: tap the box below, then tap the microphone key on your keyboard and speak.",
   after: "The big button will work again in about two minutes.",
   button: "OK, take me to the box"
 };
-function markListened(){ if (IS_IOS && !IS_IOS_NON_SAFARI) { try { localStorage.setItem("heard_last_listen", String(Date.now())); } catch (e) {} } }
-function micGated(){
-  if (!IS_IOS || IS_IOS_NON_SAFARI) return false;
-  let t = 0; try { t = parseInt(localStorage.getItem("heard_last_listen") || "0", 10) || 0; } catch (e) {}
+let emptyTries = 0;      /* tries in a row that recorded nothing */
+/* The time a spoken question was last recorded, kept on the device so it holds across a reload. */
+function markRecorded(){ if (IS_IOS && !IS_IOS_NON_SAFARI) { try { localStorage.setItem("heard_last_spoken", String(Date.now())); } catch (e) {} } }
+function recordedLately(){
+  let t = 0; try { t = parseInt(localStorage.getItem("heard_last_spoken") || "0", 10) || 0; } catch (e) {}
   return Date.now() - t < MIC_GAP_MS;
 }
 function showMicNotice(){
@@ -1306,7 +1309,6 @@ function showMicNotice(){
 
 function toggleRec(){
   if (!SR) { useKeyboardDictation("This browser cannot listen directly."); return; }
-  if (!wantRec && micGated()) { showMicNotice(); return; }
   if (speechBlocked || IS_IOS_NON_SAFARI) {
     useKeyboardDictation(IS_IOS_NON_SAFARI
       ? "On iPhone, only Safari can let a web page listen."
@@ -1435,28 +1437,24 @@ function finishCapture(){
   clearTimeout(endTimer);
   if (wantRec) return;
   recSeq++; dropRec();            /* this session is over; anything it still sends is ignored */
-  markListened();                 /* on an iPhone, starts the two-minute gap before the button listens again */
   recording = false;
   recUI(false);
   /* Interim text counts. Tapping stop mid-phrase used to discard it. */
   const t = (finalBuf + " " + interimBuf).replace(/\s+/g, " ").trim();
   finalBuf = ""; interimBuf = "";
   if (!t) {
-    /* iPhone Safari has an open fault (WebKit bug 321436, seen on iOS 26.6 and 27): after one
-       capture, later listening sessions start and then hear nothing, with no error. Tapping
-       again does not help; waiting a minute or two sometimes does. So on an iPhone a capture
-       that heard nothing sends the patient to the keyboard's own microphone key, which
-       works, and the button is tried again after two minutes. */
+    /* On an iPhone, a try that recorded nothing soon after a recorded question is the Safari
+       fault, not a patient who said nothing: say so. Two empty tries in a row get the same. */
     if (IS_IOS && !IS_IOS_NON_SAFARI) {
-      useKeyboardDictation("The microphone did not hear that. This is a fault in iPhone Safari, not in what you did.");
-      setTimeout(() => { speechBlocked = false; }, 120000);
-      return;
+      emptyTries++;
+      if (recordedLately() || emptyTries >= 2) { showMicNotice(); return; }
     }
     const why = lastRecError && !/^(no-speech|aborted)$/.test(lastRecError) ? "The microphone stopped (" + lastRecError + "). " : "Nothing was heard. ";
     showLive(why + "Tap again, or type it below.", true); return;
   }
   if (t === lastSaved) return;
   lastSaved = t;
+  emptyTries = 0; markRecorded();
   showLive("Captured: " + t);
   persistEntry(t);
 }
