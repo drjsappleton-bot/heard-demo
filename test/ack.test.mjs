@@ -21,11 +21,11 @@ const everyLine = (T) => [T.title, T.lead, ...T.points, T.agree, T.decline, T.un
 test("the wording is pinned to its version: change one, change the other", () => {
   // If this fails you changed the notice. Give it a new VERSION in ack.js, so that
   // everyone is shown the new wording, then update both values here.
-  assert.equal(A.VERSION, "2026-11-23.3");
+  assert.equal(A.VERSION, "2026-11-23.4");
   // What each line says, and their order, were set by the physician owner on 23 November
   // 2026 at 7:53 PM. He allowed licence in the words at 7:55 PM, the intent to stay.
   assert.deepEqual(A.TEXT.points, [
-    "This is not real time communication with your care team. Heard only records your questions as they come up, so they can be heard at your next visit or call.",
+    "Heard is solely intended to record and facilitate answering of all your questions. These will not be seen or addressed until your next interaction with your care team. Heard does not send any real-time alerts or communication with your care team.",
     "Sometimes Heard shows a message telling you to get help right away. It does not catch every problem. No message does not mean you are okay.",
     "Heard is not a doctor or nurse. It cannot tell you what is wrong. When in doubt, ask your nurse or call your doctor's office.",
     "Heard does not initiate any care or contact anyone for you. Always take a strong concern to your nurse, your doctor's office or 911."
@@ -38,10 +38,11 @@ test("the wording is pinned to its version: change one, change the other", () =>
 
 test("each line carries the intent the owner stated", () => {
   const [one, two, three, four] = A.TEXT.points;
-  // 1. Not real time communication; only a tool to record questions, so that they are heard.
-  assert.match(one, /^This is not real time communication with your care team\./);
-  assert.match(one, /only records your questions as they come up/);
-  assert.match(one, /so they can be heard/);
+  // 1. The owner's own verbiage, word for word (23 November 2026, 8:10 PM), reworded so
+  //    that it no longer repeats the red box. No licence was taken with this line.
+  assert.equal(one, "Heard is solely intended to record and facilitate answering of all your questions. These will not be seen or addressed until your next interaction with your care team. Heard does not send any real-time alerts or communication with your care team.");
+  assert.ok(!one.includes("not real time communication with your care team"), "the first line repeats the red box again");
+  assert.ok(!/ensure/i.test(A.TEXT.points.join(" ")), "the notice guarantees a result");
   // 2. Sometimes a message; it does not catch everything; silence is not reassurance.
   assert.match(two, /^Sometimes Heard shows a message telling you to get help right away\./);
   assert.match(two, /It does not catch every problem\. No message does not mean you are okay\.$/);
@@ -78,7 +79,16 @@ test("the notice keeps the owner's vocabulary rules", () => {
   // 21 and 22 November 2026: the team "addresses" a question; nothing promises a listener,
   // an answer or a reply; "triage" and "urgent" stay out; Heard alerts no one.
   // "So they can be heard" says what the list is for. It does not say that anyone will.
-  for (const line of everyLine(A.TEXT)) {
+  // Two exceptions, both in the first line and both the owner's own words of 8:10 PM:
+  //  - "facilitate answering of all your questions". He first said "ensure", and asked
+  //    for "facilitate" if the legal seat objected to "ensure", which it had. "Answering"
+  //    is his word. It is allowed in that line and nowhere else.
+  //  - "does not send any real-time alerts", which says that Heard sends none.
+  const OWNER = ["facilitate answering of all your questions", "does not send any real-time alerts"];
+  for (const phrase of OWNER) assert.equal(everyLine(A.TEXT).filter((l) => l.includes(phrase)).length, 1, phrase);
+  assert.ok(OWNER.every((phrase) => A.TEXT.points[0].includes(phrase)));
+  for (const raw of everyLine(A.TEXT)) {
+    const line = OWNER.reduce((l, phrase) => l.replace(phrase, ""), raw);
     assert.ok(!/\banswer|\brepl(y|ies)\b|listening|we will|someone will|will be heard|ensure|guarantee|make sure/i.test(line), "a promise in: " + line);
     assert.ok(!/triage|urgent/i.test(line), "triage or urgent in: " + line);
     assert.ok(!/\balert|notif|monitor/i.test(line), "says someone is alerted or watching: " + line);
