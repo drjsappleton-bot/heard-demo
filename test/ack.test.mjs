@@ -21,13 +21,14 @@ const everyLine = (T) => [T.title, T.lead, ...T.points, T.agree, T.decline, T.un
 test("the wording is pinned to its version: change one, change the other", () => {
   // If this fails you changed the notice. Give it a new VERSION in ack.js, so that
   // everyone is shown the new wording, then update both values here.
-  assert.equal(A.VERSION, "2026-11-23.1");
+  assert.equal(A.VERSION, "2026-11-23.2");
+  // What each line says, and their order, were set by the physician owner on 23 November
+  // 2026 at 7:53 PM. He allowed licence in the words at 7:55 PM, the intent to stay.
   assert.deepEqual(A.TEXT.points, [
-    "Record your questions here. Your care team can address them at their next visit or call.",
-    "No one is watching Heard. It does not tell anyone you need help.",
-    "Heard is not a doctor or nurse. It cannot tell you what is wrong.",
-    "Sometimes Heard shows a message telling you to get help. It does not catch every problem. No message does not mean you are okay.",
-    "You do not need Heard to get care."
+    "This is not real time communication with your care team. Heard only records your questions as they come up, so they can be heard at your next visit or call.",
+    "Sometimes Heard shows a message telling you to get help right away. It does not catch every problem. No message does not mean you are okay.",
+    "Heard is not a doctor or nurse. It cannot tell you what is wrong. When in doubt, ask your nurse or call your doctor's office.",
+    "Heard does not start any care or contact anyone for you. Always take a strong concern to your nurse, your doctor's office or 911."
   ]);
   assert.equal(A.TEXT.title, "Before you start");
   assert.equal(A.TEXT.agree, "I understand");
@@ -35,14 +36,33 @@ test("the wording is pinned to its version: change one, change the other", () =>
   assert.equal(A.TEXT.under, "Tap \u201cNot now\u201d and nothing is saved. Your care is the same either way.");
 });
 
-test("the notice says the five things it exists to say", () => {
-  const body = A.TEXT.points.join(" ");
-  assert.match(body, /Record your questions here/, "what Heard is for");
-  assert.match(body, /No one is watching Heard/, "no listener");
-  assert.match(body, /not a doctor or nurse/, "what it is not");
-  assert.match(body, /does not catch every problem/, "the messages are limited");
-  assert.match(body, /No message does not mean you are okay/, "silence is not reassurance");
-  assert.match(body, /You do not need Heard to get care/, "Heard is optional");
+test("each line carries the intent the owner stated", () => {
+  const [one, two, three, four] = A.TEXT.points;
+  // 1. Not real time communication; only a tool to record questions, so that they are heard.
+  assert.match(one, /^This is not real time communication with your care team\./);
+  assert.match(one, /only records your questions as they come up/);
+  assert.match(one, /so they can be heard/);
+  // 2. Sometimes a message; it does not catch everything; silence is not reassurance.
+  assert.match(two, /^Sometimes Heard shows a message telling you to get help right away\./);
+  assert.match(two, /It does not catch every problem\. No message does not mean you are okay\.$/);
+  // 3. Not a medical professional; cannot tell you what is wrong; when in doubt, go to a person.
+  assert.match(three, /not a doctor or nurse\. It cannot tell you what is wrong\. When in doubt,/);
+  // 4. Heard sets nothing in motion; a strong concern always goes to a person or 911.
+  assert.match(four, /^Heard does not start any care or contact anyone for you\./);
+  assert.match(four, /Always take a strong concern to/);
+  // The last two lines never leave out the nurse: a reader may still be in the hospital,
+  // and the red box above them says to use the call light there.
+  for (const line of [three, four]) assert.match(line, /your nurse/);
+  for (const line of [three, four]) assert.match(line, /your doctor's office/);
+  assert.match(four, /911\.$/);
+});
+
+test("the screen runs in the order the owner set: red box, lines, two buttons, read aloud last", () => {
+  // Physician owner, 23 November 2026, 7:53 PM.
+  const s = fnBody("showAck");
+  const at = (x) => { const i = s.indexOf(x); assert.ok(i > 0, x); return i; };
+  const order = [at("safeLineHTML()"), at("T.points.map"), at('id="ackYes"'), at('id="ackNo"'), at('class="ack-under"'), at('class="ack-read"')];
+  assert.deepEqual(order, [...order].sort((x, y) => x - y));
 });
 
 test("the button says the reader understands, not that they agree", () => {
@@ -56,10 +76,12 @@ test("the button says the reader understands, not that they agree", () => {
 test("the notice keeps the owner's vocabulary rules", () => {
   // 21 and 22 November 2026: the team "addresses" a question; nothing promises a listener,
   // an answer or a reply; "triage" and "urgent" stay out; Heard alerts no one.
+  // "So they can be heard" says what the list is for. It does not say that anyone will.
   for (const line of everyLine(A.TEXT)) {
-    assert.ok(!/\banswer|\brepl(y|ies)\b|listening|we will|someone will|ensure|guarantee|make sure/i.test(line), "a promise in: " + line);
+    assert.ok(!/\banswer|\brepl(y|ies)\b|listening|we will|someone will|will be heard|ensure|guarantee|make sure/i.test(line), "a promise in: " + line);
     assert.ok(!/triage|urgent/i.test(line), "triage or urgent in: " + line);
     assert.ok(!/\balert|notif|monitor/i.test(line), "says someone is alerted or watching: " + line);
+    assert.ok(!/recommend/i.test(line), "Heard recommends (counsel question 5 is open): " + line);
   }
 });
 
@@ -198,7 +220,7 @@ test("a save from one device cannot erase the record made on another", () => {
 test("the voice reads what is on the screen, in order, then names the two buttons", () => {
   // Owner agreed, 23 November 2026. For a reader without their glasses, or who reads little.
   const lines = fnBody("ackSpokenLines");
-  assert.match(lines, /return \[T\.title\]\.concat\(T\.points, \[RF \? RF\.MESSAGE\.standing : SAFE_LINE_FALLBACK, T\.spokenButtons\(\), cg \? T\.caregiverUnder\(ackCtx\.first\) : T\.under\]\);/);
+  assert.match(lines, /return \[T\.title, RF \? RF\.MESSAGE\.standing : SAFE_LINE_FALLBACK\]\.concat\(T\.points, \[T\.spokenButtons\(\), cg \? T\.caregiverUnder\(ackCtx\.first\) : T\.under\]\);/);
   assert.equal(A.TEXT.spokenButtons(), "There are two buttons. One says: I understand. The other says: Not now.");
   assert.equal(A.TEXT.readAloud, "Read this to me");
   assert.equal(A.TEXT.stopReading, "Stop reading");

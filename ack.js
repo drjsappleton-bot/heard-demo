@@ -10,14 +10,28 @@
    its button says "I understand", not "I agree", on purpose: there are no terms here
    to agree to. Counsel decides what the real documents say.
 
-   Where the wording came from. The owner dictated what the notice should cover. The
-   lines below follow the recommendations of the attorney seat of the role-played panel
-   (23 November 2026), which is an AI evaluator and not a lawyer. Three of the owner's
-   phrases were changed on that advice: "ensuring that they are answered" (a promise
-   Heard cannot keep, and "answered" breaks the owner's own rule), "may alert" (no one
-   is alerted), and "not medical advice" (the safety messages do tell a person to call
-   911, so the notice says instead that Heard is not a doctor or nurse). The wording
-   is the owner's to change.
+   Where the wording came from. The physician owner rejected the first wording
+   (version 2026-11-23.1, never merged) and on 23 November 2026 at 7:53 PM dictated what
+   each line should say and the order of the screen: the standing statement in its red
+   box first, four lines, the two buttons, and "Read this to me" at the very bottom.
+   Two minutes later he allowed some licence in the wording, the intent to stay as he
+   stated it. Four changes were made to his dictated words under that licence:
+     - "so we ensure that they are heard" became "so they can be heard at your next
+       visit or call". The echo of the name stays. The guarantee goes, because Heard
+       cannot make a care team act (his own rule of 21 November 2026: nothing on screen
+       promises a listener).
+     - "recommending you seek more immediate help" became "telling you to get help
+       right away". Whether "Heard recommends" may be said at all is an open question
+       for counsel (Q5).
+     - "does not instigate or activate any direct care or communication" became "does
+       not start any care or contact anyone for you": the same meaning in words a
+       tired reader can take in.
+     - The last two lines name the nurse and the call light as well as the doctor's
+       office and 911, so that they do not contradict the red box for a patient who
+       is still in the hospital.
+   The button labels, "I understand" and "Not now", and the absence of any release
+   wording, follow the attorney seat of the role-played panel (an AI evaluator, not a
+   lawyer). The wording is the owner's to change.
 
    Who sees it. A new patient before their page is created. A patient whose page has
    no record for the current wording. A caregiver before they join, and a caregiver
@@ -54,20 +68,19 @@
 (function (root) {
   "use strict";
 
-  var VERSION = "2026-11-23.1";
+  var VERSION = "2026-11-23.2";
 
   var TEXT = {
     title: "Before you start",
     lead: "Please read this. Then choose a button.",
     /* each line is one idea; the page shows them as a list */
     points: [
-      "Record your questions here. Your care team can address them at their next visit or call.",
-      "No one is watching Heard. It does not tell anyone you need help.",
-      "Heard is not a doctor or nurse. It cannot tell you what is wrong.",
-      "Sometimes Heard shows a message telling you to get help. It does not catch every problem. No message does not mean you are okay.",
-      "You do not need Heard to get care."
+      "This is not real time communication with your care team. Heard only records your questions as they come up, so they can be heard at your next visit or call.",
+      "Sometimes Heard shows a message telling you to get help right away. It does not catch every problem. No message does not mean you are okay.",
+      "Heard is not a doctor or nurse. It cannot tell you what is wrong. When in doubt, ask your nurse or call your doctor's office.",
+      "Heard does not start any care or contact anyone for you. Always take a strong concern to your nurse, your doctor's office or 911."
     ],
-    /* the standing statement from redflags.js is shown here, in its own box */
+    /* the standing statement from redflags.js is shown above these lines, in its own red box */
     /* the read-aloud button, and what the voice says after the last line on the screen */
     readAloud: "Read this to me",
     stopReading: "Stop reading",

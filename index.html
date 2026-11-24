@@ -260,13 +260,13 @@
   .ack-card { background: #fff; border-radius: 18px; border: 3px solid var(--blue); padding: 20px 18px 18px; width: 100%; max-width: 460px; margin: auto 0; box-shadow: 0 12px 34px rgba(0,0,0,.4); }
   .ack-card h3 { color: var(--blue); font-size: 24px; line-height: 1.2; margin-bottom: 6px; outline: none; }
   .ack-card .ack-lead { font-size: 16px; color: var(--mut); margin-bottom: 10px; line-height: 1.35; }
-  .ack-card ul { margin: 0 0 12px 22px; padding: 0; }
+  .ack-card ul { margin: 0 0 14px 22px; padding: 0; }
   .ack-card li { font-size: 18px; line-height: 1.4; margin: 0 0 10px; }
   .ack-card .safeline { text-align: left; font-size: 17px; margin: 0 0 14px; }
   .ack-card .btn { font-size: 18px; min-height: 58px; }
   .ack-card .btn.sub { font-size: 18px; font-weight: 700; border: 2px solid var(--blue); }
   /* "Read this to me": its own look, so it is never taken for one of the two answers. */
-  .ack-card .ack-read { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; min-height: 48px; margin: 0 0 12px; padding: 8px 12px; border: 1px dashed var(--accent); border-radius: 24px; background: var(--blue-lt); color: var(--blue); font-size: 17px; font-weight: 600; font-family: inherit; cursor: pointer; }
+  .ack-card .ack-read { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; min-height: 48px; margin: 14px 0 0; padding: 8px 12px; border: 1px dashed var(--accent); border-radius: 24px; background: var(--blue-lt); color: var(--blue); font-size: 17px; font-weight: 600; font-family: inherit; cursor: pointer; }
   .ack-card .ack-under { font-size: 15px; color: var(--mut); margin-top: 12px; text-align: center; line-height: 1.35; }
   .ack-said { font-size: 18px; line-height: 1.45; margin-bottom: 12px; }
   .provtag { display: inline-block; background: var(--blue-lt); color: var(--blue); border-radius: 8px; padding: 4px 10px; font-size: 14px; font-weight: 600; margin: 2px 4px 2px 0; }
@@ -900,7 +900,7 @@ const ACK_CAN_SPEAK = typeof window.speechSynthesis !== "undefined" && typeof wi
 let ackSpeaking = false, ackSpeakSeq = 0;
 function ackSpokenLines(){
   const T = ACK.TEXT, cg = !!(ackCtx && ackCtx.w.by === "caregiver");
-  return [T.title].concat(T.points, [RF ? RF.MESSAGE.standing : SAFE_LINE_FALLBACK, T.spokenButtons(), cg ? T.caregiverUnder(ackCtx.first) : T.under]);
+  return [T.title, RF ? RF.MESSAGE.standing : SAFE_LINE_FALLBACK].concat(T.points, [T.spokenButtons(), cg ? T.caregiverUnder(ackCtx.first) : T.under]);
 }
 function ackStopSpeaking(){
   ackSpeakSeq++;
@@ -937,13 +937,15 @@ function showAck(){
     '<h3 id="ackTitle" tabindex="-1">' + esc(T.title) + '</h3>' +
     '<div id="ackBody">' +
     '<div class="ack-lead">' + esc(cg ? T.caregiverLead(ackCtx.first) : T.lead) + '</div>' +
-    (ACK_CAN_SPEAK ? '<button type="button" class="ack-read" id="ackRead" onclick="ackToggleSpeak()"><span aria-hidden="true">&#128266;</span><span id="ackReadLabel">' + esc(T.readAloud) + '</span></button>' : '') +
-    '<ul>' + T.points.map(x => '<li>' + esc(x) + '</li>').join("") + '</ul>' +
+    /* Order set by the physician owner, 23 November 2026: the red box first, then the
+       lines, the two buttons, and "Read this to me" at the very bottom. */
     safeLineHTML() +
+    '<ul>' + T.points.map(x => '<li>' + esc(x) + '</li>').join("") + '</ul>' +
     '</div>' +
     '<button class="btn" id="ackYes" onclick="ackAgree()">' + esc(T.agree) + '</button>' +
     '<button class="btn sub" id="ackNo" onclick="ackDecline()">' + esc(T.decline) + '</button>' +
     '<div class="ack-under">' + esc(cg ? T.caregiverUnder(ackCtx.first) : T.under) + '</div>' +
+    (ACK_CAN_SPEAK ? '<button type="button" class="ack-read" id="ackRead" onclick="ackToggleSpeak()"><span aria-hidden="true">&#128266;</span><span id="ackReadLabel">' + esc(T.readAloud) + '</span></button>' : '') +
     '</div>';
   o.classList.remove("hidden");
   o.scrollTop = 0;
