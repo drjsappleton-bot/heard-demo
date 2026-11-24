@@ -37,8 +37,17 @@
    the care team "addresses" a question; nothing promises a listener, a reply or an
    answer; Heard "shows a message", it does not alert anyone.
 
+   "Read this to me" (owner agreed, 23 November 2026). A button on the notice has
+   the device's own voice read it aloud, for a reader without their glasses or who
+   reads little. It speaks the same lines that are on the screen, in the same order,
+   then names the two buttons. It never taps a button for the reader. Only this
+   fixed text is spoken; nothing a patient said or typed is ever read out. The page
+   picks a voice stored on the device when there is one. Some browsers have only an
+   online voice, and those send this fixed text to the browser's maker to be voiced.
+   Where the browser has no voice at all, the button is not shown.
+
    Not built here, for the rebuild: a time from the server rather than the device,
-   a stored copy of the exact text shown, and a spoken version of the notice.
+   and a stored copy of the exact text shown.
 
    Loaded as a plain script in the browser (window.HeardAck) and imported by the
    Node tests (globalThis.HeardAck). */
@@ -59,6 +68,10 @@
       "You do not need Heard to get care."
     ],
     /* the standing statement from redflags.js is shown here, in its own box */
+    /* the read-aloud button, and what the voice says after the last line on the screen */
+    readAloud: "Read this to me",
+    stopReading: "Stop reading",
+    spokenButtons: function () { return "There are two buttons. One says: " + TEXT.agree + ". The other says: " + TEXT.decline + "."; },
     agree: "I understand",
     decline: "Not now",
     under: "Tap \u201cNot now\u201d and nothing is saved. Your care is the same either way.",

@@ -14,7 +14,7 @@ const html = readFileSync(new URL("../index.html", import.meta.url), "utf8");
 const fnBody = (name) => { const at = html.search(new RegExp("(async )?function " + name + "\\(")); assert.ok(at > 0, name); return html.slice(at, html.indexOf("\n}\n", at) + 3); };
 const T0 = new Date(2026, 10, 23, 19, 0, 0).getTime(), MIN = 60 * 1000;
 const patient = A.who("patient"), sam = A.who("caregiver", "Sam O'Brien");
-const everyLine = (T) => [T.title, T.lead, ...T.points, T.agree, T.decline, T.under, T.caregiverLead("Pat"), T.caregiverUnder("Pat"), T.declined.title, T.declined.body, T.declined.bodyExisting, T.declined.again, T.declined.home];
+const everyLine = (T) => [T.title, T.lead, ...T.points, T.agree, T.decline, T.under, T.caregiverLead("Pat"), T.caregiverUnder("Pat"), T.readAloud, T.stopReading, T.spokenButtons(), T.declined.title, T.declined.body, T.declined.bodyExisting, T.declined.again, T.declined.home];
 
 // ---- the wording ----
 
@@ -191,4 +191,30 @@ test("the two buttons are the same size, and the first focus is the title, not a
 test("a save from one device cannot erase the record made on another", () => {
   assert.ok(fnBody("saveRecord").includes("if (ACK) rec.acks = ACK.merge(srv.acks, rec.acks);"));
   assert.ok(fnBody("renderPatient").includes("if (ACK) ptRec.acks = ACK.merge(ptRec.acks, cached.acks);"));
+});
+
+// ---- "Read this to me" ----
+
+test("the voice reads what is on the screen, in order, then names the two buttons", () => {
+  // Owner agreed, 23 November 2026. For a reader without their glasses, or who reads little.
+  const lines = fnBody("ackSpokenLines");
+  assert.match(lines, /return \[T\.title\]\.concat\(T\.points, \[RF \? RF\.MESSAGE\.standing : SAFE_LINE_FALLBACK, T\.spokenButtons\(\), cg \? T\.caregiverUnder\(ackCtx\.first\) : T\.under\]\);/);
+  assert.equal(A.TEXT.spokenButtons(), "There are two buttons. One says: I understand. The other says: Not now.");
+  assert.equal(A.TEXT.readAloud, "Read this to me");
+  assert.equal(A.TEXT.stopReading, "Stop reading");
+});
+
+test("reading aloud never answers for the reader, stops when the notice closes, and is hidden where there is no voice", () => {
+  const t = fnBody("ackToggleSpeak");
+  assert.ok(!/ackAgree|ackDecline|ACK\.record|\.click\(/.test(t), "the voice taps a button");
+  assert.match(fnBody("ackHide"), /^function ackHide\(\)\{ ackStopSpeaking\(\);/);
+  assert.ok(fnBody("ackStopSpeaking").includes("speechSynthesis.cancel()"));
+  assert.ok(fnBody("showAck").includes("(ACK_CAN_SPEAK ? '<button type=\"button\" class=\"ack-read\""));
+  // Its own look, never one of the two answer buttons.
+  assert.ok(!/class="btn[^"]*" id="ackRead"/.test(html));
+  assert.match(html, /\.ack-card \.ack-read \{[^}]*min-height: 48px/);
+  // Only the fixed notice is spoken: nothing a patient said or typed.
+  assert.ok(!/ptRec|entries|\.text\b/.test(fnBody("ackSpokenLines") + t));
+  // A voice stored on the device is preferred.
+  assert.ok(t.includes("v.localService"));
 });

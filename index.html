@@ -265,6 +265,8 @@
   .ack-card .safeline { text-align: left; font-size: 17px; margin: 0 0 14px; }
   .ack-card .btn { font-size: 18px; min-height: 58px; }
   .ack-card .btn.sub { font-size: 18px; font-weight: 700; border: 2px solid var(--blue); }
+  /* "Read this to me": its own look, so it is never taken for one of the two answers. */
+  .ack-card .ack-read { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; min-height: 48px; margin: 0 0 12px; padding: 8px 12px; border: 1px dashed var(--accent); border-radius: 24px; background: var(--blue-lt); color: var(--blue); font-size: 17px; font-weight: 600; font-family: inherit; cursor: pointer; }
   .ack-card .ack-under { font-size: 15px; color: var(--mut); margin-top: 12px; text-align: center; line-height: 1.35; }
   .ack-said { font-size: 18px; line-height: 1.45; margin-bottom: 12px; }
   .provtag { display: inline-block; background: var(--blue-lt); color: var(--blue); border-radius: 8px; padding: 4px 10px; font-size: 14px; font-weight: 600; margin: 2px 4px 2px 0; }
@@ -889,7 +891,41 @@ const ACK = window.HeardAck || null;
 const ACK_UNAVAILABLE = "Heard could not load the notice it must show first. Check your connection and reload the page.";
 let ackCtxName = "";     /* the name a caregiver typed, kept while the notice is open */
 let ackCtx = null;       /* { w: who is answering, first: the patient's first name for a caregiver, onAgree } */
-function ackHide(){ const o = document.getElementById("ackOverlay"); if (o) { o.classList.add("hidden"); o.innerHTML = ""; } }
+function ackHide(){ ackStopSpeaking(); const o = document.getElementById("ackOverlay"); if (o) { o.classList.add("hidden"); o.innerHTML = ""; } }
+/* ---- "Read this to me" ----
+   The device's own voice reads the notice: the lines on the screen, in order, then the
+   names of the two buttons. It never answers for the reader. Only this fixed text is
+   spoken. A voice stored on the device is used when there is one. */
+const ACK_CAN_SPEAK = typeof window.speechSynthesis !== "undefined" && typeof window.SpeechSynthesisUtterance !== "undefined";
+let ackSpeaking = false, ackSpeakSeq = 0;
+function ackSpokenLines(){
+  const T = ACK.TEXT, cg = !!(ackCtx && ackCtx.w.by === "caregiver");
+  return [T.title].concat(T.points, [RF ? RF.MESSAGE.standing : SAFE_LINE_FALLBACK, T.spokenButtons(), cg ? T.caregiverUnder(ackCtx.first) : T.under]);
+}
+function ackStopSpeaking(){
+  ackSpeakSeq++;
+  if (ackSpeaking && ACK_CAN_SPEAK) { try { window.speechSynthesis.cancel(); } catch (e) {} }
+  ackSpeaking = false;
+  const b = document.getElementById("ackReadLabel"); if (b && ACK) b.textContent = ACK.TEXT.readAloud;
+}
+function ackToggleSpeak(){
+  if (!ACK_CAN_SPEAK || !ACK || !ackCtx) return;
+  if (ackSpeaking) { ackStopSpeaking(); return; }
+  const synth = window.speechSynthesis, seq = ++ackSpeakSeq, lines = ackSpokenLines();
+  try { synth.cancel(); } catch (e) {}
+  let voice = null;
+  try { voice = (synth.getVoices() || []).filter(v => /^en/i.test(v.lang) && v.localService)[0] || null; } catch (e) {}
+  ackSpeaking = true;
+  const b = document.getElementById("ackReadLabel"); if (b) b.textContent = ACK.TEXT.stopReading;
+  /* One line at a time: some browsers cut a long passage short. */
+  lines.forEach((t, i) => {
+    const u = new SpeechSynthesisUtterance(t);
+    u.lang = "en-US"; u.rate = 0.9; if (voice) u.voice = voice;
+    u.onend = () => { if (seq === ackSpeakSeq && i === lines.length - 1) ackStopSpeaking(); };
+    u.onerror = () => { if (seq === ackSpeakSeq) ackStopSpeaking(); };
+    try { synth.speak(u); } catch (e) { if (seq === ackSpeakSeq) ackStopSpeaking(); }
+  });
+}
 function ackReset(){ ackHide(); ackCtx = null; }
 function askAck(w, first, onAgree){ ackCtx = { w: w, first: first || "", onAgree: onAgree }; showAck(); }
 function showAck(){
@@ -901,6 +937,7 @@ function showAck(){
     '<h3 id="ackTitle" tabindex="-1">' + esc(T.title) + '</h3>' +
     '<div id="ackBody">' +
     '<div class="ack-lead">' + esc(cg ? T.caregiverLead(ackCtx.first) : T.lead) + '</div>' +
+    (ACK_CAN_SPEAK ? '<button type="button" class="ack-read" id="ackRead" onclick="ackToggleSpeak()"><span aria-hidden="true">&#128266;</span><span id="ackReadLabel">' + esc(T.readAloud) + '</span></button>' : '') +
     '<ul>' + T.points.map(x => '<li>' + esc(x) + '</li>').join("") + '</ul>' +
     safeLineHTML() +
     '</div>' +
