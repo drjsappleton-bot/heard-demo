@@ -15,17 +15,17 @@
    each line should say and the order of the screen: the standing statement in its red
    box first, four lines, the two buttons, and "Read this to me" at the very bottom.
    Two minutes later he allowed some licence in the wording, the intent to stay as he
-   stated it. The first line is the exception: it is his own verbiage, given at 8:10 PM
-   after he corrected a mis-transcription, and it was reworded because the earlier
-   first line repeated the red box above. He first said "ensure answering of all your
-   questions" and then, in the same minute, asked for "facilitate" in place of "ensure"
-   if the legal seat objected to it. It had: the attorney seat of the role-played panel
-   (an AI evaluator, not a lawyer) called "ensuring that they are answered" a promise
-   of a result the care team controls. "Facilitate" claims help, not a result. The
-   attorney seat has not been run on the new sentence. "Answering" stays as his word;
-   it departs from his rule of 21 November 2026 that the care team "addresses" a
-   question, and that is his to decide. Three changes were made to his dictated words
-   in the other lines under the licence he gave:
+   stated it. The first line is the exception: it is his own verbiage, given between
+   8:08 and 8:14 PM, reworded because the earlier first line repeated the red box above.
+   He first said "ensure answering of all your questions". He then asked for
+   "facilitate" in place of "ensure" if the legal seat objected to it, which it had: the
+   attorney seat of the role-played panel (an AI evaluator, not a lawyer) called
+   "ensuring that they are answered" a promise of a result the care team controls.
+   "Facilitate" claims help, not a result. At 8:14 PM he chose "addressing" over
+   "answering", which keeps his rule of 21 November 2026 that the care team "addresses"
+   a question, and he confirmed "solely intended". The attorney seat has not been run
+   on the final sentence. Three changes were made to his dictated words in the other
+   lines under the licence he gave:
      - "recommending you seek more immediate help" became "telling you to get help
        right away". Whether "Heard recommends" may be said at all is an open question
        for counsel (Q5).
@@ -75,14 +75,14 @@
 (function (root) {
   "use strict";
 
-  var VERSION = "2026-11-23.4";
+  var VERSION = "2026-11-23.5";
 
   var TEXT = {
     title: "Before you start",
     lead: "Please read this. Then choose a button.",
     /* each line is one idea; the page shows them as a list */
     points: [
-      "Heard is solely intended to record and facilitate answering of all your questions. These will not be seen or addressed until your next interaction with your care team. Heard does not send any real-time alerts or communication with your care team.",
+      "Heard is solely intended to record and facilitate addressing of all your questions. These will not be seen or addressed until your next interaction with your care team. Heard does not send any real-time alerts or communication with your care team.",
       "Sometimes Heard shows a message telling you to get help right away. It does not catch every problem. No message does not mean you are okay.",
       "Heard is not a doctor or nurse. It cannot tell you what is wrong. When in doubt, ask your nurse or call your doctor's office.",
       "Heard does not initiate any care or contact anyone for you. Always take a strong concern to your nurse, your doctor's office or 911."
