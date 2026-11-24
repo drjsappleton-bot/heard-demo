@@ -21,14 +21,14 @@ const everyLine = (T) => [T.title, T.lead, ...T.points, T.agree, T.decline, T.un
 test("the wording is pinned to its version: change one, change the other", () => {
   // If this fails you changed the notice. Give it a new VERSION in ack.js, so that
   // everyone is shown the new wording, then update both values here.
-  assert.equal(A.VERSION, "2026-11-23.2");
+  assert.equal(A.VERSION, "2026-11-23.3");
   // What each line says, and their order, were set by the physician owner on 23 November
   // 2026 at 7:53 PM. He allowed licence in the words at 7:55 PM, the intent to stay.
   assert.deepEqual(A.TEXT.points, [
     "This is not real time communication with your care team. Heard only records your questions as they come up, so they can be heard at your next visit or call.",
     "Sometimes Heard shows a message telling you to get help right away. It does not catch every problem. No message does not mean you are okay.",
     "Heard is not a doctor or nurse. It cannot tell you what is wrong. When in doubt, ask your nurse or call your doctor's office.",
-    "Heard does not start any care or contact anyone for you. Always take a strong concern to your nurse, your doctor's office or 911."
+    "Heard does not initiate any care or contact anyone for you. Always take a strong concern to your nurse, your doctor's office or 911."
   ]);
   assert.equal(A.TEXT.title, "Before you start");
   assert.equal(A.TEXT.agree, "I understand");
@@ -48,7 +48,8 @@ test("each line carries the intent the owner stated", () => {
   // 3. Not a medical professional; cannot tell you what is wrong; when in doubt, go to a person.
   assert.match(three, /not a doctor or nurse\. It cannot tell you what is wrong\. When in doubt,/);
   // 4. Heard sets nothing in motion; a strong concern always goes to a person or 911.
-  assert.match(four, /^Heard does not start any care or contact anyone for you\./);
+  // "Initiate" is the owner's word (23 November 2026, 8:01 PM), chosen over "start".
+  assert.match(four, /^Heard does not initiate any care or contact anyone for you\./);
   assert.match(four, /Always take a strong concern to/);
   // The last two lines never leave out the nurse: a reader may still be in the hospital,
   // and the red box above them says to use the call light there.

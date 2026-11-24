@@ -24,8 +24,9 @@
        right away". Whether "Heard recommends" may be said at all is an open question
        for counsel (Q5).
      - "does not instigate or activate any direct care or communication" became "does
-       not start any care or contact anyone for you": the same meaning in words a
-       tired reader can take in.
+       not initiate any care or contact anyone for you". "Initiate" is the owner's
+       word, chosen at 8:01 PM over "start", which he found too loose (version
+       2026-11-23.3).
      - The last two lines name the nurse and the call light as well as the doctor's
        office and 911, so that they do not contradict the red box for a patient who
        is still in the hospital.
@@ -68,7 +69,7 @@
 (function (root) {
   "use strict";
 
-  var VERSION = "2026-11-23.2";
+  var VERSION = "2026-11-23.3";
 
   var TEXT = {
     title: "Before you start",
@@ -78,7 +79,7 @@
       "This is not real time communication with your care team. Heard only records your questions as they come up, so they can be heard at your next visit or call.",
       "Sometimes Heard shows a message telling you to get help right away. It does not catch every problem. No message does not mean you are okay.",
       "Heard is not a doctor or nurse. It cannot tell you what is wrong. When in doubt, ask your nurse or call your doctor's office.",
-      "Heard does not start any care or contact anyone for you. Always take a strong concern to your nurse, your doctor's office or 911."
+      "Heard does not initiate any care or contact anyone for you. Always take a strong concern to your nurse, your doctor's office or 911."
     ],
     /* the standing statement from redflags.js is shown above these lines, in its own red box */
     /* the read-aloud button, and what the voice says after the last line on the screen */
