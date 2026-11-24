@@ -11,6 +11,7 @@
 <script src="rows.js"></script>
 <script src="loop.js"></script>
 <script src="deleted.js"></script>
+<script src="ack.js"></script>
 <style>
   :root {
     --blue: #1f4e79; --blue-lt: #eaf1f8; --accent: #2e75b6;
@@ -255,6 +256,19 @@
   .rfnote { display: block; margin-top: 4px; font-size: 14px; font-weight: 700; color: var(--red); }
   .safeline { margin-top: 12px; border: 1px solid #e6b0ac; background: var(--red-lt); color: var(--ink); border-radius: 10px; padding: 11px 14px; font-size: 15.5px; line-height: 1.4; text-align: center; font-weight: 600; }
   .calllight { margin-top: 10px; border: 1px solid #c9d9ea; background: var(--blue-lt); color: var(--ink); border-radius: 10px; padding: 11px 14px; font-size: 15px; line-height: 1.4; text-align: left; }
+  /* The notice of purpose, shown before first use (ack.js). Calm, not an alarm: blue, not red. Both buttons are the same size. */
+  .ack-card { background: #fff; border-radius: 18px; border: 3px solid var(--blue); padding: 20px 18px 18px; width: 100%; max-width: 460px; margin: auto 0; box-shadow: 0 12px 34px rgba(0,0,0,.4); }
+  .ack-card h3 { color: var(--blue); font-size: 24px; line-height: 1.2; margin-bottom: 6px; outline: none; }
+  .ack-card .ack-lead { font-size: 16px; color: var(--mut); margin-bottom: 10px; line-height: 1.35; }
+  .ack-card ul { margin: 0 0 14px 22px; padding: 0; }
+  .ack-card li { font-size: 18px; line-height: 1.4; margin: 0 0 10px; }
+  .ack-card .safeline { text-align: left; font-size: 17px; margin: 0 0 14px; }
+  .ack-card .btn { font-size: 18px; min-height: 58px; }
+  .ack-card .btn.sub { font-size: 18px; font-weight: 700; border: 2px solid var(--blue); }
+  /* "Read this to me": its own look, so it is never taken for one of the two answers. */
+  .ack-card .ack-read { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; min-height: 48px; margin: 14px 0 0; padding: 8px 12px; border: 1px dashed var(--accent); border-radius: 24px; background: var(--blue-lt); color: var(--blue); font-size: 17px; font-weight: 600; font-family: inherit; cursor: pointer; }
+  .ack-card .ack-under { font-size: 15px; color: var(--mut); margin-top: 12px; text-align: center; line-height: 1.35; }
+  .ack-said { font-size: 18px; line-height: 1.45; margin-bottom: 12px; }
   .provtag { display: inline-block; background: var(--blue-lt); color: var(--blue); border-radius: 8px; padding: 4px 10px; font-size: 14px; font-weight: 600; margin: 2px 4px 2px 0; }
 </style>
 </head>
@@ -270,6 +284,9 @@
 
   <!-- Red-flag safety message. Filled in by showSafetyMessage(). -->
   <div id="rfOverlay" class="rf-overlay hidden" role="alertdialog" aria-modal="true" aria-labelledby="rfTitle" aria-describedby="rfBody"></div>
+
+  <!-- Notice of purpose, shown before first use. Filled in by showAck(). -->
+  <div id="ackOverlay" class="rf-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="ackTitle" aria-describedby="ackBody"></div>
 
   <footer>Prototype for concept demonstration only. Demo data is stored in a demo database on this site and is not automatically deleted. Not for clinical use.</footer>
 </div>
@@ -643,6 +660,7 @@ async function decideAccount(email, action){
 const app = () => document.getElementById("app");
 async function render(){
   stopUI(true);
+  ackReset();
   document.getElementById("hdr").classList.remove("hidden");
   route = parseHash();
   if (route.v === "drHome" || route.v === "drPatient") {
@@ -812,7 +830,6 @@ async function newPatient(){
   const l = document.getElementById("npLast").value.trim();
   const msg = document.getElementById("npMsg");
   if (!f || !l) { msg.innerHTML = '<span class="err">First and last name required.</span>'; return; }
-  msg.textContent = "Creating your page…";
   const sel = document.getElementById("npDoc");
   let doctor = sel ? sel.value : "";
   let typedDoctor = false;
@@ -823,10 +840,23 @@ async function newPatient(){
   }
   const teamEl = document.getElementById("npTeam");
   const team = (teamEl && teamEl.style.display !== "none") ? teamEl.value.trim() : "";
+  /* The notice of purpose comes first (ack.js). Nothing is created, and nothing is
+     sent anywhere, until the person taps the button to go on. If they decline, the
+     names they typed are dropped. */
+  if (!ACK) { msg.innerHTML = '<span class="err">' + esc(ACK_UNAVAILABLE) + '</span>'; return; }
+  askAck(ACK.who("patient"), null, (at) => createPatient({ f: f, l: l, doctor: doctor, typedDoctor: typedDoctor, team: team }, at));
+}
+async function createPatient(p, ackAt){
+  const f = p.f, l = p.l, team = p.team, typedDoctor = p.typedDoctor;
+  let doctor = p.doctor;
+  /* After a decline and "Read it again", the sign-up form is no longer on screen. */
+  const msg = document.getElementById("npMsg") || document.getElementById("ackMsg");
+  if (msg) msg.textContent = "Creating your page…";
   const id = rnd(6);
   try {
     const doc = (await loadDoc()) || EMPTY_DOC();
     doc.pts[id] = { first: f, last: l, doctor: doctor, team: team, created: Date.now(), entries: [], deleted: [] };
+    ACK.record(doc.pts[id], ACK.who("patient"), ackAt);
     doc.idx.push({ id: id, first: f, last: l, doctor: doctor, team: team, created: Date.now() });
     // A doctor the patient typed joins the directory, so the dropdown fills as the demo is used.
     if (typedDoctor && doctor) {
@@ -847,8 +877,107 @@ async function newPatient(){
     // Render from this copy if the very first read has not caught up yet.
     try { localStorage.setItem("heard_cache_" + id, JSON.stringify(doc.pts[id])); } catch (e) {}
     location.hash = "#/b/" + bucket + "/p/" + id;
-  } catch (e) { msg.innerHTML = '<span class="err">' + esc(e.message) + '</span>'; }
+  } catch (e) { if (msg) msg.innerHTML = '<span class="err">' + esc(e.message) + '</span>'; }
 }
+
+/* ---------- notice of purpose (ack.js) ----------
+   One screen, before first use: what Heard is for, what it is not, and two buttons
+   of the same size. It is a notice and a record that a button was tapped. It is not
+   terms of use, a privacy notice, consent or a release. The wording and the record
+   live in ack.js. The standing statement is taken from the safety list, so the notice
+   and the line under the microphone always say the same thing. If ack.js did not
+   load, the patient side does not open: the notice is required, so this fails closed. */
+const ACK = window.HeardAck || null;
+const ACK_UNAVAILABLE = "Heard could not load the notice it must show first. Check your connection and reload the page.";
+let ackCtxName = "";     /* the name a caregiver typed, kept while the notice is open */
+let ackCtx = null;       /* { w: who is answering, first: the patient's first name for a caregiver, onAgree } */
+function ackHide(){ ackStopSpeaking(); const o = document.getElementById("ackOverlay"); if (o) { o.classList.add("hidden"); o.innerHTML = ""; } }
+/* ---- "Read this to me" ----
+   The device's own voice reads the notice: the lines on the screen, in order, then the
+   names of the two buttons. It never answers for the reader. Only this fixed text is
+   spoken. A voice stored on the device is used when there is one. */
+const ACK_CAN_SPEAK = typeof window.speechSynthesis !== "undefined" && typeof window.SpeechSynthesisUtterance !== "undefined";
+let ackSpeaking = false, ackSpeakSeq = 0;
+function ackSpokenLines(){
+  const T = ACK.TEXT, cg = !!(ackCtx && ackCtx.w.by === "caregiver");
+  return [T.title, RF ? RF.MESSAGE.standing : SAFE_LINE_FALLBACK].concat(T.points, [T.spokenButtons(), cg ? T.caregiverUnder(ackCtx.first) : T.under]);
+}
+function ackStopSpeaking(){
+  ackSpeakSeq++;
+  if (ackSpeaking && ACK_CAN_SPEAK) { try { window.speechSynthesis.cancel(); } catch (e) {} }
+  ackSpeaking = false;
+  const b = document.getElementById("ackReadLabel"); if (b && ACK) b.textContent = ACK.TEXT.readAloud;
+}
+function ackToggleSpeak(){
+  if (!ACK_CAN_SPEAK || !ACK || !ackCtx) return;
+  if (ackSpeaking) { ackStopSpeaking(); return; }
+  const synth = window.speechSynthesis, seq = ++ackSpeakSeq, lines = ackSpokenLines();
+  try { synth.cancel(); } catch (e) {}
+  let voice = null;
+  try { voice = (synth.getVoices() || []).filter(v => /^en/i.test(v.lang) && v.localService)[0] || null; } catch (e) {}
+  ackSpeaking = true;
+  const b = document.getElementById("ackReadLabel"); if (b) b.textContent = ACK.TEXT.stopReading;
+  /* One line at a time: some browsers cut a long passage short. */
+  lines.forEach((t, i) => {
+    const u = new SpeechSynthesisUtterance(t);
+    u.lang = "en-US"; u.rate = 0.9; if (voice) u.voice = voice;
+    u.onend = () => { if (seq === ackSpeakSeq && i === lines.length - 1) ackStopSpeaking(); };
+    u.onerror = () => { if (seq === ackSpeakSeq) ackStopSpeaking(); };
+    try { synth.speak(u); } catch (e) { if (seq === ackSpeakSeq) ackStopSpeaking(); }
+  });
+}
+function ackReset(){ ackHide(); ackCtx = null; }
+function askAck(w, first, onAgree){ ackCtx = { w: w, first: first || "", onAgree: onAgree }; showAck(); }
+function showAck(){
+  const o = document.getElementById("ackOverlay");
+  if (!o || !ACK || !ackCtx) return;
+  const T = ACK.TEXT, cg = ackCtx.w.by === "caregiver";
+  o.innerHTML =
+    '<div class="ack-card">' +
+    '<h3 id="ackTitle" tabindex="-1">' + esc(T.title) + '</h3>' +
+    '<div id="ackBody">' +
+    '<div class="ack-lead">' + esc(cg ? T.caregiverLead(ackCtx.first) : T.lead) + '</div>' +
+    /* Order set by the physician owner, 23 November 2026: the red box first, then the
+       lines, the two buttons, and "Read this to me" at the very bottom. */
+    safeLineHTML() +
+    '<ul>' + T.points.map(x => '<li>' + esc(x) + '</li>').join("") + '</ul>' +
+    '</div>' +
+    '<button class="btn" id="ackYes" onclick="ackAgree()">' + esc(T.agree) + '</button>' +
+    '<button class="btn sub" id="ackNo" onclick="ackDecline()">' + esc(T.decline) + '</button>' +
+    '<div class="ack-under">' + esc(cg ? T.caregiverUnder(ackCtx.first) : T.under) + '</div>' +
+    (ACK_CAN_SPEAK ? '<button type="button" class="ack-read" id="ackRead" onclick="ackToggleSpeak()"><span aria-hidden="true">&#128266;</span><span id="ackReadLabel">' + esc(T.readAloud) + '</span></button>' : '') +
+    '</div>';
+  o.classList.remove("hidden");
+  o.scrollTop = 0;
+  /* Start at the top, on the title, never on a button: Enter must not answer for the reader. */
+  const h = document.getElementById("ackTitle");
+  if (h) { try { h.focus({ preventScroll: true }); } catch (e) {} }
+  o.scrollTop = 0;
+}
+function ackAgree(){
+  const c = ackCtx; ackReset();
+  if (c && c.onAgree) c.onAgree(Date.now());
+}
+/* Declining leaves the patient side. Nothing is recorded. The reader is told that
+   care does not depend on Heard and where to take a question, and can read the notice again. */
+function ackDecline(){
+  ackHide();
+  const T = ACK.TEXT.declined, existing = !!(ackCtx && route && (route.v === "patient" || route.v === "care"));
+  document.getElementById("hdr").classList.remove("hidden");
+  document.getElementById("tagline").textContent = "Patient";
+  app().innerHTML =
+    '<div class="card"><h2 class="sec">' + esc(T.title) + '</h2>' +
+    '<div class="ack-said">' + esc(existing ? T.bodyExisting : T.body) + '</div>' +
+    safeLineHTML() +
+    '<div class="note" id="ackMsg"></div>' +
+    '<button class="btn" style="margin-top:14px" onclick="ackAgain()">' + esc(T.again) + '</button>' +
+    '<button class="btn sub" onclick="ackLeave()">' + esc(T.home) + '</button></div>';
+  window.scrollTo(0, 0);
+}
+function ackAgain(){ if (ackCtx) showAck(); else ackLeave(); }
+function ackLeave(){ ackReset(); ackCtxName = ""; if (route && route.v === "landing") renderLanding(); else goHome(); }
+/* A page that exists, opened by someone with no record for the current wording. */
+function ackGateHTML(){ return '<div class="card"><div class="empty">' + esc(ACK ? ACK.TEXT.lead : ACK_UNAVAILABLE) + '</div></div>'; }
 
 /* ---------- patient page ---------- */
 let ptRec = null;
@@ -871,10 +1000,21 @@ async function renderPatient(){
     ptRec.entries = mergeEntries(ptRec.entries, cached.entries, ptRec.deleted);
     /* never shown here; kept so a save from this device cannot erase the provider-side record */
     if (DEL) { ptRec.removedClearedAt = Math.max(ptRec.removedClearedAt || 0, cached.removedClearedAt || 0); ptRec.removed = DEL.merge(ptRec.removed, cached.removed, ptRec.removedClearedAt); }
+    if (ACK) ptRec.acks = ACK.merge(ptRec.acks, cached.acks);
   }
   localStorage.setItem(LS.myPatient, route.id);
   AUTHOR = { by: "patient", name: "" };
   RENDER_READONLY = false;
+  /* The notice of purpose, for a page with no record of it in the current wording
+     (a page made before the notice existed, or before the wording changed). */
+  if (!ACK || ACK.needed(ptRec, ACK.who("patient"))) {
+    app().innerHTML = ackGateHTML();
+    if (ACK) askAck(ACK.who("patient"), null, (at) => { ACK.record(ptRec, ACK.who("patient"), at); drawPatient(); saveRecord(); });
+    return;
+  }
+  drawPatient();
+}
+function drawPatient(){
   app().innerHTML =
     '<div class="card"><h2 class="sec">Hello, ' + esc(ptRec.first) + '</h2>' +
     '<div class="privacy"><span id="privDot" class="dot"></span><span id="privLabel">Microphone off &mdash; nothing is being recorded</span></div>' +
@@ -973,19 +1113,35 @@ async function renderCaregiver(){
     return;
   }
   AUTHOR = { by: "caregiver", name: stored };
+  /* A caregiver who joined before the notice existed, or before its wording changed. */
+  if (!ACK || ACK.needed(ptRec, ACK.who("caregiver", stored))) {
+    app().innerHTML = ackGateHTML();
+    if (ACK) askAck(ACK.who("caregiver", stored), ptRec.first, (at) => { ACK.record(ptRec, ACK.who("caregiver", stored), at); drawCaregiver(stored); saveRecord(); });
+    return;
+  }
   drawCaregiver(stored);
 }
-async function joinAsCaregiver(){
-  const n = (document.getElementById("cgName").value || "").trim();
+async function joinAsCaregiver(ackAt){
+  const el = document.getElementById("cgName");
+  const n = String(el ? el.value : ackCtxName).trim();   /* after a decline and "Read it again" the name box is gone */
   const m = document.getElementById("cgMsg");
-  if (!n) { m.innerHTML = '<span class="err">Please enter your name.</span>'; return; }
+  if (!n) { if (m) m.innerHTML = '<span class="err">Please enter your name.</span>'; return; }
+  /* The caregiver reads the notice for themselves before they join. Their tap is
+     recorded under their own name. It says nothing about the patient. */
+  if (!ACK) { if (m) m.innerHTML = '<span class="err">' + esc(ACK_UNAVAILABLE) + '</span>'; return; }
+  const w = ACK.who("caregiver", n);
+  if (ACK.needed(ptRec, w) && !(ackAt > 0)) { ackCtxName = n; askAck(w, ptRec.first, (at) => joinAsCaregiver(at)); return; }
+  ackCtxName = "";
   localStorage.setItem(LS.cgPrefix + route.id, n);
   AUTHOR = { by: "caregiver", name: n };
+  let changed = false;
+  if (ackAt > 0 && ACK.needed(ptRec, w)) { ACK.record(ptRec, w, ackAt); changed = true; }
   if (!ptRec.caregivers.some(c => String(c.name).toLowerCase() === n.toLowerCase())) {
     ptRec.caregivers.push({ name: n, joined: Date.now() });
-    try { await saveRecord(); } catch (e) {}
+    changed = true;
   }
   drawCaregiver(n);
+  if (changed) { try { await saveRecord(); } catch (e) {} }
 }
 function drawCaregiver(name){
   app().innerHTML =
@@ -1172,6 +1328,7 @@ async function saveRecord(){
     rec.entries = mergeEntries(srv.entries, rec.entries, rec.deleted);
     /* never shown here; merged so a save from this device cannot erase the provider-side record */
     if (LR) rec.reads = LR.mergeReads(srv.reads, rec.reads);
+    if (ACK) rec.acks = ACK.merge(srv.acks, rec.acks);
     if (DEL) { rec.removedClearedAt = Math.max(srv.removedClearedAt || 0, rec.removedClearedAt || 0); rec.removed = DEL.merge(srv.removed, rec.removed, rec.removedClearedAt); }
     doc.pts[id] = rec;
     await saveDoc(doc);
@@ -1999,6 +2156,7 @@ async function renderDrPatient(again){
     '<div class="card"><h2 class="sec">Patient</h2><div class="nm" style="font-size:17px;font-weight:700">' + esc(drRec.last) + ', ' + esc(drRec.first) + '</div>' +
     '<div class="dt" style="font-size:14px;color:var(--mut)">' + drRec.entries.length + ' captured item(s) &middot; signed in ' + new Date(drRec.created).toLocaleString() + (drRec.doctor ? ' &middot; Doctor: ' + esc(drRec.doctor) : '') + '</div>' +
     (LR ? '<div class="dt" id="drLastRead" style="font-size:14px;color:var(--mut);margin-top:4px">' + esc(LR.providerLine(drRec.reads, Date.now())) + ' The patient is not shown this.</div>' : '') +
+    (ACK ? '<div class="dt" id="drAck" style="font-size:14px;color:var(--mut);margin-top:4px">' + esc(ACK.providerLine(drRec)) + '</div>' : '') +
     '<div class="note">Sorted by keyword on this device (no AI).</div></div>' +
     '<div id="results"></div>' + settingsHTML(true);
   showList();

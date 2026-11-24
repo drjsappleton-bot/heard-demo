@@ -11,8 +11,10 @@ const toml = readFileSync(new URL("netlify.toml", root), "utf8");
 const fnBody = (name) => { const at = html.search(new RegExp("(async )?function " + name + "\\(")); return html.slice(at, html.indexOf("\n}\n", at) + 3); };
 
 test("the patient's page carries nothing for providers and no demo links", () => {
-  const body = fnBody("renderPatient");
-  assert.ok(body.length > 500, "renderPatient was not found");
+  // Since 23 November 2026 renderPatient loads the record and shows the notice of purpose
+  // (ack.js), and drawPatient draws the page. Both are checked.
+  const body = fnBody("renderPatient") + fnBody("drawPatient");
+  assert.ok(fnBody("drawPatient").length > 500, "drawPatient was not found");
   for (const gone of ["For your care team", "Demo links", "Provider view", "Copy provider link", "PIN", "qrDr", "/dr/"]) {
     assert.ok(!body.includes(gone), "the patient page still shows: " + gone);
   }
