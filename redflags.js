@@ -47,7 +47,7 @@
 (function (root) {
   "use strict";
 
-  var VERSION = "2026-11-24.1";
+  var VERSION = "2026-11-24.2";
 
   /* Review status at this version (21 November 2026 review): every group has been
      revised. Open points are listed in the project's START-HERE. */
