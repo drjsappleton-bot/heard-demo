@@ -99,9 +99,12 @@
     caregiverUnder: function (first) { return "Tap \u201cNot now\u201d and nothing is saved. Care for " + first + " is the same either way."; },
     declined: {
       title: "Heard is not set up",
-      body: "Nothing was saved. Your care does not change. You can still ask your questions. Tell your nurse or doctor, or write them down for your next visit. You can come back any time.",
+      /* The owner's words of 24 November 2026, 6:02 PM. They say why nothing was saved.
+         This screen is not part of the notice a person taps "I understand" on, so
+         VERSION does not change and nobody is shown the notice again because of it. */
+      body: "Nothing was saved, because the limits of I'm Heard were not accepted. Your care is unchanged. You can still ask your questions the usual way: tell your nurse or doctor, or write them down. To start again, use the buttons below.",
       /* a page that already holds questions: they are still there */
-      bodyExisting: "Nothing new was saved. Your care does not change. You can still ask your questions. Tell your nurse or doctor, or write them down for your next visit. You can come back any time.",
+      bodyExisting: "Nothing new was saved, because the limits of I'm Heard were not accepted. Your care is unchanged. You can still ask your questions the usual way: tell your nurse or doctor, or write them down. To start again, use the buttons below.",
       again: "Read it again",
       home: "Back to the start"
     },
