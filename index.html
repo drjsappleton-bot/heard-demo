@@ -1337,6 +1337,45 @@ async function saveRecord(){
   }
   catch (e) { if (m && ptRec === rec) m.innerHTML = '<span class="err">Could not sync to server; kept on this device for now.</span>'; }
 }
+/* ---------- the care team's mark reaches the page without a reload ----------
+   Physician owner, 24 November 2026. Once a minute, and when the page comes back to
+   the front, the patient's or caregiver's page asks for its list again and draws it.
+   It only reads: nothing is saved, and no open of the list is recorded, because this
+   is not the provider side. It never runs while a question is being spoken, checked
+   in the review box or typed, while a safety message is up, or while the notice is
+   on the screen, so it cannot disturb words that are not saved yet.
+   What can change on the screen: a question the team marked addressed, a question a
+   caregiver or another device added, and a question deleted elsewhere. Whether anyone
+   opened the list is never shown here (rule of 21 November 2026). */
+const LIST_REFRESH_MS = 60 * 1000;
+let listRefreshBusy = false;
+function listRefreshQuiet(){
+  if (!route || (route.v !== "patient" && route.v !== "care") || !ptRec) return false;
+  if (document.hidden || !document.getElementById("entries")) return false;
+  if (recording || wantRec || reviewOpen || rfPendingKey) return false;
+  const t = document.getElementById("typeInput");
+  if (t && (t.value || document.activeElement === t)) return false;
+  return true;
+}
+async function refreshList(){
+  if (listRefreshBusy || !listRefreshQuiet()) return;
+  listRefreshBusy = true;
+  const id = route.id, rec = ptRec;
+  try {
+    const doc = await loadDoc();
+    const srv = doc ? normRec(doc.pts[id]) : null;
+    /* the person may have started a question, or left the page, while the list was on its way */
+    if (!srv || ptRec !== rec || route.id !== id || !listRefreshQuiet()) return;
+    rec.deleted = [...new Set((srv.deleted || []).concat(rec.deleted || []))];
+    rec.entries = mergeEntries(srv.entries, rec.entries, rec.deleted);
+    localStorage.setItem("heard_cache_" + id, JSON.stringify(rec));
+    renderEntries();
+  } catch (e) { /* no connection: the list stays as it is, and the next minute tries again */ }
+  finally { listRefreshBusy = false; }
+}
+setInterval(refreshList, LIST_REFRESH_MS);
+document.addEventListener("visibilitychange", () => { if (!document.hidden) refreshList(); });
+
 /* ---------- red-flag safety message ----------
    The list and the wording live in redflags.js. This shows one of two fixed
    messages, red or amber, when something captured matches the list. Which one
