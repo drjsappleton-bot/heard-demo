@@ -123,6 +123,44 @@ const MUST_FLAG = [
   ["my chest hurts and my calf is swollen", "clot", R], // red wins
 
   // ---- heart (amber) ----
+  // ---- heart_rhythm (amber): an irregular or changed heartbeat (physician, 24 Nov 2026) ----
+  ["my heartbeat is irregular", "heart_rhythm", A],
+  ["I have an irregular heartbeat", "heart_rhythm", A],
+  ["my pulse is uneven", "heart_rhythm", A],
+  ["my heart keeps skipping beats", "heart_rhythm", A],
+  ["my heart skipped a beat", "heart_rhythm", A],
+  ["I feel extra beats", "heart_rhythm", A],
+  ["my heartbeat feels different", "heart_rhythm", A],
+  ["my heart rate changed after the new pill", "heart_rhythm", A],
+  ["there is a change in my heartbeat", "heart_rhythm", A],
+  ["my heart is beating funny", "heart_rhythm", A],
+  ["my heartbeat is irregular and I have chest pain", "heart_rhythm", R], // red wins
+  // ---- head_injury (amber): any stated blow to the head (physician, 24 Nov 2026) ----
+  ["I hit my head on the bed rail", "head_injury", A],
+  ["bumped my head getting out of the car", "head_injury", A],
+  ["she banged her head on the cabinet", "head_injury", A],
+  ["my head hit the floor", "head_injury", A],
+  ["I have a bump on my head", "head_injury", A],
+  ["could I have a concussion", "head_injury", A],
+  ["head injury", "head_injury", A],
+  ["I fell and hit my head", "head_injury", R],       // a fall is red, and red wins
+  ["I hit my head and passed out", "head_injury", R],
+  // ---- foot_color (amber): a blue foot or blue toes, cold or not (physician, 24 Nov 2026) ----
+  ["my foot is cold and blue", "foot_color", A],
+  ["I have a cold blue foot", "foot_color", A],
+  ["my toes are blue", "foot_color", A],
+  ["my toes look a little purple", "foot_color", A],
+  // A foot or toes that "turned blue" is amber (physician, 24 Nov 2026). Anything else that turned blue stays red.
+  ["my toes turned blue", "foot_color", A],
+  ["my foot is turning blue", "foot_color", A],
+  ["my toes have turned blue", "foot_color", A],
+  ["he turned blue", "breathing", R],
+  ["her lips turned blue", "breathing", R],
+  // atrial fibrillation now (physician, 24 Nov 2026)
+  ["I think I am in afib", "heart_rhythm", A],
+  ["I went into a-fib last night", "heart_rhythm", A],
+  ["my afib is back", "heart_rhythm", A],
+  ["the atrial fibrillation came back", "heart_rhythm", A],
   ["my heart is racing", "heart", A],
   ["my heart is pounding", "heart", A],
   ["I am having palpitations", "heart", A],
@@ -320,6 +358,21 @@ const MUST_NOT_FLAG = [
   "how do I prevent infection",
   "my incision is a little red",
   "my temperature is 98.6",
+  // 24 Nov 2026: beside the three new amber groups
+  "my head hurts",                            // a headache is not a blow to the head
+  "I have a headache",
+  "can you raise the head of my bed",
+  "I hit my elbow on the walker",
+  "my heartbeat is slow",                     // slow is not on the list
+  "I have a history of afib",                 // a history shows nothing
+  "do I restart my Eliquis for my afib",
+  "what should my heart rate be",
+  "is my heart rate normal",
+  "will this pill change my heart rate",
+  "my foot is cold",                          // cold alone is not on the list
+  "my feet are freezing can I have a blanket",
+  "can I put my feet up on the blue pillow",
+  "I want my blue socks on my feet",
   // nerve block numbness
   "my arm is numb from the block",
   "my leg is still numb from the nerve block",
@@ -477,6 +530,16 @@ test("neither base message names a condition (only the condition lists do)", () 
       assert.equal(all.includes(word), false, "message must not name a condition: " + word);
     }
   }
+});
+
+test("the amber message carries the reminder, with no number in it, and the red message does not", async () => {
+  // Physician, 24 November 2026. He dropped the temperature figure.
+  assert.equal(RF.MESSAGES.amber.reminder, "Check the instructions from your surgeon's office for when to call.");
+  assert.ok(!/\d/.test(RF.MESSAGES.amber.reminder));
+  assert.equal(RF.MESSAGES.red.reminder, undefined);
+  // The page draws it on the amber message only, above the line on what to do if it is worse.
+  const html = (await import("node:fs")).readFileSync(new URL("../index.html", import.meta.url), "utf8");
+  assert.ok(html.includes("((amber && M.reminder) ? '<div class=\"rf-rem\">' + esc(M.reminder) + '</div>' : '') +\n    (amber ? '<div class=\"rf-esc\">'"));
 });
 
 test("the red message sends home users to 911, and the amber message always says how to escalate", () => {

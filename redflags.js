@@ -47,7 +47,7 @@
 (function (root) {
   "use strict";
 
-  var VERSION = "2026-11-24.1";
+  var VERSION = "2026-11-24.2";
 
   /* Review status at this version (21 November 2026 review): every group has been
      revised. Open points are listed in the project's START-HERE. */
@@ -118,7 +118,9 @@
       /* blue, purple or gray lips or face */
       /\b(lip|lips|face)\b.{0,20}\b(blue|bluish|purple|gray|grey)\b/,
       /\b(blue|bluish|purple|gray|grey)\b.{0,10}\b(lip|lips|face)\b/,
-      /\bturn(s|ed|ing)? blue\b/
+      /* "turned blue", unless it is a foot or toes that turned blue: that is the amber
+         foot_color rule (physician, 24 Nov 2026) */
+      /^(?!.*\b(foot|feet|toe|toes)\b.{0,25}\bturn(s|ed|ing)? blue\b).*\bturn(s|ed|ing)? blue\b/
     ]) },
 
     /* ---- bleeding (red): heavy or internal bleeding. Reviewed 21 Nov 2026 ---- */
@@ -217,6 +219,27 @@
     { id: "heart", tier: "amber", rx: any([
       /\bheart\b.{0,20}\b(racing|races|raced|pounding|pounds|pounded|fluttering|flutters|beating (so |very |really |too )?(fast|hard))\b/,
       /\bpalpitation\w*/
+    ]) },
+
+    /* ---- heart_rhythm (amber): an irregular or changed heartbeat. Asked for by the
+       physician on 24 Nov 2026; phrases approved by him on 24 Nov 2026. A slow heartbeat
+       is not on the list. ---- */
+    { id: "heart_rhythm", tier: "amber", rx: any([
+      /* irregular, either order: "irregular heartbeat", "my pulse is irregular" */
+      /\birregular\b.{0,12}\b(heart|heart ?beat|pulse|rhythm)\b/,
+      /\b(heart|heart ?beat|heart rate|heart rhythm|pulse)\b.{0,20}\b(irregular\w*|uneven|out of rhythm)\b/,
+      /* skipping or extra beats */
+      /\b(heart|heart ?beat)\b.{0,15}\b(skip|skips|skipp\w*)\b/,
+      /\b(skip|skips|skipp\w*)\b.{0,6}\bbeats?\b/,
+      /\bextra (heart ?)?beats?\b/,
+      /* changed, either order: "my heartbeat feels different", "a change in my heart rate" */
+      /\b(heart ?beat|heart rate|heart rhythm|pulse)\b.{0,20}\b(changed|changing|different|not right|strange|weird|funny|odd)\b/,
+      /\b(change|changes|changed|difference)\b.{0,4}\b(in|to)\b.{0,4}\b(my|his|her|their) (heart ?beat|heart rate|heart rhythm|pulse)\b/,
+      /\bheart\b.{0,12}\bbeating\b.{0,8}\b(funny|weird|strange|odd|irregular\w*|different\w*)\b/,
+      /* atrial fibrillation now: "in afib", "afib is back" (physician, 24 Nov 2026).
+         A history of it shows nothing. */
+      /\b(in|into)\b.{0,4}\b(a ?fib|a-fib|atrial fib\w*)\b/,
+      /\b(a ?fib|a-fib|atrial fib\w*)\b.{0,12}\bback\b/
     ]) },
 
     /* ---- stroke_signs (red, shows the stroke list). Reviewed 21 Nov 2026 ---- */
@@ -333,6 +356,28 @@
     /* ---- near_fall (amber): almost fell. Reviewed 21 Nov 2026 ---- */
     { id: "near_fall", tier: "amber", rx: any([
       /\b(almost|nearly)\b.{0,6}\b(fell|fall|fallen|slipped|tripped)\b/
+    ]) },
+
+    /* ---- head_injury (amber): any stated blow to the head. Asked for by the
+       physician on 24 Nov 2026; phrases approved by him on 24 Nov 2026. With a fall in the
+       same entry the fall rule makes it red. A headache alone is not on the list. ---- */
+    { id: "head_injury", tier: "amber", rx: any([
+      /\b(hit|bump|bumped|bang|banged|struck|smacked|knocked|cracked|whacked)\b.{0,8}\b(my|his|her|their) head\b/,
+      /* "my head hit the rail" */
+      /\b(my|his|her|their) head\b.{0,6}\b(hit|struck|banged|bumped|smacked|slammed)\b/,
+      /\bhead (injury|trauma)\b/,
+      /\b(injured|injury to) (my|his|her|their) head\b/,
+      /\bconcuss\w*/,
+      /\b(bump|knot|lump|goose egg|cut|gash)\b.{0,6}\bon (my|his|her|their|the) head\b/
+    ]) },
+
+    /* ---- foot_color (amber): a blue foot or blue toes, cold or not. Asked for by the
+       physician on 24 Nov 2026 as "a cold, blue foot"; phrases approved by him on
+       24 Nov 2026. "Cold" alone is not on the list. A foot or toes that "turned blue"
+       is amber here, not red through the breathing rule. ---- */
+    { id: "foot_color", tier: "amber", rx: any([
+      /\b(foot|feet|toe|toes)\b (is|are|looks?|turned|turning|went|going|has turned|have turned|seems?|feels?|got|getting)\b.{0,25}\b(blue|bluish|purple)\b/,
+      /\b(blue|bluish|purple)\b.{0,3}\b(foot|feet|toe|toes)\b/
     ]) },
 
     /* ---- wound (amber). The amber message adds the wound line when this rule
@@ -538,6 +583,8 @@
     homeLabel: "At home",
     homeAction: "Call your surgeon's office now.",
     homeNote: "Do not wait for a reply here.",
+    /* A reminder with no number (physician, 24 Nov 2026). Shown on every amber message. */
+    reminder: "Check the instructions from your surgeon's office for when to call.",
     wound: "For a wound concern, call your surgeon's office first, before you go to an emergency room or urgent care.",
     escalate: "If it is severe or getting worse: in the hospital, press your call button. At home, call 911.",
     saved: MESSAGE.saved,
