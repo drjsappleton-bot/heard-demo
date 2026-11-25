@@ -242,6 +242,7 @@
   .rf-card.amber .btn { background: var(--amber); }
   .rf-card.amber .rf-where.hosp { background: var(--amber-lt); border: 1px solid #e6d9a8; }
   .rf-card .rf-wound { font-size: 16px; font-weight: 700; margin: 2px 0 10px; line-height: 1.35; }
+  .rf-card .rf-rem { font-size: 15px; margin: 2px 0 10px; line-height: 1.35; }
   .rf-card .rf-esc { font-size: 15px; font-weight: 700; margin: 2px 0 10px; line-height: 1.35; }
   .rf-card .rf-rec { font-size: 15px; font-weight: 800; margin: 0 0 6px; }
   .rf-card .rf-list { border: 1px solid var(--line, #d9dee3); border-radius: 12px; padding: 10px 14px; margin: 4px 0 10px; }
@@ -1435,6 +1436,7 @@ function showSafetyMessage(entry){
     listHTML +
     (lists.length ? '<div class="rf-src">' + esc(LT.sourceStart + sources.join("; ") + LT.sourceEnd) + '</div>' : '') +
     (wound ? '<div class="rf-wound">' + esc(M.wound) + '</div>' : '') +
+    ((amber && M.reminder) ? '<div class="rf-rem">' + esc(M.reminder) + '</div>' : '') +
     (amber ? '<div class="rf-esc">' + esc(M.escalate) + '</div>' : '') +
     (selfHarm ? '<div class="rf-crisis">' + esc(M.crisis) + '</div>' : '') +
     '<div class="rf-saved">' + esc(M.saved) + '</div>' +
