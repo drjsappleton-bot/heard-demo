@@ -101,7 +101,9 @@ test("an untick saved before the rule is left alone: a stale tick does not come 
 test("the page says a tick is final, and tells a caregiver to ask a new question", () => {
   const html = page("index.html");
   assert.equal(L.TEXT.tickFinal, "A tick cannot be removed. If you still have a question, ask it as a new question.");
-  assert.match(L.TEXT.ready, /A tick cannot be removed\.$/);
+  // The owner chose on 24 November 2026 not to add the sentence under an addressed question; it is on the closed list only.
+  assert.ok(!/cannot be removed/.test(L.TEXT.ready));
+  assert.match(L.TEXT.ready, /goes back on your open list\.$/);
   assert.equal(L.TEXT.caregiverOnly("Margaret"), "Only Margaret can tick \u201cI was heard\u201d or \u201cNot heard\u201d. If you disagree with how a question was addressed, ask a new question.");
   assert.ok(html.includes("esc(LOOP.TEXT.closedNote) + ' ' + esc(LOOP.TEXT.tickFinal)"), "the closed list no longer says a tick is final");
   assert.ok(html.includes("esc(LOOP.TEXT.caregiverOnly(ptRec.first))"), "the caregiver page no longer carries the line");

@@ -36,7 +36,7 @@
     /* under a question the team has not addressed yet */
     locked: "You can tick this after your care team has addressed it with you.",
     /* under a question the team has marked addressed */
-    ready: "Your care team marked this addressed. Tick “I was heard” if you agree. If not, tap “Not heard” and it goes back on your open list. A tick cannot be removed.",
+    ready: "Your care team marked this addressed. Tick “I was heard” if you agree. If not, tap “Not heard” and it goes back on your open list.",
     /* under the closed list, and the reason given when a tick is refused */
     tickFinal: "A tick cannot be removed. If you still have a question, ask it as a new question.",
     /* on the caregiver's page */
