@@ -47,7 +47,7 @@
 (function (root) {
   "use strict";
 
-  var VERSION = "2026-11-21.10";
+  var VERSION = "2026-11-24.1";
 
   /* Review status at this version (21 November 2026 review): every group has been
      revised. Open points are listed in the project's START-HERE. */
@@ -520,7 +520,7 @@
     homeAction: "Call 911.",
     homeNote: "If you are sure it is not an emergency, call your surgeon's office now. Do not wait for a reply here.",
     crisis: "If you are thinking about harming yourself, call or text 988.",
-    saved: "Your words were saved for your care team to see at their next visit.",
+    saved: "Your words were saved for your next interaction with your care team.",
     button: "I understand",
     /* The line under the microphone on every capture screen. Wording chosen by the
        physician owner on 22 November 2026: the same words the intro film speaks. */
