@@ -781,7 +781,7 @@ async function renderLanding(){
     '<img class="markimg" src="' + ICON_URL + '" alt="Heard icon" onerror="iconFallback(this)">' +
     '<h1>Heard</h1>' +
     '<div class="tag">Say it when you think of it. Leave your next visit saying, &quot;I\'m heard.&quot;</div>' +
-    '<div class="tagsub">Speak your questions and concerns any time. Your care team sees them at their next visit.</div>' +
+    '<div class="tagsub">Speak your questions and concerns any time. They are seen at your next interaction with your care team.</div>' +
     '</div>' +
     '<div class="toprow">' +
     '<button class="bm" onclick="toggleBookmarkHelp()"><b>&#128278; Bookmark my site</b><small>so you can come back</small></button>' +
@@ -1019,8 +1019,8 @@ function drawPatient(){
     '<div class="privacy"><span id="privDot" class="dot"></span><span id="privLabel">Microphone off &mdash; nothing is being recorded</span></div>' +
     '<button id="recBtn" class="recbtn" onclick="toggleRec()"><span class="mic">&#127908;</span><span id="recLabel">Tap to speak</span></button>' +
     '<div class="note">' + (SPEECH_LIKELY
-      ? 'Tap, say your question or concern, tap again to stop. Your care team will see it at their next visit.'
-      : 'On this browser, tap the box below and use the microphone key on your keyboard to speak. Your care team will see it at their next visit.'
+      ? 'Tap, say your question or concern, tap again to stop. It will be seen at your next interaction with your care team.'
+      : 'On this browser, tap the box below and use the microphone key on your keyboard to speak. It will be seen at your next interaction with your care team.'
       ) + (IS_IOS_NON_SAFARI ? ' Opening this page in Safari lets you speak with one tap instead.' : '') + '</div>' +
     '<div id="liveText"></div>' + reviewBoxHTML() +
     '<div class="typebox"><input id="typeInput" type="text" aria-label="Type a question or concern" placeholder="Or type a question / concern&hellip;" onkeydown="if(event.key===\'Enter\')addTyped()"><button onclick="addTyped()">Add</button></div>' +

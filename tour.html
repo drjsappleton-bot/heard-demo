@@ -438,7 +438,7 @@ const RF_AMBER = (RFX && RFX.MESSAGES && RFX.MESSAGES.amber) || {
   hospitalLabel: "In the hospital", hospitalAction: "Tell your nurse now.", homeLabel: "At home",
   homeAction: "Call your surgeon's office now.", homeNote: "Do not wait for a reply here.",
   escalate: "If it is severe or getting worse: in the hospital, press your call button. At home, call 911.",
-  saved: "Your words were saved for your care team to see at their next visit.", button: "I understand" };
+  saved: "Your words were saved for your next interaction with your care team.", button: "I understand" };
 const RF_STANDING = (RFX && RFX.MESSAGE && RFX.MESSAGE.standing) || "This tool is for recording your questions. It is not real time communication with your care team. For anything urgent or emergent: use your call light in the hospital, call your doctor's office, or call 911.";
 const escT = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const safeLine = () => '<div class="safeline">' + escT(RF_STANDING) + '</div>';
@@ -452,7 +452,7 @@ const patientHead = () =>
   '<div class="c"><div class="sec">Hello, Margaret</div>' +
   '<div class="privacy"><span class="dot" id="dot"></span><span id="plabel">Microphone off &mdash; nothing is being recorded</span></div>' +
   '<div class="mic" id="mic"><em>&#127908;</em><span id="miclabel">Tap to speak</span></div>' +
-  '<div class="note" style="text-align:center;margin-top:7px">Tap, say your question or concern, tap again to stop. Your care team will see it at their next visit.</div>' +
+  '<div class="note" style="text-align:center;margin-top:7px">Tap, say your question or concern, tap again to stop. It will be seen at your next interaction with your care team.</div>' +
   '<div class="livebox" id="live">&nbsp;</div>' +
   '<div class="typebox"><div class="f">Or type a question / concern&hellip;</div><div class="a">Add</div></div>' + safeLine() + '</div>';
 const entry = (id, text, cls, left, right) =>

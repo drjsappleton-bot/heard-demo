@@ -82,3 +82,29 @@ test("the call-light line is gone from the patient and caregiver pages", () => {
     assert.equal(RF.check(q).hit, false, "the safety list now matches: " + q);
   }
 });
+
+test("the page says \"your next interaction with your care team\", the wording of the notice", () => {
+  // Physician owner, 24 November 2026 (cards D1 to D6). His tagline keeps "your next visit",
+  // and so does the one narrated line that uses it, intro clip 24, until the films are redone.
+  const SAVED = "Your words were saved for your next interaction with your care team.";
+  const NOTE = "It will be seen at your next interaction with your care team.";
+  assert.equal(RF.MESSAGE.saved, SAVED);
+  assert.equal(RF.MESSAGES.amber.saved, SAVED);
+  const html = page("index.html");
+  assert.equal(html.split(NOTE).length - 1, 2, "both lines under the microphone on the patient page");
+  assert.ok(html.includes("Speak your questions and concerns any time. They are seen at your next interaction with your care team."));
+  for (const name of ["index.html", "intro.html", "tour.html"]) {
+    const h = page(name);
+    assert.ok(!h.includes("see it at their next visit"), name + " still says the care team will see it at their next visit");
+    assert.ok(!h.includes("sees them at their next visit"), name);
+    assert.ok(!h.includes("to see at their next visit"), name + " still carries the old saved line");
+  }
+  // Both films print the same two lines on their phone screen. Nothing spoken changed.
+  for (const name of ["intro.html", "tour.html"]) {
+    const h = page(name);
+    assert.ok(h.includes(SAVED), name + " does not carry the saved line as its fallback");
+    assert.ok(h.includes(NOTE), name + " does not print the line under the microphone");
+  }
+  assert.ok(page("intro.html").includes('"Some concerns should not wait for your next visit.", my, "24"'), "intro clip 24 is spoken as recorded");
+  assert.ok(html.includes("Leave your next visit saying"), "the tagline is the owner's and stays");
+});
