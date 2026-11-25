@@ -118,7 +118,9 @@
       /* blue, purple or gray lips or face */
       /\b(lip|lips|face)\b.{0,20}\b(blue|bluish|purple|gray|grey)\b/,
       /\b(blue|bluish|purple|gray|grey)\b.{0,10}\b(lip|lips|face)\b/,
-      /\bturn(s|ed|ing)? blue\b/
+      /* "turned blue", unless it is a foot or toes that turned blue: that is the amber
+         foot_color rule (physician, 24 Nov 2026) */
+      /^(?!.*\b(foot|feet|toe|toes)\b.{0,25}\bturn(s|ed|ing)? blue\b).*\bturn(s|ed|ing)? blue\b/
     ]) },
 
     /* ---- bleeding (red): heavy or internal bleeding. Reviewed 21 Nov 2026 ---- */
@@ -220,8 +222,8 @@
     ]) },
 
     /* ---- heart_rhythm (amber): an irregular or changed heartbeat. Asked for by the
-       physician on 24 Nov 2026; phrases drafted for his approval. A slow heartbeat
-       and atrial fibrillation by name are not on the list. ---- */
+       physician on 24 Nov 2026; phrases approved by him on 24 Nov 2026. A slow heartbeat
+       is not on the list. ---- */
     { id: "heart_rhythm", tier: "amber", rx: any([
       /* irregular, either order: "irregular heartbeat", "my pulse is irregular" */
       /\birregular\b.{0,12}\b(heart|heart ?beat|pulse|rhythm)\b/,
@@ -233,7 +235,11 @@
       /* changed, either order: "my heartbeat feels different", "a change in my heart rate" */
       /\b(heart ?beat|heart rate|heart rhythm|pulse)\b.{0,20}\b(changed|changing|different|not right|strange|weird|funny|odd)\b/,
       /\b(change|changes|changed|difference)\b.{0,4}\b(in|to)\b.{0,4}\b(my|his|her|their) (heart ?beat|heart rate|heart rhythm|pulse)\b/,
-      /\bheart\b.{0,12}\bbeating\b.{0,8}\b(funny|weird|strange|odd|irregular\w*|different\w*)\b/
+      /\bheart\b.{0,12}\bbeating\b.{0,8}\b(funny|weird|strange|odd|irregular\w*|different\w*)\b/,
+      /* atrial fibrillation now: "in afib", "afib is back" (physician, 24 Nov 2026).
+         A history of it shows nothing. */
+      /\b(in|into)\b.{0,4}\b(a ?fib|a-fib|atrial fib\w*)\b/,
+      /\b(a ?fib|a-fib|atrial fib\w*)\b.{0,12}\bback\b/
     ]) },
 
     /* ---- stroke_signs (red, shows the stroke list). Reviewed 21 Nov 2026 ---- */
@@ -353,7 +359,7 @@
     ]) },
 
     /* ---- head_injury (amber): any stated blow to the head. Asked for by the
-       physician on 24 Nov 2026; phrases drafted for his approval. With a fall in the
+       physician on 24 Nov 2026; phrases approved by him on 24 Nov 2026. With a fall in the
        same entry the fall rule makes it red. A headache alone is not on the list. ---- */
     { id: "head_injury", tier: "amber", rx: any([
       /\b(hit|bump|bumped|bang|banged|struck|smacked|knocked|cracked|whacked)\b.{0,8}\b(my|his|her|their) head\b/,
@@ -366,9 +372,9 @@
     ]) },
 
     /* ---- foot_color (amber): a blue foot or blue toes, cold or not. Asked for by the
-       physician on 24 Nov 2026 as "a cold, blue foot"; phrases drafted for his
-       approval. "Cold" alone is not on the list. "Turned blue" is in the breathing
-       rule and is red, whatever turned blue. ---- */
+       physician on 24 Nov 2026 as "a cold, blue foot"; phrases approved by him on
+       24 Nov 2026. "Cold" alone is not on the list. A foot or toes that "turned blue"
+       is amber here, not red through the breathing rule. ---- */
     { id: "foot_color", tier: "amber", rx: any([
       /\b(foot|feet|toe|toes)\b (is|are|looks?|turned|turning|went|going|has turned|have turned|seems?|feels?|got|getting)\b.{0,25}\b(blue|bluish|purple)\b/,
       /\b(blue|bluish|purple)\b.{0,3}\b(foot|feet|toe|toes)\b/

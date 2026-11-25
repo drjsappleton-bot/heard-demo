@@ -150,10 +150,17 @@ const MUST_FLAG = [
   ["I have a cold blue foot", "foot_color", A],
   ["my toes are blue", "foot_color", A],
   ["my toes look a little purple", "foot_color", A],
-  // "turned blue" is in the breathing rule, which is red, whatever turned blue.
-  // Left as it was on 21 Nov 2026; the physician decides whether a foot is the exception.
-  ["my toes turned blue", "foot_color", R],
-  ["my foot is turning blue", "breathing", R],
+  // A foot or toes that "turned blue" is amber (physician, 24 Nov 2026). Anything else that turned blue stays red.
+  ["my toes turned blue", "foot_color", A],
+  ["my foot is turning blue", "foot_color", A],
+  ["my toes have turned blue", "foot_color", A],
+  ["he turned blue", "breathing", R],
+  ["her lips turned blue", "breathing", R],
+  // atrial fibrillation now (physician, 24 Nov 2026)
+  ["I think I am in afib", "heart_rhythm", A],
+  ["I went into a-fib last night", "heart_rhythm", A],
+  ["my afib is back", "heart_rhythm", A],
+  ["the atrial fibrillation came back", "heart_rhythm", A],
   ["my heart is racing", "heart", A],
   ["my heart is pounding", "heart", A],
   ["I am having palpitations", "heart", A],
@@ -357,7 +364,8 @@ const MUST_NOT_FLAG = [
   "can you raise the head of my bed",
   "I hit my elbow on the walker",
   "my heartbeat is slow",                     // slow is not on the list
-  "I have a history of afib",                 // a history, and afib is not on the list by name
+  "I have a history of afib",                 // a history shows nothing
+  "do I restart my Eliquis for my afib",
   "what should my heart rate be",
   "is my heart rate normal",
   "will this pill change my heart rate",
