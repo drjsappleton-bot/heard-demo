@@ -199,13 +199,15 @@ test("a missing ack.js closes the patient side, it does not open it", () => {
 test("declining records nothing, and the screen after it promises nothing", () => {
   const d = fnBody("ackDecline");
   assert.ok(!/ACK\.record|saveRecord|saveDoc|localStorage/.test(d), "a decline writes something");
-  for (const b of [A.TEXT.declined.body, A.TEXT.declined.bodyExisting]) {
-    assert.match(b, /Your care does not change/);
-    assert.match(b, /Tell your nurse or doctor, or write them down for your next visit/);
-    assert.match(b, /You can come back any time/);
-  }
-  assert.match(A.TEXT.declined.body, /^Nothing was saved\./);
-  assert.match(A.TEXT.declined.bodyExisting, /^Nothing new was saved\./, "an older page still holds its questions");
+  // The owner's words of 24 November 2026, 6:02 PM, word for word.
+  assert.equal(A.TEXT.declined.body, "Nothing was saved, because the limits of I'm Heard were not accepted. Your care is unchanged. You can still ask your questions the usual way: tell your nurse or doctor, or write them down. To start again, use the buttons below.");
+  // An older page still holds its questions, so there the first words are "Nothing new was saved".
+  assert.equal(A.TEXT.declined.bodyExisting, A.TEXT.declined.body.replace(/^Nothing was saved/, "Nothing new was saved"));
+  assert.match(A.TEXT.declined.bodyExisting, /^Nothing new was saved, because/);
+  assert.equal(A.TEXT.declined.title, "Heard is not set up");
+  // The screen is not part of the notice itself: the wording a tap is recorded against is unchanged.
+  assert.equal(A.VERSION, "2026-11-23.5");
+  for (const b of [A.TEXT.declined.body, A.TEXT.declined.bodyExisting]) assert.ok(!/urgent|triage|reply|answer|we will|someone will/i.test(b));
 });
 
 test("the two buttons are the same size, and the first focus is the title, not a button", () => {
