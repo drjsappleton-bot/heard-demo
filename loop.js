@@ -15,6 +15,12 @@
    time. To keep a slow clock from undoing a tap, every stamp is placed at least
    one millisecond after the event it answers (see after()).
 
+   A tick is final (physician owner, 24 November 2026). Once the patient has ticked
+   "I was heard" after the team's mark, the tick cannot be removed, "Not heard" no
+   longer applies to that question, and a "Not heard" tapped on another device that
+   had not yet seen the tick does not undo it. The patient asks a new question
+   instead. A caregiver never ticks: the page tells them to ask a new question.
+
    Wording follows the physician's rule of 21 November 2026: "addressed", never
    "answered", "read" or "replied". The names "I was heard" and "Not heard" are
    kept because both films say them in the recorded narration.
@@ -31,6 +37,10 @@
     locked: "You can tick this after your care team has addressed it with you.",
     /* under a question the team has marked addressed */
     ready: "Your care team marked this addressed. Tick “I was heard” if you agree. If not, tap “Not heard” and it goes back on your open list.",
+    /* under the closed list, and the reason given when a tick is refused */
+    tickFinal: "A tick cannot be removed. If you still have a question, ask it as a new question.",
+    /* on the caregiver's page */
+    caregiverOnly: function (first) { return "Only " + first + " can tick “I was heard” or “Not heard”. If you disagree with how a question was addressed, ask a new question."; },
     waiting: "Waiting for your care team",
     addressed: "Heard by your care team",
     heardLabel: "I was heard",
@@ -56,24 +66,28 @@
   /* A question is closed when the team addressed it and the patient confirmed. */
   function isClosed(e) { return confirmed(e); }
 
-  /* The patient ticks or unticks. Returns false, and changes nothing, when locked. */
+  /* The patient ticks. Returns false, and changes nothing, when the question is
+     locked, when it is already ticked, or when asked to remove a tick: a tick is final. */
   function markHeard(e, v, now) {
     if (!canMarkHeard(e)) return false;
-    e.heard = !!v;
+    if (!v || confirmed(e)) return false;
+    e.heard = true;
     e.heardAt = after(now, e.addressedAt);
     return true;
   }
-  /* The patient taps "Not heard". The question goes back to the open list. */
+  /* The patient taps "Not heard". The question goes back to the open list.
+     Not after a tick: a ticked question is closed for good. */
   function bounce(e, now) {
-    if (!isAddressed(e)) return false;
+    if (!isAddressed(e) || confirmed(e)) return false;
     e.bouncedAt = after(now, Math.max(e.addressedAt || 0, e.heardAt || 0));
     e.addressed = false;
     e.heard = false;
     return true;
   }
-  /* The care team marks the question addressed. Any earlier tick stops counting. */
+  /* The care team marks the question addressed. A tick made before this mark stops
+     counting. A question the patient has already closed stays as it is. */
   function address(e, now, who) {
-    if (!e) return false;
+    if (!e || confirmed(e)) return false;
     e.addressed = true;
     e.addressedAt = after(now, Math.max(e.bouncedAt || 0, e.heardAt || 0));
     e.heard = false;
@@ -91,6 +105,11 @@
   /* Run on every entry after a merge, so the saved flags agree with the rules. */
   function settle(e) {
     if (!e) return e;
+    /* A tick is final. If one copy holds a tick made after the team's mark and another
+       copy holds a "Not heard" against that same mark, the tick stands. */
+    if (e.heard && e.heardAt && e.addressedAt && e.heardAt >= e.addressedAt && (e.bouncedAt || 0) > e.addressedAt) {
+      e.bouncedAt = e.addressedAt; e.addressed = true;
+    }
     if ((e.bouncedAt || 0) > (e.addressedAt || 0)) e.addressed = false;
     e.heard = confirmed(e);
     return e;

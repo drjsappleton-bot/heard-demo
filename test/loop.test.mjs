@@ -42,15 +42,75 @@ test("a tick made before the team's mark never closes a question", () => {
   assert.equal(L.isClosed(server), false);
 });
 
-test("the patient can untick, and the later tap wins when two copies merge", () => {
-  const e = q(); L.address(e, T0); L.markHeard(e, true, T0 + MIN);
-  const stale = JSON.parse(JSON.stringify(e));            // another device still holds the tick
-  L.markHeard(e, false, T0 + 2 * MIN);
+test("a tick is final: it cannot be removed, and Not heard no longer applies", () => {
+  // Physician owner, 24 November 2026. The patient asks a new question instead.
+  const e = q(); L.address(e, T0);
+  assert.equal(L.markHeard(e, true, T0 + MIN), true);
+  const ticked = JSON.stringify(e);
+  assert.equal(L.markHeard(e, false, T0 + 2 * MIN), false, "an untick was accepted");
+  assert.equal(L.markHeard(e, true, T0 + 2 * MIN), false, "a second tick moved the time of the first");
+  assert.equal(L.bounce(e, T0 + 3 * MIN), false, "Not heard was accepted on a ticked question");
+  assert.equal(L.address(e, T0 + 4 * MIN, "Dr. Test"), false, "a closed question was marked again, which removes the tick");
+  assert.equal(JSON.stringify(e), ticked, "a refused tap changed the question");
+  assert.equal(L.isClosed(e), true);
+  // An untick is refused on an open, addressed question too: there is nothing to remove.
+  const f = q(); L.address(f, T0);
+  assert.equal(L.markHeard(f, false, T0 + MIN), false);
+  assert.equal(f.heardAt, undefined);
+});
+
+test("a tick is final across devices: a Not heard from a device that had not seen the tick does not undo it", () => {
+  const server = q(); L.address(server, T0);
+  const other = JSON.parse(JSON.stringify(server));       // a second device, same question, before the tick
+  L.markHeard(server, true, T0 + MIN);
+  assert.equal(L.bounce(other, T0 + 2 * MIN), true);      // it has not seen the tick, so its own rules allow it
+  for (const [into, from] of [[server, other], [other, server]]) {
+    const t = JSON.parse(JSON.stringify(into)), e = JSON.parse(JSON.stringify(from));
+    // the page's merge: the later tick, the team's mark from either copy, the later Not heard
+    L.mergeHeard(t, e);
+    if (e.addressed) t.addressed = true;
+    if ((e.addressedAt || 0) > (t.addressedAt || 0)) t.addressedAt = e.addressedAt;
+    if ((e.bouncedAt || 0) > (t.bouncedAt || 0)) t.bouncedAt = e.bouncedAt;
+    L.settle(t);
+    assert.equal(L.isClosed(t), true, "the tick was undone by the other device");
+    assert.equal(L.isAddressed(t), true);
+  }
+});
+
+test("a Not heard with no tick still stands, and a later mark by the team opens the tick again", () => {
+  const e = q(); L.address(e, T0); L.bounce(e, T0 + MIN); L.settle(e);
+  assert.equal(L.isAddressed(e), false);
   assert.equal(L.isClosed(e), false);
+  L.address(e, T0 + 2 * MIN);
+  assert.equal(L.markHeard(e, true, T0 + 3 * MIN), true);
+  L.settle(e);
+  assert.equal(L.isClosed(e), true);
+});
+
+test("an untick saved before the rule is left alone: a stale tick does not come back over it", () => {
+  // Data from before 24 November 2026 can hold heard:false with a later time than a tick.
+  const e = q(); L.address(e, T0); L.markHeard(e, true, T0 + MIN);
+  const stale = JSON.parse(JSON.stringify(e));
+  e.heard = false; e.heardAt = T0 + 2 * MIN;              // how an untick was stored
   L.mergeHeard(e, stale); L.settle(e);
-  assert.equal(e.heard, false, "the stale tick came back over a later untick");
+  assert.equal(e.heard, false);
   L.mergeHeard(stale, e); L.settle(stale);
   assert.equal(stale.heard, false, "the merge must give the same answer in either direction");
+});
+
+test("the page says a tick is final, and tells a caregiver to ask a new question", () => {
+  const html = page("index.html");
+  assert.equal(L.TEXT.tickFinal, "A tick cannot be removed. If you still have a question, ask it as a new question.");
+  // The owner chose on 24 November 2026 not to add the sentence under an addressed question; it is on the closed list only.
+  assert.ok(!/cannot be removed/.test(L.TEXT.ready));
+  assert.match(L.TEXT.ready, /goes back on your open list\.$/);
+  assert.equal(L.TEXT.caregiverOnly("Margaret"), "Only Margaret can tick \u201cI was heard\u201d or \u201cNot heard\u201d. If you disagree with how a question was addressed, ask a new question.");
+  assert.ok(html.includes("esc(LOOP.TEXT.closedNote) + ' ' + esc(LOOP.TEXT.tickFinal)"), "the closed list no longer says a tick is final");
+  assert.ok(html.includes("esc(LOOP.TEXT.caregiverOnly(ptRec.first))"), "the caregiver page no longer carries the line");
+  assert.ok(!html.includes("You can see it, and you cannot set it."));
+  // A ticked box is drawn ticked and off. A caregiver is never drawn a box at all.
+  assert.ok(html.includes("(heard ? 'checked disabled' : '')"));
+  assert.match(html, /const control = readOnly\s*\? '<span class="heardchk"/);
 });
 
 test("Not heard sends the question back, and it locks again until the team re-addresses it", () => {

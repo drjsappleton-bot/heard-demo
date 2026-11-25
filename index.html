@@ -1034,7 +1034,7 @@ function drawPatient(){
     '<div class="choice" id="bmPanel" style="display:none"></div>' +
     '<div class="card"><h2 class="sec">Captured so far (<span id="count">' + ptRec.entries.length + '</span>)</h2><div id="entries"></div></div>' +
     '<div class="card" id="closedCard" style="display:none"><h2 class="sec">Heard by your care team (<span id="closedCount">0</span>)</h2>' +
-    '<div class="note" style="margin-bottom:6px">' + esc(LOOP.TEXT.closedNote) + '</div>' +
+    '<div class="note" style="margin-bottom:6px">' + esc(LOOP.TEXT.closedNote) + ' ' + esc(LOOP.TEXT.tickFinal) + '</div>' +
     '<div id="closedEntries"></div></div>';
   /* The patient's page carries nothing for providers and no demo links (demo
      recommendation 7, 22 November 2026). A provider reaches a patient from the
@@ -1159,7 +1159,7 @@ function drawCaregiver(name){
     '<div class="card" id="closedCard" style="display:none"><h2 class="sec">Heard by your care team (<span id="closedCount">0</span>)</h2>' +
     '<div class="note" style="margin-bottom:6px">' + esc(LOOP.TEXT.closedNoteCaregiver(ptRec.first)) + '</div>' +
     '<div id="closedEntries"></div></div>' +
-    '<div class="card"><div class="warnbox">Only ' + esc(ptRec.first) + ' can tick "I was heard". You can see it, and you cannot set it.</div></div>';
+    '<div class="card"><div class="warnbox">' + esc(LOOP.TEXT.caregiverOnly(ptRec.first)) + '</div></div>';
   renderEntries();
 }
 /* ---- "Bookmark my site" ----
@@ -1216,7 +1216,7 @@ function entryHTML(e, i, closed, readOnly){
   const control = readOnly
     ? '<span class="heardchk" style="font-weight:400;color:var(--mut)">' + (heard ? '&#9745; Patient marked heard' : '&#9744; Patient has not marked this yet') + '</span>'
     : '<label class="heardchk' + (addressed ? '' : ' locked') + '">' +
-      '<input type="checkbox" ' + (heard ? 'checked' : '') + (addressed ? '' : ' disabled') + ' onchange="markHeard(' + i + ', this.checked)"> ' + esc(T.heardLabel) + '</label>';
+      '<input type="checkbox" ' + (heard ? 'checked disabled' : '') + (addressed ? '' : ' disabled') + ' onchange="markHeard(' + i + ', this.checked)"> ' + esc(T.heardLabel) + '</label>';
   const bounce = (!readOnly && !closed && addressed)
     ? '<button class="nhx" onclick="bounceHeard(' + i + ')">&#10006; ' + esc(T.notHeardLabel) + '</button>'
     : '';
@@ -1286,7 +1286,8 @@ const LR = window.HeardLastRead || null;
 const ROWS = window.HeardRows || null;
 function markHeard(i, v){
   const e = ptRec.entries[i]; if (!e) return;
-  /* Locked until the care team has marked the question addressed. */
+  /* Locked until the care team has marked the question addressed. A tick is final:
+     the rules refuse an untick, and the list is drawn again as it stands. */
   if (!LOOP.markHeard(e, v, Date.now())) { renderEntries(); return; }
   renderEntries(); saveRecord();
 }
